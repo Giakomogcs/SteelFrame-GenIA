@@ -48,7 +48,13 @@ body {
 
 html,
 body {
-  font-family: "Montserrat", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family:
+    "Montserrat",
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
@@ -57,11 +63,33 @@ body {
   color: var(--text);
   /* Background-assinatura DT: 4 radial-gradients magenta + diagonal escura */
   background:
-    radial-gradient(1100px 750px at 8% -10%, rgba(221, 28, 74, 0.55), transparent 60%),
-    radial-gradient(900px 650px at 105% 15%, rgba(221, 28, 74, 0.32), transparent 65%),
-    radial-gradient(1000px 800px at 100% 110%, rgba(138, 15, 44, 0.45), transparent 60%),
-    radial-gradient(700px 600px at -10% 90%, rgba(221, 28, 74, 0.25), transparent 65%),
-    linear-gradient(135deg, #2a0e1a 0%, #1d1520 38%, var(--bg) 70%, #0e0c11 100%);
+    radial-gradient(
+      1100px 750px at 8% -10%,
+      rgba(221, 28, 74, 0.55),
+      transparent 60%
+    ),
+    radial-gradient(
+      900px 650px at 105% 15%,
+      rgba(221, 28, 74, 0.32),
+      transparent 65%
+    ),
+    radial-gradient(
+      1000px 800px at 100% 110%,
+      rgba(138, 15, 44, 0.45),
+      transparent 60%
+    ),
+    radial-gradient(
+      700px 600px at -10% 90%,
+      rgba(221, 28, 74, 0.25),
+      transparent 65%
+    ),
+    linear-gradient(
+      135deg,
+      #2a0e1a 0%,
+      #1d1520 38%,
+      var(--bg) 70%,
+      #0e0c11 100%
+    );
   background-attachment: fixed;
 }
 
@@ -111,7 +139,11 @@ body {
   letter-spacing: 1.4px;
   text-transform: uppercase;
   font-size: 0.7rem;
-  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-deep) 100%);
+  background: linear-gradient(
+    135deg,
+    var(--primary) 0%,
+    var(--primary-deep) 100%
+  );
   color: #fff;
   box-shadow: 0 4px 14px rgba(221, 28, 74, 0.4);
 }
@@ -159,7 +191,11 @@ body {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(135deg, var(--accent, var(--primary)) 0%, transparent 55%);
+  background: linear-gradient(
+    135deg,
+    var(--accent, var(--primary)) 0%,
+    transparent 55%
+  );
   opacity: 0.14;
   pointer-events: none;
 }
@@ -192,9 +228,15 @@ body {
   letter-spacing: 0.6px;
   text-transform: uppercase;
   color: #fff;
-  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-deep) 100%);
+  background: linear-gradient(
+    135deg,
+    var(--primary) 0%,
+    var(--primary-deep) 100%
+  );
   box-shadow: 0 4px 14px rgba(221, 28, 74, 0.4);
-  transition: filter 0.15s ease, transform 0.1s ease;
+  transition:
+    filter 0.15s ease,
+    transform 0.1s ease;
 }
 .dt-btn-primary:hover {
   filter: brightness(1.08);
@@ -213,7 +255,9 @@ body {
   color: var(--text);
   font-weight: 600;
   letter-spacing: 0.4px;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
 }
 .dt-btn-ghost:hover {
   background: rgba(255, 255, 255, 0.08);

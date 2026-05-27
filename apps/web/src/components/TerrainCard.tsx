@@ -18,7 +18,8 @@ export function TerrainCard({ terrain }: Props) {
           )}
         </div>
         <span className="rounded-full border border-brand-500/40 bg-brand-500/15 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-brand-400">
-          {terrain.areaM2.toLocaleString("pt-BR", { maximumFractionDigits: 0 })} m²
+          {terrain.areaM2.toLocaleString("pt-BR", { maximumFractionDigits: 0 })}{" "}
+          m²
         </span>
       </div>
 
