@@ -4,8 +4,41 @@
 
 @import "leaflet/dist/leaflet.css";
 
+/* =====================================================================
+   SENAI Distrito Tecnológico — Design System tokens
+   Fonte da verdade: docs/design-system-dt.md (nexus-factory)
+   ===================================================================== */
 :root {
   color-scheme: dark;
+
+  /* Marca SENAI Distrito Tecnológico */
+  --primary: #dd1c4a;
+  --primary-soft: #ff3d6a;
+  --primary-deep: #8a0f2c;
+
+  /* Superfícies (dark theme) */
+  --bg: #161419;
+  --bg-elev: #1f1c23;
+  --bg-elev-2: #2a262f;
+  --border: rgba(255, 255, 255, 0.08);
+
+  /* Texto */
+  --text: #f6f4f8;
+  --text-dim: rgba(246, 244, 248, 0.66);
+  --text-faint: rgba(246, 244, 248, 0.42);
+
+  /* Acentos setoriais */
+  --sales: var(--primary);
+  --inventory: #6c4bd6;
+  --purchasing: #e08a1a;
+  --production: #2faa6a;
+  --neutral: #3a3540;
+
+  /* Raios */
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: clamp(14px, 1.4vw, 20px);
+  --radius-pill: 999px;
 }
 
 html,
@@ -13,10 +46,176 @@ body {
   height: 100%;
 }
 
+html,
 body {
-  @apply bg-slate-950 text-slate-100 antialiased;
+  font-family: "Montserrat", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  color: var(--text);
+  /* Background-assinatura DT: 4 radial-gradients magenta + diagonal escura */
+  background:
+    radial-gradient(1100px 750px at 8% -10%, rgba(221, 28, 74, 0.55), transparent 60%),
+    radial-gradient(900px 650px at 105% 15%, rgba(221, 28, 74, 0.32), transparent 65%),
+    radial-gradient(1000px 800px at 100% 110%, rgba(138, 15, 44, 0.45), transparent 60%),
+    radial-gradient(700px 600px at -10% 90%, rgba(221, 28, 74, 0.25), transparent 65%),
+    linear-gradient(135deg, #2a0e1a 0%, #1d1520 38%, var(--bg) 70%, #0e0c11 100%);
+  background-attachment: fixed;
 }
 
 .leaflet-container {
-  background: #0c1f33;
+  background: #0e0c11;
+}
+
+/* =====================================================================
+   Componentes utilitários do DS DT
+   ===================================================================== */
+
+/* Header de marca — layout 3 colunas (logo | texto | nav) */
+.brand {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: clamp(10px, 1.5vw, 18px);
+  padding: clamp(2px, 0.6vh, 8px) 4px clamp(8px, 1.2vh, 16px);
+}
+.brand-logo {
+  height: clamp(38px, 5.6vh, 56px);
+  width: auto;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.5));
+}
+.brand-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+}
+.brand-title {
+  font-weight: 800;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--text);
+}
+.brand-sub {
+  font-weight: 500;
+  color: var(--text-dim);
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+  font-size: 0.7rem;
+}
+.brand-badge {
+  padding: 6px 12px;
+  border-radius: var(--radius-pill);
+  font-weight: 700;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-deep) 100%);
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(221, 28, 74, 0.4);
+}
+
+/* Status pill com indicador pulsante */
+.dt-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  padding: 6px 14px;
+  border-radius: var(--radius-pill);
+  font-weight: 600;
+  letter-spacing: 0.6px;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.dt-status-pill::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--primary);
+  box-shadow: 0 0 10px var(--primary);
+}
+
+/* Card setorial (barra lateral colorida + glow) */
+.dt-card {
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(160deg, var(--bg-elev) 0%, var(--bg-elev-2) 100%);
+  box-shadow:
+    0 10px 24px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  overflow: hidden;
+  transition:
+    transform 0.1s ease,
+    box-shadow 0.15s ease,
+    border-color 0.15s ease;
+}
+.dt-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, var(--accent, var(--primary)) 0%, transparent 55%);
+  opacity: 0.14;
+  pointer-events: none;
+}
+.dt-card::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: var(--accent, var(--primary));
+  box-shadow: 0 0 18px var(--accent, var(--primary));
+}
+.dt-card:hover {
+  border-color: rgba(255, 255, 255, 0.16);
+}
+.dt-card:hover::before {
+  opacity: 0.22;
+}
+
+/* CTA primário magenta */
+.dt-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0.55rem 1.1rem;
+  border-radius: var(--radius-md);
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: #fff;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-deep) 100%);
+  box-shadow: 0 4px 14px rgba(221, 28, 74, 0.4);
+  transition: filter 0.15s ease, transform 0.1s ease;
+}
+.dt-btn-primary:hover {
+  filter: brightness(1.08);
+}
+.dt-btn-primary:active {
+  transform: translateY(1px);
+}
+.dt-btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.55rem 1.1rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.dt-btn-ghost:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.18);
 }

@@ -12,19 +12,24 @@ export default async function HomePage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Meus terrenos</h1>
-        <p className="text-sm text-slate-400">
-          Cadastre terrenos pelo mapa de satélite e gere modelos 3D steel frame com IA.
-        </p>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <span className="dt-status-pill mb-3">SENAI · Distrito Tecnológico</span>
+          <h1 className="text-3xl font-extrabold uppercase tracking-tight text-white">
+            Meus terrenos
+          </h1>
+          <p className="text-sm text-white/60">
+            Cadastre terrenos pelo mapa de satélite e gere modelos 3D steel frame com IA.
+          </p>
+        </div>
       </div>
 
       {terrains.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-white/10 bg-slate-900/40 p-10 text-center">
-          <p className="text-slate-300">Você ainda não cadastrou nenhum terreno.</p>
+        <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.03] p-10 text-center backdrop-blur">
+          <p className="text-white/80">Você ainda não cadastrou nenhum terreno.</p>
           <Link
             href="/terrenos/novo"
-            className="mt-4 inline-block rounded-md bg-brand-600 px-4 py-2 text-sm font-medium hover:bg-brand-500"
+            className="dt-btn-primary mt-4 inline-flex text-sm"
           >
             Cadastrar primeiro terreno
           </Link>
