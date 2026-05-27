@@ -1,0 +1,7 @@
+node_modules
+.next
+.turbo
+Dockerfile
+.git
+.env
+.env.local

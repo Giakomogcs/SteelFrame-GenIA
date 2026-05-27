@@ -1,0 +1,36 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Terrain {
+  id          String     @id @default(cuid())
+  name        String
+  address     String?
+  // Polígono em GeoJSON: [[lng, lat], ...] (lista de vértices, em ordem)
+  polygon     Json
+  // Centro (lng, lat) e área em m² (calculados no client e persistidos)
+  centerLng   Float
+  centerLat   Float
+  areaM2      Float
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  buildings   Building[]
+}
+
+model Building {
+  id          String   @id @default(cuid())
+  terrainId   String
+  terrain     Terrain  @relation(fields: [terrainId], references: [id], onDelete: Cascade)
+  name        String
+  // Parâmetros do wizard (material, budget, pé direito, vãos, etc.) em JSON
+  params      Json
+  // Modelo gerado (dimensões, colunas, treliças) em JSON
+  model       Json
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}

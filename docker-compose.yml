@@ -1,0 +1,40 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: sfg-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: sfg
+      POSTGRES_PASSWORD: sfg
+      POSTGRES_DB: sfg
+    ports:
+      - "5432:5432"
+    volumes:
+      - sfg-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sfg -d sfg"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  web:
+    profiles: ["full"]
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    container_name: sfg-web
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://sfg:sfg@postgres:5432/sfg?schema=public
+      AZURE_AI_ENDPOINT: ${AZURE_AI_ENDPOINT:-}
+      AZURE_AI_API_KEY: ${AZURE_AI_API_KEY:-}
+      AZURE_AI_MODEL: ${AZURE_AI_MODEL:-gpt-5.4-mini}
+      AZURE_AI_API_VERSION: ${AZURE_AI_API_VERSION:-2024-05-01-preview}
+      NODE_ENV: production
+    ports:
+      - "3000:3000"
+
+volumes:
+  sfg-pgdata:
