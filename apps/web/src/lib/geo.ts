@@ -322,3 +322,226 @@ export function computeSlopeAnalysis(
     earthworksRecommended: earth.recommended,
   };
 }
+
+// ============================================================
+// Amostragem por GRID 2D dentro do polígono — base do cálculo real
+// de terraplenagem (integra cut/fill sobre área de cada célula).
+// ============================================================
+
+/** Ponto-em-polígono (ray casting). Polígono em [lng, lat]. */
+export function pointInPolygon(pt: LngLat, poly: LngLat[]): boolean {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const [xi, yi] = poly[i];
+    const [xj, yj] = poly[j];
+    const intersect =
+      yi > pt[1] !== yj > pt[1] &&
+      pt[0] < ((xj - xi) * (pt[1] - yi)) / (yj - yi || 1e-12) + xi;
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
+
+export interface GridCell {
+  lng: number;
+  lat: number;
+  row: number;
+  col: number;
+  inside: boolean;
+}
+
+export interface GridSampling {
+  n: number;
+  samples: GridCell[];
+  /** área (m²) de uma célula da grade — todas iguais na projeção local */
+  cellAreaM2: number;
+  bbox: { minLng: number; maxLng: number; minLat: number; maxLat: number };
+}
+
+/**
+ * Gera grade NxN de pontos cobrindo o bbox do polígono, marcando inside.
+ * Cada célula representa uma área real (m²) que será multiplicada
+ * pela altura de corte/aterro para volume.
+ */
+export function gridSamples(polygon: LngLat[], n: number): GridSampling {
+  let minLng = Infinity,
+    maxLng = -Infinity,
+    minLat = Infinity,
+    maxLat = -Infinity;
+  for (const [lng, lat] of polygon) {
+    if (lng < minLng) minLng = lng;
+    if (lng > maxLng) maxLng = lng;
+    if (lat < minLat) minLat = lat;
+    if (lat > maxLat) maxLat = lat;
+  }
+  const dLng = (maxLng - minLng) / n;
+  const dLat = (maxLat - minLat) / n;
+  const midLat = (minLat + maxLat) / 2;
+  const cellW = haversineM([minLng, midLat], [minLng + dLng, midLat]);
+  const cellH = haversineM([minLng, minLat], [minLng, minLat + dLat]);
+  const cellAreaM2 = cellW * cellH;
+
+  const samples: GridCell[] = [];
+  for (let r = 0; r < n; r++) {
+    const lat = minLat + dLat * (r + 0.5);
+    for (let c = 0; c < n; c++) {
+      const lng = minLng + dLng * (c + 0.5);
+      samples.push({
+        lng,
+        lat,
+        row: r,
+        col: c,
+        inside: pointInPolygon([lng, lat], polygon),
+      });
+    }
+  }
+  return {
+    n,
+    samples,
+    cellAreaM2,
+    bbox: { minLng, maxLng, minLat, maxLat },
+  };
+}
+
+/**
+ * Calcula análise de relevo a partir de um GRID 2D amostrado com elevações
+ * reais. Integração de corte/aterro usa a área real de cada célula.
+ *
+ * Para a opção compensada usamos a **mediana** das elevações das células
+ * dentro do polígono — para grids regulares (células com área igual),
+ * a mediana minimiza Σ|h-H| (mass-balance verdadeiro), enquanto a média
+ * minimiza Σ(h-H)² (não é a métrica de volume).
+ */
+export function computeSlopeFromGrid(
+  grid: GridSampling,
+  elevations: number[],
+  polygon: LngLat[],
+): SlopeAnalysis {
+  const { samples, cellAreaM2 } = grid;
+  const cells = samples
+    .map((s, i) => ({ ...s, h: elevations[i] }))
+    .filter((s) => Number.isFinite(s.h));
+  const insideCells = cells.filter((s) => s.inside);
+  const usedCells = insideCells.length >= 3 ? insideCells : cells;
+
+  if (usedCells.length === 0) {
+    return {
+      slopePct: 0,
+      elevationDelta: 0,
+      elevationMean: 0,
+      profile: [],
+      classification: "plano",
+      needsLeveling: false,
+      earthworksM3: 0,
+      earthworksOptions: computeEarthworksOptions([{ h: 0 }], 0).options,
+      earthworksRecommended: "balanced",
+    };
+  }
+
+  const hs = usedCells.map((s) => s.h);
+  const hMin = Math.min(...hs);
+  const hMax = Math.max(...hs);
+  const hMean = hs.reduce((a, b) => a + b, 0) / hs.length;
+  const sorted = [...hs].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  const hMedian =
+    sorted.length % 2
+      ? sorted[mid]
+      : (sorted[mid - 1] + sorted[mid]) / 2;
+
+  const sumCut = (H: number) =>
+    hs.reduce((s, h) => s + Math.max(0, h - H) * cellAreaM2, 0);
+  const sumFill = (H: number) =>
+    hs.reduce((s, h) => s + Math.max(0, H - h) * cellAreaM2, 0);
+
+  const cutVol = sumCut(hMin);
+  const fillVol = sumFill(hMax);
+  const balCut = sumCut(hMedian);
+  const balFill = sumFill(hMedian);
+
+  const balanced: EarthworksOption = {
+    key: "balanced",
+    label: "Corte + aterro compensado",
+    platformH: Number(hMedian.toFixed(2)),
+    cutM3: Math.round(balCut),
+    fillM3: Math.round(balFill),
+    unitCost: EARTHWORKS_RATES.balanced,
+    totalCost: Math.round((balCut + balFill) * EARTHWORKS_RATES.balanced),
+    description:
+      "Plataforma na cota mediana (mass-balance) — quase tudo se move dentro do lote.",
+  };
+  const cut: EarthworksOption = {
+    key: "cut",
+    label: "Só corte (rebaixar)",
+    platformH: Number(hMin.toFixed(2)),
+    cutM3: Math.round(cutVol),
+    fillM3: 0,
+    unitCost: EARTHWORKS_RATES.cutHaul,
+    totalCost: Math.round(cutVol * EARTHWORKS_RATES.cutHaul),
+    description:
+      "Rebaixa o terreno até a cota mais baixa e descarta o material.",
+  };
+  const fillOpt: EarthworksOption = {
+    key: "fill",
+    label: "Só aterro (elevar)",
+    platformH: Number(hMax.toFixed(2)),
+    cutM3: 0,
+    fillM3: Math.round(fillVol),
+    unitCost: EARTHWORKS_RATES.fillImport,
+    totalCost: Math.round(fillVol * EARTHWORKS_RATES.fillImport),
+    description:
+      "Importa material para chegar à cota mais alta — sem bota-fora.",
+  };
+  const options = [balanced, cut, fillOpt];
+  const recommended = [...options].sort((a, b) => a.totalCost - b.totalCost)[0]
+    .key;
+
+  // Perfil AA': diagonal SW→NE da grade.
+  const N = grid.n;
+  const profileCells: { lng: number; lat: number; h: number }[] = [];
+  for (let i = 0; i < N; i++) {
+    const s = cells.find((c) => c.row === i && c.col === i);
+    if (s) profileCells.push({ lng: s.lng, lat: s.lat, h: s.h });
+  }
+  let accD = 0;
+  const profile: { d: number; h: number }[] = [];
+  for (let i = 0; i < profileCells.length; i++) {
+    if (i > 0) {
+      const a = profileCells[i - 1];
+      const b = profileCells[i];
+      accD += haversineM([a.lng, a.lat], [b.lng, b.lat]);
+    }
+    profile.push({
+      d: Math.round(accD),
+      h: Number(profileCells[i].h.toFixed(2)),
+    });
+  }
+
+  const totalDist =
+    profile.length > 1 ? profile[profile.length - 1].d - profile[0].d : 0;
+  const elevationDelta = hMax - hMin;
+  const slopePct = totalDist > 0 ? (elevationDelta / totalDist) * 100 : 0;
+  const classification: SlopeAnalysis["classification"] =
+    slopePct < 2
+      ? "plano"
+      : slopePct < 5
+        ? "suave"
+        : slopePct < 10
+          ? "moderado"
+          : "acentuado";
+  const needsLeveling = slopePct > 3 || elevationDelta > 1.5;
+  const recOpt = options.find((o) => o.key === recommended)!;
+  const earthworksM3 = needsLeveling ? recOpt.cutM3 + recOpt.fillM3 : 0;
+
+  return {
+    slopePct: Number(slopePct.toFixed(2)),
+    elevationDelta: Number(elevationDelta.toFixed(2)),
+    elevationMean: Number(hMean.toFixed(1)),
+    profile,
+    classification,
+    needsLeveling,
+    earthworksM3,
+    earthworksOptions: options,
+    earthworksRecommended: recommended,
+  };
+}

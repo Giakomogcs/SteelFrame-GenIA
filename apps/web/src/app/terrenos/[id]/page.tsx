@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import type { ComponentProps } from "react";
 import { prisma } from "@sfg/db";
 import { TerrainEditClient } from "./TerrainEditClient";
 import { Breadcrumb } from "@/components/Breadcrumb";
@@ -168,8 +169,9 @@ export default async function TerrainPage({
           elevationDelta: terrain.elevationDelta,
           elevationMean: terrain.elevationMean,
           profile:
-            (terrain.elevationProfile as { d: number; h: number }[] | null) ??
-            null,
+            (terrain.elevationProfile as ComponentProps<
+              typeof ReliefPanel
+            >["initial"]["profile"]) ?? null,
         }}
       />
     </>

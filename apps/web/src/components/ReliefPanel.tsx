@@ -6,17 +6,9 @@
  * + mini-mapa de curvas (heatmap suave) + CTA Recalcular.
  */
 import SlopeCard from "./SlopeCard";
+import type { ComponentProps } from "react";
 
-interface Props {
-  terrainId: string;
-  areaM2: number;
-  initial: {
-    slopePct: number | null;
-    elevationDelta: number | null;
-    elevationMean: number | null;
-    profile: { d: number; h: number }[] | null;
-  };
-}
+type Props = ComponentProps<typeof SlopeCard>;
 
 export default function ReliefPanel(props: Props) {
   return (

@@ -17,6 +17,13 @@ const CreateTerrainSchema = z.object({
       MAX_TERRAIN_AREA_M2,
       `Área máxima ${MAX_TERRAIN_AREA_M2 / 10_000} ha — selecione um lote, não uma região.`,
     ),
+  // Endereço estruturado (opcional, vem do reverse-geocoding do Nominatim).
+  state: z.string().length(2).optional().nullable(),
+  city: z.string().max(120).optional().nullable(),
+  district: z.string().max(120).optional().nullable(),
+  addressStreet: z.string().max(255).optional().nullable(),
+  addressNumber: z.string().max(20).optional().nullable(),
+  cep: z.string().max(20).optional().nullable(),
 });
 
 export async function GET() {
@@ -44,6 +51,12 @@ export async function POST(req: Request) {
       centerLng: parsed.data.centerLng,
       centerLat: parsed.data.centerLat,
       areaM2: parsed.data.areaM2,
+      state: parsed.data.state?.toUpperCase() ?? null,
+      city: parsed.data.city ?? null,
+      district: parsed.data.district ?? null,
+      addressStreet: parsed.data.addressStreet ?? null,
+      addressNumber: parsed.data.addressNumber ?? null,
+      cep: parsed.data.cep ?? null,
     },
   });
 

@@ -3,6 +3,7 @@ import { prisma } from "@sfg/db";
 import { promptToShedStream } from "@/lib/shedPromptToProject";
 import { generateFallbackShed, recomputeEstimate } from "@/lib/shedDefaults";
 import type { IndustrialShed } from "@/lib/shedSchema";
+import { extractUF } from "@/lib/knowledge";
 
 export const runtime = "nodejs";
 
@@ -89,13 +90,14 @@ export async function POST(req: NextRequest) {
       where: { id: terrainId },
     });
     if (terrain) {
+      const ufResolved = extractUF(terrain.state ?? terrain.address ?? null);
       terrainContext = {
         areaM2: terrain.areaM2,
         address: terrain.address ?? undefined,
         centerLat: terrain.centerLat,
         centerLng: terrain.centerLng,
         slopePct: terrain.slopePct ?? undefined,
-        uf: terrain.state ?? undefined,
+        uf: ufResolved === "BR" ? undefined : ufResolved,
         city: terrain.city ?? undefined,
         zoneamento: terrain.zoneamento ?? undefined,
       };

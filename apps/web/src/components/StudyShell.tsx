@@ -111,24 +111,25 @@ export default function StudyShell({
     <div className="study-shell">
       <header className="study-shell__header">
         <div>
-          <div style={{ fontSize: 12, color: "#94a3b8" }}>{terrainName}</div>
-          <h1 style={{ margin: 0, fontSize: 18 }}>{briefingTitle}</h1>
+          <div className="eyebrow">{terrainName}</div>
+          <h1>{briefingTitle}</h1>
         </div>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <div
+          style={{
+            display: "flex",
+            gap: "var(--space-2)",
+            alignItems: "center",
+          }}
+        >
           <span
-            className="pill"
-            style={{
-              background: report.ok ? "#064e3b" : "#7f1d1d",
-              color: "#e2e8f0",
-              padding: "4px 10px",
-              borderRadius: 12,
-              fontSize: 11,
-            }}
+            className={`study-shell__pill ${
+              report.ok ? "study-shell__pill--ok" : "study-shell__pill--err"
+            }`}
           >
             {report.ok ? "✓ válido" : `${report.errors.length} erro(s)`}
           </span>
           {saving && (
-            <span style={{ fontSize: 11, color: "#94a3b8" }}>salvando…</span>
+            <span className="study-shell__saving">salvando…</span>
           )}
           {!acceptedAt && (
             <button
@@ -150,15 +151,7 @@ export default function StudyShell({
             </button>
           )}
           {acceptedAt && (
-            <span
-              className="pill"
-              style={{
-                background: "#1e3a8a",
-                color: "#fff",
-                padding: "4px 10px",
-                borderRadius: 12,
-              }}
-            >
+            <span className="study-shell__pill study-shell__pill--info">
               Aceito · {new Date(acceptedAt).toLocaleDateString("pt-BR")}
             </span>
           )}
@@ -172,8 +165,7 @@ export default function StudyShell({
       )}
       {err && (
         <div
-          className="study-shell__banner"
-          style={{ background: "#7f1d1d" }}
+          className="study-shell__banner study-shell__banner--error"
           role="alert"
         >
           {err}
@@ -342,9 +334,15 @@ function BuildingDetailsPanel({ site, shedsById }: DetailsProps) {
   const enriched = useMemo(
     () =>
       site.buildings.map((b) => {
+        const embedded = b.shed ?? undefined;
         const linked = b.shedId ? shedsById?.[b.shedId] : undefined;
-        const shed = linked ?? deriveShedForPlacement(b);
-        return { placement: b, shed, source: linked ? "linked" : "derived" };
+        const shed = embedded ?? linked ?? deriveShedForPlacement(b);
+        const source: "embedded" | "linked" | "derived" = embedded
+          ? "embedded"
+          : linked
+            ? "linked"
+            : "derived";
+        return { placement: b, shed, source };
       }),
     [site.buildings, shedsById],
   );
@@ -423,20 +421,37 @@ function BuildingDetailsPanel({ site, shedsById }: DetailsProps) {
               <span
                 style={{
                   fontSize: 10,
-                  color: source === "linked" ? "#10b981" : "#fbbf24",
-                  border: `1px solid ${source === "linked" ? "#065f46" : "#78350f"}`,
+                  color:
+                    source === "embedded"
+                      ? "#38bdf8"
+                      : source === "linked"
+                        ? "#10b981"
+                        : "#fbbf24",
+                  border: `1px solid ${
+                    source === "embedded"
+                      ? "#0c4a6e"
+                      : source === "linked"
+                        ? "#065f46"
+                        : "#78350f"
+                  }`,
                   padding: "2px 6px",
                   borderRadius: 6,
                   textTransform: "uppercase",
                   letterSpacing: 0.5,
                 }}
                 title={
-                  source === "linked"
-                    ? "Galpão vinculado"
-                    : "Programa derivado automaticamente do footprint"
+                  source === "embedded"
+                    ? "Galpão gerado pela IA e embutido no SitePlan"
+                    : source === "linked"
+                      ? "Galpão vinculado"
+                      : "Programa derivado automaticamente do footprint"
                 }
               >
-                {source === "linked" ? "Vinculado" : "Derivado"}
+                {source === "embedded"
+                  ? "IA"
+                  : source === "linked"
+                    ? "Vinculado"
+                    : "Derivado"}
               </span>
             </div>
 

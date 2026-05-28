@@ -2,6 +2,7 @@ import "./globals.css";
 import type { Metadata } from "next";
 import { prisma } from "@sfg/db";
 import { Sidebar } from "@/components/Sidebar";
+import { AlertDialogProvider } from "@/components/AlertDialog";
 
 export const metadata: Metadata = {
   title: "SteelFrame GenIA — SENAI Distrito Tecnológico",
@@ -39,10 +40,12 @@ export default async function RootLayout({
         />
       </head>
       <body>
-        <div className="app">
-          <Sidebar counts={{ terrenos: terrenoCount }} />
-          <main className="main">{children}</main>
-        </div>
+        <AlertDialogProvider>
+          <div className="app">
+            <Sidebar counts={{ terrenos: terrenoCount }} />
+            <main className="main">{children}</main>
+          </div>
+        </AlertDialogProvider>
       </body>
     </html>
   );

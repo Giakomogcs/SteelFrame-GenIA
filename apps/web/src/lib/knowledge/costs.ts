@@ -141,10 +141,78 @@ export const COST_SOURCES: string[] = [
   "Composições internas (steel frame)",
 ];
 
+/** Mapa de nome completo → UF (case-insensitive). Aceita variações com/sem
+ *  acento para casar respostas do Nominatim (`address.state = "São Paulo"`)
+ *  ou textos livres em `Terrain.address`. */
+export const STATE_NAME_TO_UF: Record<string, CostState> = {
+  // Sudeste
+  "sao paulo": "SP",
+  "são paulo": "SP",
+  "rio de janeiro": "RJ",
+  "minas gerais": "MG",
+  "espirito santo": "ES",
+  "espírito santo": "ES",
+  // Sul
+  "rio grande do sul": "RS",
+  parana: "PR",
+  paraná: "PR",
+  "santa catarina": "SC",
+  // Nordeste
+  bahia: "BA",
+  pernambuco: "PE",
+  ceara: "CE",
+  ceará: "CE",
+  // Centro-Oeste
+  goias: "GO",
+  goiás: "GO",
+  "distrito federal": "DF",
+  "mato grosso": "MT",
+  "mato grosso do sul": "MS",
+  // Norte
+  para: "PA",
+  pará: "PA",
+  amazonas: "AM",
+};
+
+/** Normaliza acentos e caixa baixa para casamento robusto. */
+function normalize(text: string): string {
+  return text
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
+/** Extrai a UF (sigla) a partir de qualquer texto: sigla "SP", nome completo
+ *  "São Paulo" ou trecho de endereço contendo o nome do estado. */
+export function extractUF(text?: string | null): CostState {
+  if (!text) return "BR";
+  const raw = text.trim();
+  // 1) Sigla pura (ex.: "SP").
+  if (/^[A-Za-z]{2}$/.test(raw)) {
+    const up = raw.toUpperCase() as CostState;
+    if (up in COST_PER_M2_BY_STATE) return up;
+  }
+  const norm = normalize(raw);
+  // 2) Nome completo do estado (ordenado por tamanho desc p/ evitar
+  //    falso match de "Mato Grosso" antes de "Mato Grosso do Sul").
+  const names = Object.keys(STATE_NAME_TO_UF).sort(
+    (a, b) => b.length - a.length,
+  );
+  for (const name of names) {
+    if (norm.includes(name)) return STATE_NAME_TO_UF[name];
+  }
+  // 3) Sigla isolada dentro do texto (ex.: ", SP, Brasil").
+  const m = norm.match(/(?:^|[\s,;\/-])([a-z]{2})(?:[\s,;\/-]|$)/);
+  if (m) {
+    const up = m[1].toUpperCase() as CostState;
+    if (up in COST_PER_M2_BY_STATE && up !== "BR") return up;
+  }
+  return "BR";
+}
+
 export function getCostState(uf?: string | null): CostState {
-  if (!uf) return "BR";
-  const up = uf.toUpperCase() as CostState;
-  return (up in COST_PER_M2_BY_STATE ? up : "BR") as CostState;
+  return extractUF(uf);
 }
 
 /** Faixa estimada R$/m² para (UF, padrão) considerando CUB e SINAPI seed. */

@@ -1,23 +1,23 @@
 /**
- * Serviço de medição de relevo.
- * Consulta open-elevation.com para N pontos amostrais do polígono,
- * computa a análise de slope e persiste no terreno.
- * Reutilizado por POST /api/terrenos (auto, ao criar) e
- * POST /api/terrenos/[id]/slope (recálculo manual).
+ * Serviço de medição de relevo (real, baseado em DEM global).
+ *
+ * Amostra uma grade 2D (10×10 = 100 pontos) dentro do bbox do polígono,
+ * consulta elevações reais via OpenTopography (Copernicus 30 m) — ou
+ * OpenTopoData como fallback — e integra cut/fill usando a área real
+ * de cada célula. O resultado é persistido no Terrain e devolvido para
+ * a UI.
  */
 import { prisma } from "@sfg/db";
 import {
-  diagonalSamples,
-  haversineM,
-  computeSlopeAnalysis,
+  gridSamples,
+  computeSlopeFromGrid,
   type LngLat,
-  type ElevationSample,
   type SlopeAnalysis,
 } from "@/lib/geo";
+import { fetchElevations } from "@/lib/elevationProvider";
 
-interface ElevationApiResponse {
-  results: { latitude: number; longitude: number; elevation: number }[];
-}
+/** Quantidade de células por lado da grade. 10×10 = 100 → 1 req OpenTopoData. */
+const GRID_N = 10;
 
 export async function measureAndPersistSlope(
   terrainId: string,
@@ -27,29 +27,14 @@ export async function measureAndPersistSlope(
   const polygon = terrain.polygon as unknown as LngLat[];
   if (!polygon || polygon.length < 3) throw new Error("Polígono inválido");
 
-  const samples = diagonalSamples(polygon, 9);
-  const locations = samples.map(([lng, lat]) => `${lat},${lng}`).join("|");
+  const grid = gridSamples(polygon, GRID_N);
+  const points: Array<[number, number]> = grid.samples.map((s) => [
+    s.lng,
+    s.lat,
+  ]);
 
-  const res = await fetch(
-    `https://api.open-elevation.com/api/v1/lookup?locations=${locations}`,
-    { signal: AbortSignal.timeout(10_000) },
-  );
-  if (!res.ok) throw new Error(`open-elevation ${res.status}`);
-  const api = (await res.json()) as ElevationApiResponse;
-
-  const enriched: ElevationSample[] = [];
-  let acc = 0;
-  for (let i = 0; i < samples.length; i++) {
-    if (i > 0) acc += haversineM(samples[i - 1], samples[i]);
-    enriched.push({
-      d: acc,
-      h: api.results[i]?.elevation ?? 0,
-      lat: samples[i][1],
-      lng: samples[i][0],
-    });
-  }
-
-  const analysis = computeSlopeAnalysis(enriched, terrain.areaM2);
+  const { elevations } = await fetchElevations(points, grid.bbox);
+  const analysis = computeSlopeFromGrid(grid, elevations, polygon);
 
   await prisma.terrain.update({
     where: { id: terrain.id },
@@ -57,7 +42,15 @@ export async function measureAndPersistSlope(
       slopePct: analysis.slopePct,
       elevationMean: analysis.elevationMean,
       elevationDelta: analysis.elevationDelta,
-      elevationProfile: analysis.profile,
+      // Persistimos perfil + opções de terraplenagem juntos para que o
+      // SSR mostre os mesmos números do último cálculo sem precisar de
+      // uma migration nova. Formato legado (array puro) ainda é aceito
+      // por SlopeCard, mas é sobrescrito no primeiro Recalcular.
+      elevationProfile: {
+        profile: analysis.profile,
+        earthworksOptions: analysis.earthworksOptions,
+        earthworksRecommended: analysis.earthworksRecommended,
+      } as unknown as object,
     },
   });
 

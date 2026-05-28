@@ -19,6 +19,37 @@ import {
   MAX_MAP_ZOOM,
   MIN_MAP_ZOOM,
 } from "@/lib/geo";
+import { extractUF } from "@/lib/knowledge";
+
+/** Subset do objeto `address` retornado pelo Nominatim. */
+interface NominatimAddress {
+  state?: string;
+  city?: string;
+  town?: string;
+  village?: string;
+  municipality?: string;
+  suburb?: string;
+  neighbourhood?: string;
+  city_district?: string;
+  road?: string;
+  house_number?: string;
+  postcode?: string;
+}
+
+function parseNominatimAddress(addr?: NominatimAddress): ResolvedLocation {
+  if (!addr) return {};
+  const stateName = addr.state;
+  const uf = stateName ? extractUF(stateName) : "BR";
+  return {
+    uf: uf !== "BR" ? uf : undefined,
+    stateName,
+    city: addr.city ?? addr.town ?? addr.village ?? addr.municipality,
+    district: addr.suburb ?? addr.neighbourhood ?? addr.city_district,
+    street: addr.road,
+    houseNumber: addr.house_number,
+    postcode: addr.postcode,
+  };
+}
 
 // Ícone padrão dos vértices (Leaflet exige reset de paths em bundlers)
 const vertexIcon = L.divIcon({
@@ -47,6 +78,19 @@ const midpointIcon = L.divIcon({
     onmouseout="this.style.transform='scale(1)'"></div>`,
 });
 
+/** Componentes estruturados do endereço (Nominatim `address` object). */
+export interface ResolvedLocation {
+  /** UF em sigla (ex.: "SP"). Mapeado a partir de `address.state`. */
+  uf?: string;
+  /** Nome completo do estado retornado pelo Nominatim. */
+  stateName?: string;
+  city?: string;
+  district?: string;
+  street?: string;
+  houseNumber?: string;
+  postcode?: string;
+}
+
 interface Props {
   initialPolygon?: LngLat[]; // [lng, lat]
   initialCenter?: LngLat;
@@ -54,6 +98,9 @@ interface Props {
   onChange?: (polygon: LngLat[], areaM2: number, errors?: string[]) => void;
   /** Recebe endereço quando o usuário busca ou quando a forma fecha (reverse-geocoding). */
   onAddressResolved?: (address: string) => void;
+  /** Recebe os componentes estruturados (UF, cidade, bairro) — usados para
+   *  alimentar tabelas paramétricas (SINAPI/CUB) por estado. */
+  onLocationResolved?: (loc: ResolvedLocation) => void;
 }
 
 function MapClickHandler({
@@ -125,6 +172,7 @@ export default function TerrainMapClient({
   editable = true,
   onChange,
   onAddressResolved,
+  onLocationResolved,
 }: Props) {
   const [polygon, setPolygon] = useState<LngLat[]>(initialPolygon);
   // Modo de desenho: cliques no mapa adicionam vértice no final.
@@ -169,7 +217,7 @@ export default function TerrainMapClient({
 
   // Reverse-geocoding quando o polígono tem forma válida (preenche endereço).
   useEffect(() => {
-    if (!closed || !onAddressResolved) return;
+    if (!closed || (!onAddressResolved && !onLocationResolved)) return;
     const [lng, lat] = polygonCenter(polygon);
     const ctrl = new AbortController();
     fetch(
@@ -177,14 +225,21 @@ export default function TerrainMapClient({
       { headers: { Accept: "application/json" }, signal: ctrl.signal },
     )
       .then((r) => r.json())
-      .then((data: { display_name?: string } | null) => {
-        if (data?.display_name) onAddressResolved(data.display_name);
-      })
+      .then(
+        (data: {
+          display_name?: string;
+          address?: NominatimAddress;
+        } | null) => {
+          if (data?.display_name) onAddressResolved?.(data.display_name);
+          if (data?.address)
+            onLocationResolved?.(parseNominatimAddress(data.address));
+        },
+      )
       .catch(() => {
         /* offline ou bloqueado — ignora */
       });
     return () => ctrl.abort();
-  }, [closed, polygon, onAddressResolved]);
+  }, [closed, polygon, onAddressResolved, onLocationResolved]);
 
   // Ctrl+Z / Cmd+Z desfaz último vértice enquanto estiver desenhando.
   useEffect(() => {
@@ -259,17 +314,20 @@ export default function TerrainMapClient({
     setSearching(true);
     try {
       const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(search)}`,
+        `https://nominatim.openstreetmap.org/search?format=json&limit=1&addressdetails=1&q=${encodeURIComponent(search)}`,
         { headers: { Accept: "application/json" } },
       );
       const data = (await res.json()) as {
         lat: string;
         lon: string;
         display_name?: string;
+        address?: NominatimAddress;
       }[];
       if (data[0]) {
         setSearchTarget([parseFloat(data[0].lon), parseFloat(data[0].lat)]);
         if (data[0].display_name) onAddressResolved?.(data[0].display_name);
+        if (data[0].address)
+          onLocationResolved?.(parseNominatimAddress(data[0].address));
       }
     } finally {
       setSearching(false);

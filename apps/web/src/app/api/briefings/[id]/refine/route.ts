@@ -4,17 +4,18 @@ import { z } from "zod";
 import { SitePlanSchema } from "@/lib/sitePlanSchema";
 import { validateSitePlan } from "@/lib/siteConstraints";
 import { hashSitePlan } from "@/lib/sitePlanHash";
+import { applyRefineIntent } from "@/lib/refineIntent";
 
 export const runtime = "nodejs";
 
 // POST /api/briefings/:id/refine
 // Body: { message: string, baseHash?: string, patch?: Partial<SitePlan> }
 //
-// V1 (PRD Open Question 1): request/response síncrono, sem SSE. O cliente
-// envia `patch` opcional já calculado (a UI gera o patch determinístico a
-// partir da edição manual / chat); o servidor aplica sobre o SitePlan
-// vigente e devolve o próximo plano validado, sem persistir. A persistência
-// fica para `/site-plan` (POST).
+// Quando `patch` é informado, fazemos um merge raso sobre o SitePlan vigente
+// (mesmo comportamento antigo). Caso contrário, tentamos interpretar a
+// `message` em português via `applyRefineIntent` para gerar a proposta.
+// A persistência continua sendo feita pelo `/site-plan` (POST) — este
+// endpoint só devolve a proposta.
 const RefineSchema = z.object({
   message: z.string().min(1).max(2000),
   baseHash: z.string().optional(),
@@ -73,8 +74,37 @@ export async function POST(
   // Merge patch shallowly (top-level keys). The full SitePlanSchema parse
   // below catches any structural error.
   const base = latest.data as Record<string, unknown>;
-  const merged = { ...base, ...(parsed.data.patch ?? {}) };
-  const reparsed = SitePlanSchema.safeParse(merged);
+  let candidate: Record<string, unknown>;
+  let intentSummary: string | null = null;
+  if (parsed.data.patch && Object.keys(parsed.data.patch).length > 0) {
+    candidate = { ...base, ...parsed.data.patch };
+  } else {
+    // Sem patch explícito — tenta interpretar a mensagem em PT-BR.
+    const parsedBase = SitePlanSchema.safeParse(base);
+    if (!parsedBase.success) {
+      return NextResponse.json(
+        {
+          error: "SitePlan persistido inválido — não consigo refinar.",
+          issues: parsedBase.error.issues,
+        },
+        { status: 422 },
+      );
+    }
+    const outcome = applyRefineIntent(parsedBase.data, parsed.data.message);
+    if (outcome) {
+      candidate = outcome.next as unknown as Record<string, unknown>;
+      intentSummary = outcome.summary;
+    } else {
+      return NextResponse.json(
+        {
+          error:
+            "Não entendi a instrução. Tente algo como “adicione 2 galpões”, “remova o galpão 1”, “recuo frente 8 m” ou “aumente o galpão 1 para 3000 m²”.",
+        },
+        { status: 422 },
+      );
+    }
+  }
+  const reparsed = SitePlanSchema.safeParse(candidate);
   if (!reparsed.success) {
     return NextResponse.json(
       {
@@ -95,5 +125,6 @@ export async function POST(
     baseHash: latest.hash,
     validations: validation,
     message: parsed.data.message,
+    summary: intentSummary,
   });
 }

@@ -7,12 +7,14 @@ import TerrainMap from "@/components/TerrainMap";
 import type { LngLat } from "@/lib/geo";
 import { polygonCenter } from "@/lib/geo";
 import { Breadcrumb } from "@/components/Breadcrumb";
+import type { ResolvedLocation } from "@/components/TerrainMap.client";
 
 export default function NewTerrainPage() {
   const router = useRouter();
   const [name, setName] = useState("");
   const [nameTouched, setNameTouched] = useState(false);
   const [address, setAddress] = useState("");
+  const [location, setLocation] = useState<ResolvedLocation | null>(null);
   const [polygon, setPolygon] = useState<LngLat[]>([]);
   const [area, setArea] = useState(0);
   const [areaErrors, setAreaErrors] = useState<string[]>([]);
@@ -61,6 +63,12 @@ export default function NewTerrainPage() {
           centerLng,
           centerLat,
           areaM2: area,
+          state: location?.uf ?? null,
+          city: location?.city ?? null,
+          district: location?.district ?? null,
+          addressStreet: location?.street ?? null,
+          addressNumber: location?.houseNumber ?? null,
+          cep: location?.postcode ?? null,
         }),
       });
       if (!res.ok) throw new Error("Falha ao salvar");
@@ -141,6 +149,7 @@ export default function NewTerrainPage() {
               setAreaErrors(errs ?? []);
             }}
             onAddressResolved={handleAddressResolved}
+            onLocationResolved={setLocation}
           />
         </div>
 

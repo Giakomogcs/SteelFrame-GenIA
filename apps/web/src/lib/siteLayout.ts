@@ -78,8 +78,22 @@ function dimensionsFor(
   preferredRatio: number,
   minSide: number,
 ): { w: number; d: number } {
-  const d = Math.max(minSide, Math.sqrt(targetArea / preferredRatio));
-  const w = Math.max(minSide, targetArea / d);
+  // Clamp ratio to industrial-shed proportions so a very wide buildable cell
+  // doesn't produce a 100×8 "barraco" when the user asked for a 1000 m² shed.
+  const ratio = Math.min(Math.max(preferredRatio, 1), 2.5);
+  let d = Math.sqrt(targetArea / ratio);
+  let w = targetArea / d;
+  // Honor the structural minimum side. If both sides hit the floor, the area
+  // necessarily grows beyond the target — that's the cleanest signal to the
+  // caller that the program is too small for the constraints.
+  if (d < minSide) d = minSide;
+  if (w < minSide) w = minSide;
+  // Renormalise so w*d stays ≈ target when only one side was clamped.
+  if (d * w > targetArea && d > minSide && w === minSide) {
+    d = Math.max(minSide, targetArea / w);
+  } else if (d * w > targetArea && w > minSide && d === minSide) {
+    w = Math.max(minSide, targetArea / d);
+  }
   return { w, d };
 }
 

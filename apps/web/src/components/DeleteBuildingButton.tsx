@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, type MouseEvent } from "react";
+import { useAlertDialog } from "./AlertDialog";
 
 interface Props {
   terrainId: string;
@@ -15,15 +16,19 @@ export function DeleteBuildingButton({
   buildingName,
 }: Props) {
   const router = useRouter();
+  const { confirm, alert } = useAlertDialog();
   const [busy, setBusy] = useState(false);
 
   async function handleClick(e: MouseEvent<HTMLButtonElement>) {
     e.preventDefault();
     e.stopPropagation();
     if (busy) return;
-    const ok = window.confirm(
-      `Apagar o estudo "${buildingName}"?\n\nEssa ação não pode ser desfeita.`,
-    );
+    const ok = await confirm({
+      title: `Apagar o estudo "${buildingName}"?`,
+      message: "Essa ação não pode ser desfeita.",
+      confirmLabel: "Apagar",
+      variant: "danger",
+    });
     if (!ok) return;
     setBusy(true);
     try {
@@ -38,9 +43,11 @@ export function DeleteBuildingButton({
       router.refresh();
     } catch (err) {
       console.error(err);
-      window.alert(
-        err instanceof Error ? err.message : "Erro ao apagar o galpão.",
-      );
+      await alert({
+        title: "Erro ao apagar o galpão",
+        message: err instanceof Error ? err.message : "Tente novamente.",
+        variant: "danger",
+      });
       setBusy(false);
     }
   }

@@ -29,6 +29,7 @@ import {
   projectLotToLocal,
 } from "@/lib/siteGeometry";
 import { fitBuildings } from "@/lib/siteLayout";
+import type { IndustrialShed } from "@/lib/shedSchema";
 import {
   SitePlanSchema,
   type BuildingUse,
@@ -337,28 +338,45 @@ export default function BriefingClient({
         );
       }
       const id = await ensureBriefing();
+
+      // ---- Per-building AI generation (FR-G1, gated at step 6) ----------
+      // Each placement gets its own IndustrialShed with different size /
+      // style / zones so we never end up with N identical clones.
+      const placements = candidate.site.buildings;
+      const sheds = await Promise.all(
+        placements.map((p, idx) =>
+          generateShedForPlacement({
+            placement: p,
+            index: idx,
+            total: placements.length,
+            terrainId,
+            terrainName,
+            briefingId: id,
+            standard: state.programa.standard,
+            clearHeight: state.clearHeight,
+          }),
+        ),
+      );
+
+      // Embed each generated shed into its placement so the 3D viewer and
+      // the Details panel render the real AI output.
+      const enriched: SitePlan = {
+        ...candidate.site,
+        buildings: placements.map((p, idx) => ({
+          ...p,
+          shed: sheds[idx] ?? null,
+        })),
+      };
+
       const save = await fetch(`/api/terrenos/${terrainId}/site-plan`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ briefingId: id, data: candidate.site }),
+        body: JSON.stringify({ briefingId: id, data: enriched }),
       });
       if (!save.ok) {
         const j = (await save.json().catch(() => ({}))) as { error?: string };
         throw new Error(j.error ?? "Falha ao salvar SitePlan.");
       }
-      // Trigger AI generation gated at step 6 (FR-G1).
-      await fetch("/api/ai/generate?fallback=1", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          prompt: `Galpão de ${state.programa.use} para o terreno ${terrainName}`,
-          terrainId,
-          briefingId: id,
-          step: 6,
-          use: state.programa.use,
-          standard: state.programa.standard,
-        }),
-      }).catch(() => undefined);
       router.push(`/terrenos/${terrainId}/estudo/${id}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -965,3 +983,168 @@ function StepReview({
 // Helper bridging detectStreetEdges (currently unused by the auto-detect
 // fallback). Kept here as a future hook for OSM-fed street polylines.
 export const _detectStreetEdges = detectStreetEdges;
+
+// =========================================================================
+// AI generation — per-building.
+// =========================================================================
+
+interface PlacementGenInput {
+  placement: {
+    id: string;
+    name: string;
+    use: BuildingUse;
+    targetAreaM2: number;
+    footprintPolygon: { x: number; z: number }[];
+  };
+  index: number;
+  total: number;
+  terrainId: string;
+  terrainName: string;
+  briefingId: string;
+  standard: "economico" | "medio" | "alto";
+  clearHeight: number;
+}
+
+/** Heuristic variation hints so each building in a multi-shed study differs. */
+const VARIATIONS: Array<{
+  label: string;
+  detail: string;
+  standardOverride?: "economico" | "medio" | "alto";
+}> = [
+  {
+    label: "operação principal com mezanino administrativo",
+    detail:
+      "Inclua um mezanino de escritório (≥ 60 m²) no canto frontal, salas de gerência, sala de reunião e copa.",
+  },
+  {
+    label: "expedição cross-dock com docas dos dois lados",
+    detail:
+      "Distribua docas em paredes opostas (norte e sul), pé-direito ≥ 11 m, área de staging ampliada.",
+    standardOverride: "alto",
+  },
+  {
+    label: "manufatura/produção com ponte rolante",
+    detail:
+      "Inclua ponte rolante (5–10 t) e zona de produção contínua; reduza skylight, reforce área técnica e oficinas.",
+  },
+  {
+    label: "cold storage refrigerado",
+    detail:
+      "Envoltória sandwich PIR, baixa skylight, antecâmara + casa de máquinas, doca rebaixada com seal.",
+    standardOverride: "alto",
+  },
+  {
+    label: "anexo administrativo com vestiários ampliados",
+    detail:
+      "Escritórios em 2 pavimentos (≥ 120 m²/piso), vestiários masculino/feminino completos, refeitório com cozinha.",
+  },
+  {
+    label: "centro de distribuição com alta rotatividade",
+    detail:
+      "Múltiplas docas niveladas no fundo, picking + armazenagem segregados, AVCB com sprinklers.",
+    standardOverride: "alto",
+  },
+];
+
+function variationFor(
+  index: number,
+  total: number,
+): (typeof VARIATIONS)[number] {
+  if (total <= 1) return VARIATIONS[0];
+  return VARIATIONS[index % VARIATIONS.length];
+}
+
+async function generateShedForPlacement(
+  input: PlacementGenInput,
+): Promise<IndustrialShed | null> {
+  const { placement, index, total, terrainId, terrainName, briefingId } = input;
+  const v = variationFor(index, total);
+  const bbox = polygonBBox(placement.footprintPolygon);
+  const footW = Math.max(6, Math.round(bbox.maxX - bbox.minX));
+  const footD = Math.max(6, Math.round(bbox.maxZ - bbox.minZ));
+  const standard = v.standardOverride ?? input.standard;
+  const prompt = [
+    `Projeto: ${placement.name} (${index + 1}/${total}) no terreno "${terrainName}".`,
+    `Uso principal: ${placement.use}.`,
+    `Área alvo: ${Math.round(placement.targetAreaM2)} m².`,
+    `Footprint disponível (já posicionado no lote): largura ${footW} m × profundidade ${footD} m.`,
+    `Pé-direito útil desejado: ~${input.clearHeight} m.`,
+    `Padrão construtivo: ${standard}.`,
+    `Característica obrigatória deste galpão: ${v.label}.`,
+    `Detalhe: ${v.detail}`,
+    total > 1
+      ? `Importante: este é o galpão #${index + 1} de ${total}; ele deve ser claramente diferente dos demais em programa, tipologia de cobertura, layout de zonas e abertura de docas.`
+      : "",
+    `O JSON deve usar exatamente footprint.width=${footW} e footprint.depth=${footD} para casar com o posicionamento já fixado pelo wizard.`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  try {
+    const res = await fetch("/api/ai/generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        prompt,
+        terrainId,
+        briefingId,
+        step: 6,
+        use: placement.use,
+        standard,
+      }),
+    });
+    if (!res.ok || !res.body) return null;
+    const shed = await readShedFromSse(res.body);
+    if (!shed) return null;
+    // Force footprint to the placement's actual size so the renderer aligns.
+    return {
+      ...shed,
+      footprint: { width: footW, depth: footD },
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** Reads an SSE stream from /api/ai/generate and returns the final shed. */
+async function readShedFromSse(
+  body: ReadableStream<Uint8Array>,
+): Promise<IndustrialShed | null> {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let shed: IndustrialShed | null = null;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const events = buffer.split("\n\n");
+      buffer = events.pop() ?? "";
+      for (const raw of events) {
+        const lines = raw.split("\n");
+        let evName = "";
+        let dataLine = "";
+        for (const ln of lines) {
+          if (ln.startsWith("event:")) evName = ln.slice(6).trim();
+          else if (ln.startsWith("data:")) dataLine += ln.slice(5).trim();
+        }
+        if (evName === "result" && dataLine) {
+          try {
+            const parsed = JSON.parse(dataLine) as { shed?: IndustrialShed };
+            if (parsed.shed) shed = parsed.shed;
+          } catch {
+            // ignore
+          }
+        }
+      }
+    }
+  } finally {
+    try {
+      reader.releaseLock();
+    } catch {
+      /* noop */
+    }
+  }
+  return shed;
+}

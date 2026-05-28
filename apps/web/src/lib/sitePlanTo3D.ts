@@ -32,6 +32,7 @@ const MAT_GROUND = new THREE.MeshStandardMaterial({
   color: 0x2c3e50,
   roughness: 0.95,
   metalness: 0,
+  side: THREE.DoubleSide,
 });
 const MAT_PERIMETER = new THREE.MeshStandardMaterial({
   color: 0x6b7280,
@@ -140,6 +141,36 @@ const ZONE_COLORS: Record<string, number> = {
   producao: 0x06b6d4,
 };
 
+/** Visual palette per BuildingUse — keeps neighboring sheds distinguishable. */
+const USE_PALETTE: Record<
+  string,
+  { wallBase: number; wallMetal: number; roof: number }
+> = {
+  logistics: { wallBase: 0xe7e2d8, wallMetal: 0xbcc4cc, roof: 0x475569 },
+  industrial: { wallBase: 0xdcd3c1, wallMetal: 0x8a8f96, roof: 0x3f3f46 },
+  cross_dock: { wallBase: 0xece2cf, wallMetal: 0xa3c4e0, roof: 0x1e3a5f },
+  distribution_center: {
+    wallBase: 0xe2dcce,
+    wallMetal: 0xb8a07a,
+    roof: 0x5b4636,
+  },
+  cold_storage: { wallBase: 0xe8edf2, wallMetal: 0xd4e4ef, roof: 0x4b6b7a },
+  manufacturing: { wallBase: 0xd6cdba, wallMetal: 0x9aa6ad, roof: 0x4a5360 },
+};
+
+function paletteForUse(use: string | undefined) {
+  return USE_PALETTE[use ?? "logistics"] ?? USE_PALETTE.logistics;
+}
+
+function cloneStandard(
+  base: THREE.MeshStandardMaterial,
+  color: number,
+): THREE.MeshStandardMaterial {
+  const m = base.clone();
+  m.color = new THREE.Color(color);
+  return m;
+}
+
 // ---- Builder options -----------------------------------------------------
 
 export type Lod = "structural" | "architectural";
@@ -165,7 +196,10 @@ export interface BuildSiteOptions {
 export function deriveShedForPlacement(
   placement: BuildingPlacement,
 ): IndustrialShed {
-  const { w, d } = footprintSize(placement.footprintPolygon);
+  const { w, d } = footprintLocalSize(
+    placement.footprintPolygon,
+    placement.rotationRad ?? 0,
+  );
   const areaM2 = Math.max(placement.targetAreaM2 ?? 0, Math.round(w * d));
   const shed = generateFallbackShed({
     areaM2,
@@ -227,15 +261,44 @@ function footprintSize(poly: readonly V[]): { w: number; d: number } {
   return { w: maxX - minX, d: maxZ - minZ };
 }
 
+/**
+ * Real (local-frame) width × depth of the building. The persisted
+ * `footprintPolygon` is already rotated to its final orientation, but the
+ * Three.js group is *also* rotated by `placement.rotationRad`, so reading the
+ * AABB of the rotated polygon yields a box bigger than the actual rectangle
+ * — that previously made the rendered shed visibly larger than the wizard
+ * requested. Un-rotate around the centroid first to recover the original
+ * dimensions used to build walls, roof and skeleton.
+ */
+function footprintLocalSize(
+  poly: readonly V[],
+  rotationRad: number,
+): { w: number; d: number } {
+  if (!rotationRad) return footprintSize(poly);
+  const c = centroidXZ(poly);
+  const cos = Math.cos(-rotationRad);
+  const sin = Math.sin(-rotationRad);
+  const local = poly.map((p) => {
+    const dx = p.x - c.x;
+    const dz = p.z - c.z;
+    return { x: dx * cos - dz * sin, z: dx * sin + dz * cos };
+  });
+  return footprintSize(local);
+}
+
 // ---- Layer 1 — terrain ---------------------------------------------------
 
 export function buildTerrainLayer(site: SitePlan): THREE.Group {
   const g = new THREE.Group();
   g.name = "layer:terrain";
   // Flat lot pad (extruded polygon) — relief comes later (F8).
+  // Build vertices directly in the XZ plane (polygon.x → world.x,
+  // polygon.z → world.z) so the pad matches the same orientation used by
+  // perimeter walls, gates and building placements. A previous version
+  // rotated by -π/2 which mirrored the lot relative to everything else.
   const shape = lotShape(site.lotPolygonLocal);
   const geom = new THREE.ShapeGeometry(shape);
-  geom.rotateX(-Math.PI / 2);
+  geom.rotateX(Math.PI / 2);
   const mesh = new THREE.Mesh(geom, MAT_GROUND);
   mesh.name = "terrain:lot-pad";
   mesh.receiveShadow = true;
@@ -360,7 +423,12 @@ export function buildShedMesh(
     use: placement.use,
     shed,
   };
-  const { w, d } = footprintSize(placement.footprintPolygon);
+  // Use the un-rotated rectangle dimensions so we don't double-count the
+  // rotation that the parent group will apply via `g.rotation.y` below.
+  const { w, d } = footprintLocalSize(
+    placement.footprintPolygon,
+    placement.rotationRad ?? 0,
+  );
   const height = shed?.structure.clearHeight ?? 8;
   const freeSpan = shed?.structure.freeSpan ?? Math.min(w, d);
   const baySpacing = shed?.structure.baySpacing ?? 6;
@@ -401,8 +469,17 @@ export function buildShedMesh(
       Math.max(0, shed?.envelope.wallBaseHeight ?? 2.5),
       height - 0.5,
     );
-    addLayeredWalls(g, w, d, height, baseH, placement.id);
-    addGableRoof(g, w, d, height, shed?.roof.slopePct ?? 10, placement.id);
+    const palette = paletteForUse(placement.use);
+    addLayeredWalls(g, w, d, height, baseH, placement.id, palette);
+    addGableRoof(
+      g,
+      w,
+      d,
+      height,
+      shed?.roof.slopePct ?? 10,
+      placement.id,
+      palette,
+    );
     if ((shed?.roof.skylightPct ?? 0) > 0) {
       addSkylightStrips(
         g,
@@ -518,8 +595,15 @@ function addLayeredWalls(
   height: number,
   baseH: number,
   id: string,
+  palette?: { wallBase: number; wallMetal: number },
 ): void {
   const upperH = Math.max(0, height - baseH);
+  const baseMat = palette
+    ? cloneStandard(MAT_WALL_BASE, palette.wallBase)
+    : MAT_WALL_BASE;
+  const metalMat = palette
+    ? cloneStandard(MAT_WALL_METAL, palette.wallMetal)
+    : MAT_WALL_METAL;
   const walls = [
     { name: "front", w: width, d: 0.18, x: 0, z: depth / 2, ry: 0 },
     { name: "back", w: width, d: 0.18, x: 0, z: -depth / 2, ry: 0 },
@@ -530,7 +614,7 @@ function addLayeredWalls(
     if (baseH > 0) {
       const base = new THREE.Mesh(
         new THREE.BoxGeometry(wlObj.w, baseH, wlObj.d),
-        MAT_WALL_BASE,
+        baseMat,
       );
       base.position.set(wlObj.x, baseH / 2, wlObj.z);
       base.name = `wall:${id}:${wlObj.name}:base`;
@@ -539,7 +623,7 @@ function addLayeredWalls(
     if (upperH > 0) {
       const upper = new THREE.Mesh(
         new THREE.BoxGeometry(wlObj.w, upperH, wlObj.d),
-        MAT_WALL_METAL,
+        metalMat,
       );
       upper.position.set(wlObj.x, baseH + upperH / 2, wlObj.z);
       upper.name = `wall:${id}:${wlObj.name}:upper`;
@@ -555,6 +639,7 @@ function addGableRoof(
   baseY: number,
   pitchPct: number,
   id: string,
+  palette?: { roof: number },
 ): void {
   const halfWidth = width / 2;
   const rise = halfWidth * (pitchPct / 100);
@@ -562,11 +647,12 @@ function addGableRoof(
   const g = new THREE.Group();
   g.position.y = baseY;
   g.name = `roof:${id}`;
+  const roofMat = palette ? cloneStandard(MAT_ROOF, palette.roof) : MAT_ROOF;
   for (const dir of [-1, 1] as const) {
     const angle = Math.atan2(rise, halfWidth) * dir;
     const slope = new THREE.Mesh(
       new THREE.BoxGeometry(slopeLen, 0.05, depth),
-      MAT_ROOF,
+      roofMat,
     );
     slope.position.set((halfWidth / 2) * dir, rise / 2, 0);
     slope.rotation.z = -angle;
@@ -866,7 +952,9 @@ export function sitePlanTo3D(
   buildingsGroup.name = "layer:buildings";
   const synth = opts.synthesizeShed ?? false;
   for (const placement of site.buildings) {
-    let shed = placement.shedId ? sheds[placement.shedId] : undefined;
+    // Priority: embedded shed > linked shed via shedId > synthesized fallback.
+    let shed: IndustrialShed | undefined =
+      placement.shed ?? (placement.shedId ? sheds[placement.shedId] : undefined);
     if (!shed && synth) shed = deriveShedForPlacement(placement);
     const g = buildShedMesh(placement, shed, lod);
     const c = centroidXZ(placement.footprintPolygon);

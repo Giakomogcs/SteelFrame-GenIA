@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, type MouseEvent } from "react";
+import { useAlertDialog } from "./AlertDialog";
 
 interface Props {
   briefingId: string;
@@ -10,6 +11,7 @@ interface Props {
 
 export function BriefingActions({ briefingId, terrainName }: Props) {
   const router = useRouter();
+  const { confirm, alert } = useAlertDialog();
   const [busy, setBusy] = useState<"cancel" | "delete" | null>(null);
 
   function stop(e: MouseEvent) {
@@ -20,9 +22,13 @@ export function BriefingActions({ briefingId, terrainName }: Props) {
   async function cancel(e: MouseEvent<HTMLButtonElement>) {
     stop(e);
     if (busy) return;
-    const ok = window.confirm(
-      `Cancelar o briefing de "${terrainName}"?\n\nEle deixa de aparecer na lista de pendentes, mas o histórico fica preservado.`,
-    );
+    const ok = await confirm({
+      title: `Cancelar o briefing de "${terrainName}"?`,
+      message:
+        "Ele deixa de aparecer na lista de pendentes, mas o histórico fica preservado.",
+      confirmLabel: "Cancelar briefing",
+      cancelLabel: "Voltar",
+    });
     if (!ok) return;
     setBusy("cancel");
     try {
@@ -38,9 +44,11 @@ export function BriefingActions({ briefingId, terrainName }: Props) {
       router.refresh();
     } catch (err) {
       console.error(err);
-      window.alert(
-        err instanceof Error ? err.message : "Erro ao cancelar o briefing.",
-      );
+      await alert({
+        title: "Erro ao cancelar o briefing",
+        message: err instanceof Error ? err.message : "Tente novamente.",
+        variant: "danger",
+      });
       setBusy(null);
     }
   }
@@ -48,9 +56,13 @@ export function BriefingActions({ briefingId, terrainName }: Props) {
   async function remove(e: MouseEvent<HTMLButtonElement>) {
     stop(e);
     if (busy) return;
-    const ok = window.confirm(
-      `Excluir o briefing de "${terrainName}"?\n\nEssa ação remove o histórico de conversa e premissas. Galpões e relatórios já gerados a partir dele são mantidos. Não pode ser desfeita.`,
-    );
+    const ok = await confirm({
+      title: `Excluir o briefing de "${terrainName}"?`,
+      message:
+        "Essa ação remove o histórico de conversa e premissas. Galpões e relatórios já gerados a partir dele são mantidos. Não pode ser desfeita.",
+      confirmLabel: "Excluir",
+      variant: "danger",
+    });
     if (!ok) return;
     setBusy("delete");
     try {
@@ -64,9 +76,11 @@ export function BriefingActions({ briefingId, terrainName }: Props) {
       router.refresh();
     } catch (err) {
       console.error(err);
-      window.alert(
-        err instanceof Error ? err.message : "Erro ao excluir o briefing.",
-      );
+      await alert({
+        title: "Erro ao excluir o briefing",
+        message: err instanceof Error ? err.message : "Tente novamente.",
+        variant: "danger",
+      });
       setBusy(null);
     }
   }

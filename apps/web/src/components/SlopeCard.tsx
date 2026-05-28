@@ -8,6 +8,16 @@ import {
   type EarthworksKey,
 } from "@/lib/geo";
 
+/** Forma persistida em terrain.elevationProfile (Json). */
+type StoredProfile =
+  | { d: number; h: number }[]
+  | {
+      profile: { d: number; h: number }[];
+      earthworksOptions?: EarthworksOption[];
+      earthworksRecommended?: EarthworksKey;
+    }
+  | null;
+
 interface Analysis {
   slopePct: number;
   elevationDelta: number;
@@ -27,7 +37,9 @@ interface Props {
     slopePct: number | null;
     elevationDelta: number | null;
     elevationMean: number | null;
-    profile: { d: number; h: number }[] | null;
+    /** Conteúdo cru de terrain.elevationProfile (Json) — pode ser array legado
+     *  ou objeto novo com profile + earthworksOptions. */
+    profile: StoredProfile;
   };
 }
 
@@ -51,10 +63,28 @@ function classifyFromPct(p: number): Analysis["classification"] {
   return "acentuado";
 }
 
-/** Reconstrói as opções de terraplenagem a partir do perfil persistido. */
-function hydrateOptions(profile: { d: number; h: number }[], areaM2: number) {
-  if (profile.length < 2) return null;
-  return computeEarthworksOptions(profile, areaM2);
+/**
+ * Normaliza o conteúdo persistido em terrain.elevationProfile.
+ * - Formato novo: { profile, earthworksOptions, earthworksRecommended }.
+ * - Formato legado: array puro [{ d, h }, ...] (recalculado com a função
+ *   antiga — números são imprecisos até o próximo "Recalcular").
+ */
+function hydrateFromStored(stored: StoredProfile, areaM2: number) {
+  if (!stored) return { profile: [] as { d: number; h: number }[] };
+  if (Array.isArray(stored)) {
+    if (stored.length < 2) return { profile: stored };
+    const legacy = computeEarthworksOptions(stored, areaM2);
+    return {
+      profile: stored,
+      earthworksOptions: legacy.options,
+      earthworksRecommended: legacy.recommended,
+    };
+  }
+  return {
+    profile: stored.profile ?? [],
+    earthworksOptions: stored.earthworksOptions,
+    earthworksRecommended: stored.earthworksRecommended,
+  };
 }
 
 export default function SlopeCard({ terrainId, areaM2, initial }: Props) {
@@ -63,8 +93,10 @@ export default function SlopeCard({ terrainId, areaM2, initial }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<Analysis | null>(() => {
     if (initial.slopePct == null) return null;
-    const profile = initial.profile ?? [];
-    const hydrated = hydrateOptions(profile, areaM2);
+    const hydrated = hydrateFromStored(initial.profile, areaM2);
+    const rec = hydrated.earthworksOptions?.find(
+      (o) => o.key === hydrated.earthworksRecommended,
+    );
     return {
       slopePct: initial.slopePct,
       elevationDelta: initial.elevationDelta ?? 0,
@@ -72,10 +104,10 @@ export default function SlopeCard({ terrainId, areaM2, initial }: Props) {
       classification: classifyFromPct(initial.slopePct),
       needsLeveling:
         initial.slopePct > 3 || (initial.elevationDelta ?? 0) > 1.5,
-      earthworksM3: 0,
-      profile,
-      earthworksOptions: hydrated?.options,
-      earthworksRecommended: hydrated?.recommended,
+      earthworksM3: rec ? rec.cutM3 + rec.fillM3 : 0,
+      profile: hydrated.profile,
+      earthworksOptions: hydrated.earthworksOptions,
+      earthworksRecommended: hydrated.earthworksRecommended,
     };
   });
 
@@ -129,7 +161,7 @@ export default function SlopeCard({ terrainId, areaM2, initial }: Props) {
               ? "Consultando…"
               : analysis
                 ? "Recalcular"
-                : "Medir relevo (open-elevation)"}
+                : "Medir relevo"}
           </button>
         </div>
       </div>
@@ -276,6 +308,38 @@ function EarthworksGrid({
 // Gráfico AA' melhorado — grid, eixos, sombreado cut/fill
 // ============================================================
 
+/**
+ * Rampa hipsométrica padrão (azul-mar → verde → amarelo → laranja → marrom
+ * → branco), usada em mapas topográficos. Interpolação RGB linear.
+ * Entrada: t ∈ [0, 1], onde 0 = ponto mais baixo do perfil, 1 = mais alto.
+ */
+const ELEV_STOPS: Array<{ t: number; rgb: [number, number, number] }> = [
+  { t: 0.0, rgb: [27, 102, 156] }, // água/baixada — azul
+  { t: 0.15, rgb: [56, 148, 232] }, // azul claro
+  { t: 0.3, rgb: [42, 145, 84] }, // verde mata
+  { t: 0.5, rgb: [206, 196, 90] }, // amarelo savana
+  { t: 0.7, rgb: [192, 124, 56] }, // laranja terra
+  { t: 0.85, rgb: [134, 76, 36] }, // marrom
+  { t: 1.0, rgb: [240, 232, 220] }, // pico — quase branco
+];
+
+function elevColor(t: number): string {
+  const x = Math.max(0, Math.min(1, t));
+  for (let i = 1; i < ELEV_STOPS.length; i++) {
+    const a = ELEV_STOPS[i - 1];
+    const b = ELEV_STOPS[i];
+    if (x <= b.t) {
+      const k = (x - a.t) / Math.max(1e-9, b.t - a.t);
+      const r = Math.round(a.rgb[0] + (b.rgb[0] - a.rgb[0]) * k);
+      const g = Math.round(a.rgb[1] + (b.rgb[1] - a.rgb[1]) * k);
+      const bl = Math.round(a.rgb[2] + (b.rgb[2] - a.rgb[2]) * k);
+      return `rgb(${r},${g},${bl})`;
+    }
+  }
+  const last = ELEV_STOPS[ELEV_STOPS.length - 1].rgb;
+  return `rgb(${last[0]},${last[1]},${last[2]})`;
+}
+
 function ProfileChart({
   profile,
   platformH,
@@ -286,7 +350,7 @@ function ProfileChart({
   const W = 960;
   const H = 260;
   const padL = 56;
-  const padR = 24;
+  const padR = 64; // espaço reservado p/ legenda da escala de relevo
   const padT = 20;
   const padB = 36;
   const innerW = W - padL - padR;
@@ -361,6 +425,29 @@ function ProfileChart({
         aria-label="Perfil AA' com plataforma recomendada"
         onMouseLeave={() => setHover(null)}
       >
+        {/*
+          Gradiente vertical alinhado ao eixo Y: como Y = elevação,
+          cada pixel da curva fica tingido pela rampa hipsométrica.
+          Topo do gráfico = pico (claro) / base = vale (azul).
+        */}
+        <defs>
+          <linearGradient
+            id="elevRamp"
+            x1={0}
+            y1={padT}
+            x2={0}
+            y2={padT + innerH}
+            gradientUnits="userSpaceOnUse"
+          >
+            {ELEV_STOPS.map((s) => (
+              <stop
+                key={s.t}
+                offset={`${(1 - s.t) * 100}%`}
+                stopColor={`rgb(${s.rgb[0]},${s.rgb[1]},${s.rgb[2]})`}
+              />
+            ))}
+          </linearGradient>
+        </defs>
         <rect
           x={padL}
           y={padT}
@@ -394,10 +481,28 @@ function ProfileChart({
         {cutPath && <path d={cutPath} fill="rgba(215,32,66,0.22)" />}
         {fillPath && <path d={fillPath} fill="rgba(56,148,232,0.22)" />}
 
-        <path d={linePath} fill="none" stroke="#D72042" strokeWidth={2.2} />
-        {profile.map((p, i) => (
-          <circle key={i} cx={x(p.d)} cy={y(p.h)} r={3} fill="#D72042" />
-        ))}
+        <path
+          d={linePath}
+          fill="none"
+          stroke="url(#elevRamp)"
+          strokeWidth={2.6}
+          strokeLinejoin="round"
+          strokeLinecap="round"
+        />
+        {profile.map((p, i) => {
+          const t = (p.h - hMinRaw) / Math.max(1e-6, hMaxRaw - hMinRaw);
+          return (
+            <circle
+              key={i}
+              cx={x(p.d)}
+              cy={y(p.h)}
+              r={3.5}
+              fill={elevColor(t)}
+              stroke="rgba(0,0,0,0.45)"
+              strokeWidth={0.8}
+            />
+          );
+        })}
 
         {platformH != null && (
           <>
@@ -430,6 +535,54 @@ function ProfileChart({
           y2={padT + innerH}
           stroke="rgba(255,255,255,0.18)"
         />
+
+        {/* Legenda da rampa hipsométrica */}
+        {(() => {
+          const lx = padL + innerW + 16;
+          const lw = 12;
+          return (
+            <g>
+              <rect
+                x={lx}
+                y={padT}
+                width={lw}
+                height={innerH}
+                fill="url(#elevRamp)"
+                stroke="rgba(255,255,255,0.18)"
+                strokeWidth={0.5}
+                rx={2}
+              />
+              <text
+                x={lx + lw + 4}
+                y={padT + 8}
+                fontSize={10}
+                fill="rgba(255,255,255,0.65)"
+                fontFamily="ui-monospace, monospace"
+              >
+                {hMaxRaw.toFixed(0)} m
+              </text>
+              <text
+                x={lx + lw + 4}
+                y={padT + innerH}
+                fontSize={10}
+                fill="rgba(255,255,255,0.65)"
+                fontFamily="ui-monospace, monospace"
+              >
+                {hMinRaw.toFixed(0)} m
+              </text>
+              <text
+                x={lx + lw / 2}
+                y={padT + innerH + 18}
+                fontSize={10}
+                textAnchor="middle"
+                fill="rgba(255,255,255,0.55)"
+                fontFamily="ui-monospace, monospace"
+              >
+                relevo
+              </text>
+            </g>
+          );
+        })()}
         <text
           x={padL}
           y={H - 10}
@@ -516,7 +669,10 @@ function ProfileChart({
               cy={hover.cy}
               r={5}
               fill="#fff"
-              stroke="#D72042"
+              stroke={elevColor(
+                (profile[hover.i].h - hMinRaw) /
+                  Math.max(1e-6, hMaxRaw - hMinRaw),
+              )}
               strokeWidth={2}
             />
           </g>
