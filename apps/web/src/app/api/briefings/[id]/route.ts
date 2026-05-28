@@ -17,6 +17,7 @@ const PatchBriefingSchema = z.object({
       "refining",
       "accepted",
       "complete",
+      "cancelled",
     ])
     .optional(),
   progress: z.number().int().min(0).max(6).optional(),
