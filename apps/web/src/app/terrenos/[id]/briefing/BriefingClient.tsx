@@ -38,7 +38,11 @@ import {
 import TerrainThumb from "@/components/TerrainThumb";
 
 const STEPS: StepDef[] = [
-  { id: "programa", label: "Programa", description: "Nº de galpões, uso e dimensões" },
+  {
+    id: "programa",
+    label: "Programa",
+    description: "Nº de galpões, uso e dimensões",
+  },
   { id: "terreno", label: "Terreno & rua", description: "Arestas e recuos" },
   { id: "perimetro", label: "Perímetro", description: "Muros e portões" },
   { id: "circulacao", label: "Circulação", description: "Vagas e vias" },
@@ -387,9 +391,7 @@ export default function BriefingClient({
               {areaM2.toLocaleString("pt-BR", { maximumFractionDigits: 0 })} m²
             </span>
           </div>
-          {terrainAddress && (
-            <p className="text-sm muted">{terrainAddress}</p>
-          )}
+          {terrainAddress && <p className="text-sm muted">{terrainAddress}</p>}
         </div>
       </header>
 
@@ -641,7 +643,7 @@ function StepProgram({
       <div className="briefing-v2__field">
         <span>Padrão construtivo</span>
         <div className="briefing-v2__seg" role="group">
-          {([ "economico", "medio", "alto"] as const).map((s) => (
+          {(["economico", "medio", "alto"] as const).map((s) => (
             <button
               key={s}
               type="button"
@@ -684,7 +686,11 @@ function StepTerrain({
   onToggleEdge: (idx: number) => void;
   onSetbacks: (sb: { front: number; sides: number; back: number }) => void;
 }) {
-  const labels = { front: "frontal", sides: "laterais", back: "fundos" } as const;
+  const labels = {
+    front: "frontal",
+    sides: "laterais",
+    back: "fundos",
+  } as const;
   return (
     <div className="briefing-v2__fields">
       <div className="briefing-v2__field">
@@ -914,8 +920,7 @@ function LotPreviewSvg({
   // Pick a nice scale-bar length (≈ 20% of view width, snapped to 5/10/20/50/100 m).
   const scaleTarget = vbW * 0.2;
   const nice = [1, 2, 5, 10, 20, 50, 100, 200, 500];
-  const scaleM =
-    nice.find((n) => n >= scaleTarget) ?? nice[nice.length - 1];
+  const scaleM = nice.find((n) => n >= scaleTarget) ?? nice[nice.length - 1];
 
   // Setback labels: classify edges as front/back/sides based on streetEdges
   // and pick midpoints. For brevity we render the setback value as a tiny
@@ -928,7 +933,10 @@ function LotPreviewSvg({
         .filter((e) => streetSet.has(e.index))
         .map((e) => e.mid);
       const avg = streetMids.reduce(
-        (a, m) => ({ x: a.x + m.x / streetMids.length, z: a.z + m.z / streetMids.length }),
+        (a, m) => ({
+          x: a.x + m.x / streetMids.length,
+          z: a.z + m.z / streetMids.length,
+        }),
         { x: 0, z: 0 },
       );
       const e = edges[edgeIdx];
@@ -953,7 +961,9 @@ function LotPreviewSvg({
   const scaleZ = vbZ + vbH - pad * 0.4;
 
   return (
-    <div className={`briefing-v2__map-wrap${hasFitError ? " briefing-v2__svg--error" : ""}`}>
+    <div
+      className={`briefing-v2__map-wrap${hasFitError ? " briefing-v2__svg--error" : ""}`}
+    >
       <TerrainThumb polygon={polygon} showPolygon={false} />
       <svg
         className="briefing-v2__svg"
@@ -964,151 +974,151 @@ function LotPreviewSvg({
       >
         <polygon className="lot" points={pts(polygonLocal)} />
 
-      {/* Buildable region (after setbacks + lane buffer) */}
-      {buildable && buildable.length >= 3 && (
-        <polygon className="buildable" points={pts(buildable)} />
-      )}
+        {/* Buildable region (after setbacks + lane buffer) */}
+        {buildable && buildable.length >= 3 && (
+          <polygon className="buildable" points={pts(buildable)} />
+        )}
 
-      {/* Lot edges with street highlight */}
-      {edges.map((e) => (
-        <line
-          key={e.index}
-          className={`edge${streetSet.has(e.index) ? " edge--street" : ""}`}
-          x1={e.a.x}
-          y1={e.a.z}
-          x2={e.b.x}
-          y2={e.b.z}
-        />
-      ))}
+        {/* Lot edges with street highlight */}
+        {edges.map((e) => (
+          <line
+            key={e.index}
+            className={`edge${streetSet.has(e.index) ? " edge--street" : ""}`}
+            x1={e.a.x}
+            y1={e.a.z}
+            x2={e.b.x}
+            y2={e.b.z}
+          />
+        ))}
 
-      {/* Setback labels on each edge (small inward offset) */}
-      {edges.map((e) => {
-        const sb = setbackByEdge(e.index);
-        const off = Math.min(vbW, vbH) * 0.025;
-        const tx = e.mid.x - e.normal.x * off;
-        const tz = e.mid.z - e.normal.z * off;
-        return (
+        {/* Setback labels on each edge (small inward offset) */}
+        {edges.map((e) => {
+          const sb = setbackByEdge(e.index);
+          const off = Math.min(vbW, vbH) * 0.025;
+          const tx = e.mid.x - e.normal.x * off;
+          const tz = e.mid.z - e.normal.z * off;
+          return (
+            <text
+              key={`sb-${e.index}`}
+              className="setback-label"
+              x={tx}
+              y={tz}
+              textAnchor="middle"
+              dominantBaseline="middle"
+            >
+              {sb.value} m
+            </text>
+          );
+        })}
+
+        {/* Buildings colored by typology, with dimension/area labels */}
+        {buildings.map((b, i) => {
+          const bbox = polygonBBox(b.polygon);
+          const cx = bbox.minX + bbox.width / 2;
+          const cz = bbox.minZ + bbox.depth / 2;
+          const area = bbox.width * bbox.depth;
+          return (
+            <g key={i}>
+              <polygon
+                className={`building building--${b.use}`}
+                points={pts(b.polygon)}
+              />
+              <text
+                className="dim-label"
+                x={cx}
+                y={cz - 6}
+                textAnchor="middle"
+                dominantBaseline="middle"
+              >
+                {bbox.width.toFixed(0)} × {bbox.depth.toFixed(0)} m
+              </text>
+              <text
+                className="area-label"
+                x={cx}
+                y={cz + 6}
+                textAnchor="middle"
+                dominantBaseline="middle"
+              >
+                {area.toLocaleString("pt-BR", { maximumFractionDigits: 0 })} m²
+                · PD {clearHeight} m
+              </text>
+            </g>
+          );
+        })}
+
+        {/* Gates as wall openings (line segment proportional to gate width) */}
+        {gates.map((g, i) => {
+          const e = edges[g.edgeIndex];
+          if (!e) return null;
+          const ux = (e.b.x - e.a.x) / e.length;
+          const uz = (e.b.z - e.a.z) / e.length;
+          const cx = e.a.x + (e.b.x - e.a.x) * g.tAlongEdge;
+          const cz = e.a.z + (e.b.z - e.a.z) * g.tAlongEdge;
+          const hw = g.width / 2;
+          return (
+            <line
+              key={i}
+              className="gate"
+              x1={cx - ux * hw}
+              y1={cz - uz * hw}
+              x2={cx + ux * hw}
+              y2={cz + uz * hw}
+            />
+          );
+        })}
+
+        {/* North indicator */}
+        <g>
           <text
-            key={`sb-${e.index}`}
-            className="setback-label"
-            x={tx}
-            y={tz}
+            className="north"
+            x={northX}
+            y={northZ}
             textAnchor="middle"
             dominantBaseline="middle"
           >
-            {sb.value} m
+            N
           </text>
-        );
-      })}
-
-      {/* Buildings colored by typology, with dimension/area labels */}
-      {buildings.map((b, i) => {
-        const bbox = polygonBBox(b.polygon);
-        const cx = bbox.minX + bbox.width / 2;
-        const cz = bbox.minZ + bbox.depth / 2;
-        const area = bbox.width * bbox.depth;
-        return (
-          <g key={i}>
-            <polygon
-              className={`building building--${b.use}`}
-              points={pts(b.polygon)}
-            />
-            <text
-              className="dim-label"
-              x={cx}
-              y={cz - 6}
-              textAnchor="middle"
-              dominantBaseline="middle"
-            >
-              {bbox.width.toFixed(0)} × {bbox.depth.toFixed(0)} m
-            </text>
-            <text
-              className="area-label"
-              x={cx}
-              y={cz + 6}
-              textAnchor="middle"
-              dominantBaseline="middle"
-            >
-              {area.toLocaleString("pt-BR", { maximumFractionDigits: 0 })} m²
-              · PD {clearHeight} m
-            </text>
-          </g>
-        );
-      })}
-
-      {/* Gates as wall openings (line segment proportional to gate width) */}
-      {gates.map((g, i) => {
-        const e = edges[g.edgeIndex];
-        if (!e) return null;
-        const ux = (e.b.x - e.a.x) / e.length;
-        const uz = (e.b.z - e.a.z) / e.length;
-        const cx = e.a.x + (e.b.x - e.a.x) * g.tAlongEdge;
-        const cz = e.a.z + (e.b.z - e.a.z) * g.tAlongEdge;
-        const hw = g.width / 2;
-        return (
           <line
-            key={i}
-            className="gate"
-            x1={cx - ux * hw}
-            y1={cz - uz * hw}
-            x2={cx + ux * hw}
-            y2={cz + uz * hw}
+            className="north-arrow"
+            x1={northX}
+            y1={northZ + pad * 0.15}
+            x2={northX}
+            y2={northZ + pad * 0.55}
           />
-        );
-      })}
+        </g>
 
-      {/* North indicator */}
-      <g>
-        <text
-          className="north"
-          x={northX}
-          y={northZ}
-          textAnchor="middle"
-          dominantBaseline="middle"
-        >
-          N
-        </text>
-        <line
-          className="north-arrow"
-          x1={northX}
-          y1={northZ + pad * 0.15}
-          x2={northX}
-          y2={northZ + pad * 0.55}
-        />
-      </g>
-
-      {/* Scale bar */}
-      <g>
-        <line
-          className="scale-bar"
-          x1={scaleX}
-          y1={scaleZ}
-          x2={scaleX + scaleM}
-          y2={scaleZ}
-        />
-        <line
-          className="scale-bar"
-          x1={scaleX}
-          y1={scaleZ - pad * 0.08}
-          x2={scaleX}
-          y2={scaleZ + pad * 0.08}
-        />
-        <line
-          className="scale-bar"
-          x1={scaleX + scaleM}
-          y1={scaleZ - pad * 0.08}
-          x2={scaleX + scaleM}
-          y2={scaleZ + pad * 0.08}
-        />
-        <text
-          className="scale-bar-label"
-          x={scaleX + scaleM / 2}
-          y={scaleZ + pad * 0.28}
-          textAnchor="middle"
-        >
-          {scaleM} m
-        </text>
-      </g>
+        {/* Scale bar */}
+        <g>
+          <line
+            className="scale-bar"
+            x1={scaleX}
+            y1={scaleZ}
+            x2={scaleX + scaleM}
+            y2={scaleZ}
+          />
+          <line
+            className="scale-bar"
+            x1={scaleX}
+            y1={scaleZ - pad * 0.08}
+            x2={scaleX}
+            y2={scaleZ + pad * 0.08}
+          />
+          <line
+            className="scale-bar"
+            x1={scaleX + scaleM}
+            y1={scaleZ - pad * 0.08}
+            x2={scaleX + scaleM}
+            y2={scaleZ + pad * 0.08}
+          />
+          <text
+            className="scale-bar-label"
+            x={scaleX + scaleM / 2}
+            y={scaleZ + pad * 0.28}
+            textAnchor="middle"
+          >
+            {scaleM} m
+          </text>
+        </g>
       </svg>
     </div>
   );
