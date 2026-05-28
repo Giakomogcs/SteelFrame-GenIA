@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@sfg/db";
 import { TerrainEditClient } from "./TerrainEditClient";
 import { Breadcrumb } from "@/components/Breadcrumb";
-import { DeleteBuildingButton } from "@/components/DeleteBuildingButton";
+import BuildingsGallery from "@/components/BuildingsGallery";
 import ReliefPanel from "@/components/ReliefPanel";
 import type { LngLat } from "@/lib/geo";
 
@@ -136,8 +136,8 @@ export default async function TerrainPage({
         </div>
       </section>
 
-      {/* Mapa + galpões estudados (rail lateral) */}
-      <section className="terrain-workspace">
+      {/* Mapa do terreno */}
+      <section className="terrain-map-section">
         <div className="card" style={{ padding: 0, overflow: "hidden" }}>
           <TerrainEditClient
             id={terrain.id}
@@ -145,108 +145,20 @@ export default async function TerrainPage({
             initialCenter={[terrain.centerLng, terrain.centerLat]}
           />
         </div>
-
-        <aside className="buildings-rail">
-          <div className="row-between">
-            <h2 style={{ fontSize: "var(--fs-md)", margin: 0 }}>
-              Galpões estudados
-              <span
-                className="muted mono"
-                style={{ marginLeft: 8, fontSize: "var(--fs-xs)" }}
-              >
-                {terrain.buildings.length}
-              </span>
-            </h2>
-            <Link
-              href={`/terrenos/${terrain.id}/briefing`}
-              className="btn btn-secondary btn-sm"
-            >
-              + Novo
-            </Link>
-          </div>
-
-          {terrain.buildings.length === 0 ? (
-            <div className="card empty" style={{ padding: "var(--space-4)" }}>
-              <div className="empty-icon">🏗️</div>
-              <div className="empty-title" style={{ fontSize: "var(--fs-sm)" }}>
-                Nenhum estudo
-              </div>
-              <div className="empty-desc" style={{ fontSize: "var(--fs-xs)" }}>
-                Inicie um briefing com a IA para gerar o primeiro modelo 3D.
-              </div>
-              <Link
-                href={`/terrenos/${terrain.id}/briefing`}
-                className="btn btn-primary btn-sm"
-              >
-                Iniciar briefing
-              </Link>
-            </div>
-          ) : (
-            <div className="buildings-list">
-              {terrain.buildings.map((b) => {
-                const m = b.model as {
-                  estimate?: { totalCost?: number; coveredAreaM2?: number };
-                  footprint?: { width?: number; depth?: number };
-                  use?: string;
-                } | null;
-                return (
-                  <div key={b.id} className="building-card">
-                    <Link
-                      href={`/terrenos/${terrain.id}/construcoes/${b.id}`}
-                      className="building-card-body"
-                    >
-                      <div className="card-row">
-                        <div style={{ minWidth: 0 }}>
-                          <div
-                            className="card-title"
-                            style={{ fontSize: "var(--fs-sm)" }}
-                          >
-                            {b.name}
-                          </div>
-                          <div className="card-subtitle">
-                            {new Date(b.createdAt).toLocaleDateString("pt-BR", {
-                              day: "2-digit",
-                              month: "short",
-                              year: "numeric",
-                            })}
-                          </div>
-                        </div>
-                        <span className="pill pill-success">
-                          <span className="dot" />
-                          Ativo
-                        </span>
-                      </div>
-                      <div className="grid-2" style={{ gap: "var(--space-2)" }}>
-                        <div>
-                          <div className="text-xs muted mono">Footprint</div>
-                          <div className="mono" style={{ fontWeight: 600 }}>
-                            {m?.footprint?.width?.toFixed(0) ?? "—"} ×{" "}
-                            {m?.footprint?.depth?.toFixed(0) ?? "—"} m
-                          </div>
-                        </div>
-                        <div>
-                          <div className="text-xs muted mono">Custo est.</div>
-                          <div className="mono" style={{ fontWeight: 600 }}>
-                            R${" "}
-                            {(m?.estimate?.totalCost ?? 0).toLocaleString(
-                              "pt-BR",
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </Link>
-                    <DeleteBuildingButton
-                      terrainId={terrain.id}
-                      buildingId={b.id}
-                      buildingName={b.name}
-                    />
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </aside>
       </section>
+
+      {/* Galeria de construções: thumb visual + 3D + dash de custos */}
+      <BuildingsGallery
+        terrainId={terrain.id}
+        terrainName={terrain.name}
+        polygon={polygon}
+        buildings={terrain.buildings.map((b) => ({
+          id: b.id,
+          name: b.name,
+          createdAt: b.createdAt.toISOString(),
+          model: b.model,
+        }))}
+      />
 
       <ReliefPanel
         terrainId={terrain.id}

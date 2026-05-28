@@ -283,14 +283,20 @@ function ProfileChart({
   profile: { d: number; h: number }[];
   platformH?: number;
 }) {
-  const W = 640;
-  const H = 180;
-  const padL = 44;
-  const padR = 16;
-  const padT = 14;
-  const padB = 28;
+  const W = 960;
+  const H = 260;
+  const padL = 56;
+  const padR = 24;
+  const padT = 20;
+  const padB = 36;
   const innerW = W - padL - padR;
   const innerH = H - padT - padB;
+
+  const [hover, setHover] = useState<{
+    i: number;
+    cx: number;
+    cy: number;
+  } | null>(null);
 
   const dMin = profile[0].d;
   const dMax = profile[profile.length - 1].d;
@@ -346,13 +352,15 @@ function ProfileChart({
   }
 
   return (
-    <svg
-      className="slope-chart"
-      viewBox={`0 0 ${W} ${H}`}
-      preserveAspectRatio="none"
-      role="img"
-      aria-label="Perfil AA' com plataforma recomendada"
-    >
+    <div className="slope-chart-wrap">
+      <svg
+        className="slope-chart"
+        viewBox={`0 0 ${W} ${H}`}
+        preserveAspectRatio="xMidYMid meet"
+        role="img"
+        aria-label="Perfil AA' com plataforma recomendada"
+        onMouseLeave={() => setHover(null)}
+      >
       <rect
         x={padL}
         y={padT}
@@ -373,9 +381,9 @@ function ProfileChart({
           <text
             x={padL - 6}
             y={g.y + 3}
-            fontSize={9}
+            fontSize={11}
             textAnchor="end"
-            fill="rgba(255,255,255,0.5)"
+            fill="rgba(255,255,255,0.55)"
             fontFamily="ui-monospace, monospace"
           >
             {g.h.toFixed(0)} m
@@ -386,9 +394,9 @@ function ProfileChart({
       {cutPath && <path d={cutPath} fill="rgba(215,32,66,0.22)" />}
       {fillPath && <path d={fillPath} fill="rgba(56,148,232,0.22)" />}
 
-      <path d={linePath} fill="none" stroke="#D72042" strokeWidth={1.8} />
+      <path d={linePath} fill="none" stroke="#D72042" strokeWidth={2.2} />
       {profile.map((p, i) => (
-        <circle key={i} cx={x(p.d)} cy={y(p.h)} r={2.5} fill="#D72042" />
+        <circle key={i} cx={x(p.d)} cy={y(p.h)} r={3} fill="#D72042" />
       ))}
 
       {platformH != null && (
@@ -399,13 +407,13 @@ function ProfileChart({
             x2={padL + innerW}
             y2={y(platformH)}
             stroke="#17A34A"
-            strokeWidth={1.4}
-            strokeDasharray="4 3"
+            strokeWidth={1.6}
+            strokeDasharray="5 4"
           />
           <text
             x={padL + innerW - 4}
-            y={y(platformH) - 4}
-            fontSize={9}
+            y={y(platformH) - 6}
+            fontSize={11}
             textAnchor="end"
             fill="#17A34A"
             fontFamily="ui-monospace, monospace"
@@ -424,52 +432,145 @@ function ProfileChart({
       />
       <text
         x={padL}
-        y={H - 8}
-        fontSize={10}
-        fill="rgba(255,255,255,0.6)"
+        y={H - 10}
+        fontSize={12}
+        fill="rgba(255,255,255,0.65)"
         fontFamily="ui-monospace, monospace"
       >
         A
       </text>
       <text
         x={padL + innerW}
-        y={H - 8}
-        fontSize={10}
+        y={H - 10}
+        fontSize={12}
         textAnchor="end"
-        fill="rgba(255,255,255,0.6)"
+        fill="rgba(255,255,255,0.65)"
         fontFamily="ui-monospace, monospace"
       >
         A&apos; · {Math.round(dMax - dMin)} m
       </text>
 
       <g transform={`translate(${padL + 8}, ${padT + 8})`}>
-        <rect width={10} height={10} fill="rgba(215,32,66,0.45)" rx={1} />
+        <rect width={12} height={12} fill="rgba(215,32,66,0.45)" rx={2} />
         <text
-          x={14}
-          y={9}
-          fontSize={9}
-          fill="rgba(255,255,255,0.7)"
+          x={18}
+          y={10}
+          fontSize={11}
+          fill="rgba(255,255,255,0.75)"
           fontFamily="ui-monospace, monospace"
         >
           corte
         </text>
         <rect
-          x={56}
-          width={10}
-          height={10}
+          x={70}
+          width={12}
+          height={12}
           fill="rgba(56,148,232,0.45)"
-          rx={1}
+          rx={2}
         />
         <text
-          x={70}
-          y={9}
-          fontSize={9}
-          fill="rgba(255,255,255,0.7)"
+          x={88}
+          y={10}
+          fontSize={11}
+          fill="rgba(255,255,255,0.75)"
           fontFamily="ui-monospace, monospace"
         >
           aterro
         </text>
       </g>
-    </svg>
+
+      {/* Hit areas para hover por amostra */}
+      {profile.map((p, i) => {
+        const cx = x(p.d);
+        const cy = y(p.h);
+        const prevX = i === 0 ? cx : (cx + x(profile[i - 1].d)) / 2;
+        const nextX =
+          i === profile.length - 1 ? cx : (cx + x(profile[i + 1].d)) / 2;
+        return (
+          <rect
+            key={`hit-${i}`}
+            x={prevX}
+            y={padT}
+            width={Math.max(1, nextX - prevX)}
+            height={innerH}
+            fill="transparent"
+            style={{ cursor: "crosshair" }}
+            onMouseEnter={() => setHover({ i, cx, cy })}
+          />
+        );
+      })}
+
+      {hover && (
+        <g pointerEvents="none">
+          <line
+            x1={hover.cx}
+            y1={padT}
+            x2={hover.cx}
+            y2={padT + innerH}
+            stroke="rgba(255,255,255,0.35)"
+            strokeWidth={1}
+            strokeDasharray="3 3"
+          />
+          <circle
+            cx={hover.cx}
+            cy={hover.cy}
+            r={5}
+            fill="#fff"
+            stroke="#D72042"
+            strokeWidth={2}
+          />
+        </g>
+      )}
+      </svg>
+
+      {hover && (() => {
+        const p = profile[hover.i];
+        const delta = platformH != null ? p.h - platformH : null;
+        const action =
+          delta == null
+            ? null
+            : delta > 0.05
+              ? { label: "corte", color: "#D72042", value: delta }
+              : delta < -0.05
+                ? { label: "aterro", color: "#3894E8", value: -delta }
+                : { label: "no nível", color: "#17A34A", value: 0 };
+        // Posicionar tooltip relativo à largura do SVG (percentual)
+        const leftPct = (hover.cx / W) * 100;
+        return (
+          <div
+            className="slope-tooltip"
+            style={{
+              left: `${leftPct}%`,
+              transform:
+                leftPct > 75
+                  ? "translate(-100%, -50%)"
+                  : leftPct < 25
+                    ? "translate(0%, -50%)"
+                    : "translate(-50%, -50%)",
+            }}
+          >
+            <div className="slope-tooltip-row">
+              <span className="slope-tooltip-lbl">Distância</span>
+              <strong>{p.d.toFixed(0)} m</strong>
+            </div>
+            <div className="slope-tooltip-row">
+              <span className="slope-tooltip-lbl">Altitude</span>
+              <strong>{p.h.toFixed(2)} m</strong>
+            </div>
+            {action && (
+              <div className="slope-tooltip-row">
+                <span className="slope-tooltip-lbl">vs. plataforma</span>
+                <strong style={{ color: action.color }}>
+                  {action.value > 0 ? `${action.value.toFixed(2)} m` : "—"}{" "}
+                  <span style={{ opacity: 0.7, fontWeight: 400 }}>
+                    {action.label}
+                  </span>
+                </strong>
+              </div>
+            )}
+          </div>
+        );
+      })()}
+    </div>
   );
 }

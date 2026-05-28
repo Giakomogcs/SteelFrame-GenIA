@@ -134,14 +134,6 @@ export function Sidebar({ active, counts = {} }: Props) {
           active={active === "base"}
         />
       </div>
-
-      <div className="sidebar-user">
-        <div className="avatar">RC</div>
-        <div className="user-meta">
-          <span className="user-name">Renata Couto</span>
-          <span className="user-role">Eng. Civil · SteelFrame BR</span>
-        </div>
-      </div>
     </aside>
   );
 }
