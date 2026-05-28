@@ -32,6 +32,8 @@ export interface FitOptions {
   requests: BuildingRequest[];
   /** Truck turning circle radius (m). Defaults to constraint minimum. */
   truckGapM?: number;
+  /** Gap between adjacent buildings in the same row (m). Defaults to constraint minimum (6 m). */
+  gapM?: number;
   /** Rotation angle (radians) to apply to all building footprints. */
   rotationRad?: number;
 }
@@ -94,10 +96,17 @@ export function fitBuildings(opts: FitOptions): FitResult {
 
   const bb = polygonBBox(opts.buildable);
   if (!isFinite(bb.width) || bb.width <= 0 || bb.depth <= 0) {
-    return { ok: false, reason: "Buildable region is empty after setbacks." };
+    return {
+      ok: false,
+      reason: "Buildable region is empty after setbacks.",
+      placements: [],
+    };
   }
 
-  const gap = SITE_CONSTRAINTS.building.minGapBetweenM;
+  const gap = Math.max(
+    SITE_CONSTRAINTS.building.minGapBetweenM,
+    opts.gapM ?? SITE_CONSTRAINTS.building.minGapBetweenM,
+  );
   const truckGap = opts.truckGapM ?? SITE_CONSTRAINTS.circulation.truckLaneMin;
   const minSide = SITE_CONSTRAINTS.building.minSideM;
   const rotationRad = opts.rotationRad ?? 0;
