@@ -9,7 +9,7 @@
  * gerado. Persistência incremental em `assumptions` via PATCH
  * `/api/briefings/:id` (FR-W4).
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { LngLat } from "@/lib/geo";
 import { Breadcrumb } from "@/components/Breadcrumb";
@@ -32,6 +32,7 @@ import { fitBuildings } from "@/lib/siteLayout";
 import {
   SitePlanSchema,
   type SitePlan,
+  type BuildingUse,
   type ValidationReport,
 } from "@/lib/sitePlanSchema";
 import LotPreviewMap from "@/components/LotPreviewMap";
@@ -58,6 +59,17 @@ interface Programa {
   standard: "economico" | "medio" | "alto";
 }
 
+interface BuildingOverride {
+  dx: number;
+  dz: number;
+  use?: BuildingUse;
+  targetAreaM2?: number;
+  name?: string;
+  rotationDeg?: number;
+  /** Width/depth ratio: <1 = deep, 1 = square, >1 = wide. */
+  aspectRatio?: number;
+}
+
 interface BriefingState {
   programa: Programa;
   setbacks: { front: number; sides: number; back: number };
@@ -70,6 +82,7 @@ interface BriefingState {
   truckStalls: number;
   rotationDeg: number;
   gapM: number;
+  buildingOverrides: Record<string, BuildingOverride>;
 }
 
 const initial = (): BriefingState => ({
@@ -84,6 +97,7 @@ const initial = (): BriefingState => ({
   truckStalls: 0,
   rotationDeg: 0,
   gapM: SITE_CONSTRAINTS.building.minGapBetweenM,
+  buildingOverrides: {},
 });
 
 interface Props {
@@ -113,6 +127,7 @@ export default function BriefingClient({
   const [furthest, setFurthest] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [selectedBuildingId, setSelectedBuildingId] = useState<string | null>(null);
 
   // Lot projection (local meters) and edges, memoized.
   const lot = useMemo(() => projectLotToLocal(polygon), [polygon]);
@@ -206,6 +221,16 @@ export default function BriefingClient({
     }
   }, [maxTargetArea, state.programa.targetAreaM2]);
 
+  // Clear building overrides when qty changes (layout resets).
+  const prevQtyRef = useRef(state.programa.qty);
+  useEffect(() => {
+    if (prevQtyRef.current !== state.programa.qty) {
+      prevQtyRef.current = state.programa.qty;
+      setState((s) => ({ ...s, buildingOverrides: {} }));
+      setSelectedBuildingId(null);
+    }
+  }, [state.programa.qty]);
+
   // ---- Derive SitePlan from current state (deterministic) ---------------
 
   /** Max number of sheds that can fit given the target area. */
@@ -236,17 +261,61 @@ export default function BriefingClient({
       const rotationRad = (state.rotationDeg * Math.PI) / 180;
       const fit = fitBuildings({
         buildable,
-        requests: Array.from({ length: state.programa.qty }, (_, i) => ({
-          id: `B${i + 1}`,
-          name: `Galpão ${i + 1}`,
-          targetAreaM2: state.programa.targetAreaM2,
-          use: state.programa.use,
-        })),
+        requests: Array.from({ length: state.programa.qty }, (_, i) => {
+          const bid = `B${i + 1}`;
+          const ov = state.buildingOverrides[bid];
+          return {
+            id: bid,
+            name: ov?.name ?? `Galpão ${i + 1}`,
+            targetAreaM2: ov?.targetAreaM2 ?? state.programa.targetAreaM2,
+            use: ov?.use ?? state.programa.use,
+            preferredRatio: ov?.aspectRatio,
+          };
+        }),
         rotationRad,
         gapM: state.gapM,
       });
+      // Apply per-building position offsets from drag
+      for (const p of fit.placements) {
+        const ov = state.buildingOverrides[p.id];
+        if (ov && (ov.dx !== 0 || ov.dz !== 0)) {
+          p.footprintPolygon = p.footprintPolygon.map((v) => ({
+            x: v.x + ov.dx,
+            z: v.z + ov.dz,
+          }));
+        }
+        // Apply per-building individual rotation around its centroid
+        if (ov?.rotationDeg) {
+          const rad = (ov.rotationDeg * Math.PI) / 180;
+          const n = p.footprintPolygon.length || 1;
+          const cx = p.footprintPolygon.reduce((s, v) => s + v.x, 0) / n;
+          const cz = p.footprintPolygon.reduce((s, v) => s + v.z, 0) / n;
+          const cos = Math.cos(rad);
+          const sin = Math.sin(rad);
+          p.footprintPolygon = p.footprintPolygon.map((v) => {
+            const dx = v.x - cx;
+            const dz = v.z - cz;
+            return { x: cx + dx * cos - dz * sin, z: cz + dx * sin + dz * cos };
+          });
+        }
+      }
       // Always use placements (even on overflow) so user sees the buildings.
-      const fitError = fit.ok ? undefined : fit.reason;
+      let fitError = fit.ok ? undefined : fit.reason;
+
+      // Collision check: detect AABB overlaps between buildings
+      for (let a = 0; a < fit.placements.length && !fitError; a++) {
+        const pa = fit.placements[a].footprintPolygon;
+        const ba = { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity };
+        for (const v of pa) { ba.minX = Math.min(ba.minX, v.x); ba.maxX = Math.max(ba.maxX, v.x); ba.minZ = Math.min(ba.minZ, v.z); ba.maxZ = Math.max(ba.maxZ, v.z); }
+        for (let b2 = a + 1; b2 < fit.placements.length; b2++) {
+          const pb = fit.placements[b2].footprintPolygon;
+          const bb2 = { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity };
+          for (const v of pb) { bb2.minX = Math.min(bb2.minX, v.x); bb2.maxX = Math.max(bb2.maxX, v.x); bb2.minZ = Math.min(bb2.minZ, v.z); bb2.maxZ = Math.max(bb2.maxZ, v.z); }
+          if (ba.maxX > bb2.minX && ba.minX < bb2.maxX && ba.maxZ > bb2.minZ && ba.minZ < bb2.maxZ) {
+            fitError = `"${fit.placements[a].name}" e "${fit.placements[b2].name}" estão sobrepostos. Reduza a área, ajuste proporção ou mova os galpões.`;
+          }
+        }
+      }
       const gates = placeGates(lot.local, state.streetEdges, {
         truckAccess: state.truckAccess,
       });
@@ -460,6 +529,31 @@ export default function BriefingClient({
               onGap={(v) => setState((s) => ({ ...s, gapM: v }))}
             />
           )}
+          {step === 2 && candidate.site && candidate.site.buildings.length > 0 && (
+            <BuildingList
+              buildings={candidate.site.buildings}
+              overrides={state.buildingOverrides}
+              selectedId={selectedBuildingId}
+              onSelect={setSelectedBuildingId}
+              onOverride={(id, patch) =>
+                setState((s) => {
+                  const prev = s.buildingOverrides[id] ?? { dx: 0, dz: 0 };
+                  return {
+                    ...s,
+                    buildingOverrides: {
+                      ...s.buildingOverrides,
+                      [id]: { ...prev, ...patch },
+                    },
+                  };
+                })
+              }
+              onResetAll={() => {
+                setState((s) => ({ ...s, buildingOverrides: {} }));
+                setSelectedBuildingId(null);
+              }}
+              maxTargetArea={maxTargetArea}
+            />
+          )}
           {step === 3 && (
             <StepCirculation
               carStalls={state.carStalls}
@@ -499,6 +593,7 @@ export default function BriefingClient({
               setbacks={state.setbacks}
               buildings={
                 (candidate.site?.buildings ?? []).map((b) => ({
+                  id: b.id,
                   polygon: b.footprintPolygon,
                   use: b.use,
                   name: b.name,
@@ -507,6 +602,26 @@ export default function BriefingClient({
               gates={candidate.site?.gates ?? []}
               hasFitError={Boolean(candidate.error)}
               clearHeight={state.clearHeight}
+              onBuildingMove={
+                step === 2
+                  ? (id, dx, dz) =>
+                      setState((s) => ({
+                        ...s,
+                        buildingOverrides: {
+                          ...s.buildingOverrides,
+                          [id]: {
+                            ...s.buildingOverrides[id],
+                            dx: (s.buildingOverrides[id]?.dx ?? 0) + dx,
+                            dz: (s.buildingOverrides[id]?.dz ?? 0) + dz,
+                          },
+                        },
+                      }))
+                  : undefined
+              }
+              onBuildingSelect={
+                step === 2 ? setSelectedBuildingId : undefined
+              }
+              selectedBuildingId={step === 2 ? selectedBuildingId : undefined}
             />
           </div>
           <div className="briefing-v2__preview-stats">
@@ -549,8 +664,15 @@ export default function BriefingClient({
         <button
           type="button"
           className="btn btn--ghost"
-          onClick={prevStep}
-          disabled={step === 0}
+          onClick={() => {
+            if (step === 0) {
+              if (window.confirm("Tem certeza que deseja sair do briefing? Alterações não salvas serão perdidas.")) {
+                router.push(`/terrenos/${terrainId}`);
+              }
+            } else {
+              prevStep();
+            }
+          }}
         >
           ← Voltar
         </button>
@@ -892,6 +1014,168 @@ function StepCirculation({
           onChange={(e) => onChange({ truckStalls: Number(e.target.value) })}
         />
       </label>
+    </div>
+  );
+}
+
+function BuildingList({
+  buildings,
+  overrides,
+  selectedId,
+  onSelect,
+  onOverride,
+  onResetAll,
+  maxTargetArea,
+}: {
+  buildings: { id: string; name: string; use: string; targetAreaM2: number }[];
+  overrides: Record<string, BuildingOverride>;
+  selectedId: string | null;
+  onSelect: (id: string | null) => void;
+  onOverride: (id: string, patch: Partial<BuildingOverride>) => void;
+  onResetAll: () => void;
+  maxTargetArea: number;
+}) {
+  if (buildings.length === 0) return null;
+  const hasAnyOverride = Object.values(overrides).some(
+    (o) => o.dx !== 0 || o.dz !== 0 || o.use || o.targetAreaM2 || o.name || o.rotationDeg || o.aspectRatio,
+  );
+  return (
+    <div className="briefing-v2__building-list">
+      <div className="briefing-v2__building-list-header">
+        <span className="briefing-v2__field-label">Galpões no terreno</span>
+        {hasAnyOverride && (
+          <button
+            type="button"
+            className="briefing-v2__building-reset-all"
+            onClick={onResetAll}
+          >
+            Resetar tudo
+          </button>
+        )}
+      </div>
+      {buildings.map((b, idx) => {
+        const ov = overrides[b.id];
+        const isSelected = selectedId === b.id;
+        const hasMoved = ov && (ov.dx !== 0 || ov.dz !== 0);
+        return (
+          <div
+            key={b.id}
+            className={`briefing-v2__building-card${isSelected ? " selected" : ""}`}
+          >
+            <div className="briefing-v2__building-card-header">
+              <span className="briefing-v2__building-card-name">
+                {b.name}
+              </span>
+              {hasMoved && (
+                <span className="briefing-v2__building-card-badge">movido</span>
+              )}
+              <button
+                type="button"
+                className="briefing-v2__building-card-btn"
+                onClick={() => onSelect(isSelected ? null : b.id)}
+              >
+                {isSelected ? "Fechar" : "Editar"}
+              </button>
+            </div>
+            {isSelected && (
+              <div className="briefing-v2__building-card-body">
+                <label className="briefing-v2__field">
+                  <span>Nome</span>
+                  <input
+                    type="text"
+                    value={ov?.name ?? b.name}
+                    onChange={(e) => {
+                      const v = e.target.value.trim();
+                      onOverride(b.id, { name: v || undefined });
+                    }}
+                  />
+                </label>
+                <div className="briefing-v2__field">
+                  <span>Uso</span>
+                  <div className="briefing-v2__seg" role="group">
+                    {USES.map((u) => (
+                      <button
+                        key={u.id}
+                        type="button"
+                        aria-pressed={(ov?.use ?? b.use) === u.id}
+                        onClick={() => onOverride(b.id, { use: u.id })}
+                      >
+                        {u.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <label className="briefing-v2__field">
+                  <span className="briefing-v2__field-label">
+                    Área alvo
+                    <span className="briefing-v2__field-value">
+                      {(ov?.targetAreaM2 ?? b.targetAreaM2).toLocaleString("pt-BR")} m²
+                    </span>
+                  </span>
+                  <input
+                    type="range"
+                    min={300}
+                    max={maxTargetArea}
+                    step={100}
+                    value={ov?.targetAreaM2 ?? b.targetAreaM2}
+                    onChange={(e) =>
+                      onOverride(b.id, { targetAreaM2: Number(e.target.value) })
+                    }
+                  />
+                </label>
+                <label className="briefing-v2__field">
+                  <span className="briefing-v2__field-label">
+                    Proporção
+                    <span className="briefing-v2__field-value">
+                      {(ov?.aspectRatio ?? 1) < 0.95
+                        ? "Profundo"
+                        : (ov?.aspectRatio ?? 1) > 1.05
+                          ? "Largo"
+                          : "Quadrado"}
+                      {" "}({(ov?.aspectRatio ?? 1).toFixed(1)})
+                    </span>
+                  </span>
+                  <input
+                    type="range"
+                    min={0.25}
+                    max={4}
+                    step={0.05}
+                    value={ov?.aspectRatio ?? 1}
+                    onChange={(e) =>
+                      onOverride(b.id, { aspectRatio: Number(e.target.value) })
+                    }
+                  />
+                </label>
+                <label className="briefing-v2__field">
+                  <span className="briefing-v2__field-label">
+                    Rotação individual
+                    <span className="briefing-v2__field-value">{ov?.rotationDeg ?? 0}°</span>
+                  </span>
+                  <input
+                    type="range"
+                    min={0}
+                    max={360}
+                    step={5}
+                    value={ov?.rotationDeg ?? 0}
+                    onChange={(e) =>
+                      onOverride(b.id, { rotationDeg: Number(e.target.value) })
+                    }
+                  />
+                </label>
+                {hasMoved && (
+                  <button
+                    type="button"
+                    className="briefing-v2__building-reset"
+                    onClick={() => onOverride(b.id, { dx: 0, dz: 0 })}
+                  >
+                    Resetar posição
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
