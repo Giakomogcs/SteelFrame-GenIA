@@ -170,17 +170,22 @@ export default function BriefingClient({
 
   // ---- Buildable area (m²) and per-building max --------------------------
 
-  const buildableRegion = useMemo(
-    () =>
-      buildBuildableRegion(lot.local, {
+  const buildableRegion = useMemo(() => {
+    try {
+      return buildBuildableRegion(lot.local, {
         setbacks: state.setbacks,
         streetEdges: state.streetEdges,
         laneBufferM: state.truckAccess
           ? SITE_CONSTRAINTS.circulation.truckLaneMin
           : SITE_CONSTRAINTS.circulation.carLaneMin,
-      }),
-    [lot.local, state.setbacks, state.streetEdges, state.truckAccess],
-  );
+      });
+    } catch {
+      // Setbacks + lane buffer exceed lot's inscribed radius → no buildable
+      // area. Return [] so downstream calculations degrade gracefully and the
+      // UI can surface the error rather than crash the render.
+      return [] as { x: number; z: number }[];
+    }
+  }, [lot.local, state.setbacks, state.streetEdges, state.truckAccess]);
 
   const buildableAreaM2 = useMemo(
     () => (buildableRegion.length >= 3 ? polygonAreaLocal(buildableRegion) : 0),

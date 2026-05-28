@@ -14,6 +14,7 @@ import { validateSitePlan } from "@/lib/siteConstraints";
 import SitePlanEditor from "./SitePlanEditor";
 import SitePlanViewer3D from "./SitePlanViewer3D.client";
 import RefineChat from "./RefineChat";
+import { deriveShedForPlacement } from "@/lib/sitePlanTo3D";
 
 interface Props {
   terrainId: string;
@@ -313,27 +314,270 @@ export default function StudyShell({
               <SitePlanViewer3D
                 site={site}
                 shedsById={shedsById}
-                lod="structural"
+                lod="architectural"
+                synthesizeShed
               />
             )}
             {tab === "premissas" && (
-              <pre
-                style={{
-                  fontSize: 11,
-                  color: "#cbd5e1",
-                  padding: 12,
-                  overflow: "auto",
-                  margin: 0,
-                  height: "100%",
-                  background: "#0b1220",
-                }}
-              >
-                {JSON.stringify(site, null, 2)}
-              </pre>
+              <BuildingDetailsPanel site={site} shedsById={shedsById} />
             )}
           </div>
         </main>
       </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// BuildingDetailsPanel — structured properties view shown in the "Detalhes"
+// tab. Replaces the raw JSON dump with a per-building program card.
+// ---------------------------------------------------------------------------
+
+interface DetailsProps {
+  site: SitePlan;
+  shedsById?: Record<string, IndustrialShed>;
+}
+
+function BuildingDetailsPanel({ site, shedsById }: DetailsProps) {
+  const enriched = useMemo(
+    () =>
+      site.buildings.map((b) => {
+        const linked = b.shedId ? shedsById?.[b.shedId] : undefined;
+        const shed = linked ?? deriveShedForPlacement(b);
+        return { placement: b, shed, source: linked ? "linked" : "derived" };
+      }),
+    [site.buildings, shedsById],
+  );
+
+  return (
+    <div
+      style={{
+        padding: 16,
+        overflow: "auto",
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        gap: 16,
+        background: "#0b1220",
+        color: "#e2e8f0",
+      }}
+    >
+      <header
+        style={{ display: "flex", justifyContent: "space-between", gap: 12 }}
+      >
+        <div>
+          <div style={{ fontSize: 11, color: "#64748b", letterSpacing: 1 }}>
+            DETALHES DO ESTUDO
+          </div>
+          <h2 style={{ margin: 0, fontSize: 18 }}>
+            {site.buildings.length} galpão
+            {site.buildings.length === 1 ? "" : "es"} · {site.gates.length}{" "}
+            portão{site.gates.length === 1 ? "" : "ões"}
+          </h2>
+        </div>
+        <div
+          style={{ display: "flex", gap: 8, fontSize: 11, color: "#94a3b8" }}
+        >
+          <span>
+            Recuos F/L/T: {site.setbacks.front}/{site.setbacks.sides}/
+            {site.setbacks.back} m
+          </span>
+        </div>
+      </header>
+
+      {enriched.length === 0 && (
+        <div style={{ color: "#94a3b8", fontSize: 13 }}>
+          Nenhum galpão posicionado.
+        </div>
+      )}
+
+      {enriched.map(({ placement, shed, source }) => {
+        const area = Math.round(shed.footprint.width * shed.footprint.depth);
+        return (
+          <article
+            key={placement.id}
+            style={{
+              border: "1px solid #1f2937",
+              borderRadius: 10,
+              background: "#0f172a",
+              padding: 14,
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: 12,
+            }}
+          >
+            <div
+              style={{
+                gridColumn: "1 / -1",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "baseline",
+              }}
+            >
+              <h3 style={{ margin: 0, fontSize: 15 }}>
+                {placement.name}{" "}
+                <span style={{ fontSize: 11, color: "#64748b" }}>
+                  · {placement.use}
+                </span>
+              </h3>
+              <span
+                style={{
+                  fontSize: 10,
+                  color: source === "linked" ? "#10b981" : "#fbbf24",
+                  border: `1px solid ${source === "linked" ? "#065f46" : "#78350f"}`,
+                  padding: "2px 6px",
+                  borderRadius: 6,
+                  textTransform: "uppercase",
+                  letterSpacing: 0.5,
+                }}
+                title={
+                  source === "linked"
+                    ? "Galpão vinculado"
+                    : "Programa derivado automaticamente do footprint"
+                }
+              >
+                {source === "linked" ? "Vinculado" : "Derivado"}
+              </span>
+            </div>
+
+            <Section title="Dimensões">
+              <Row k="Área coberta" v={`${area.toLocaleString("pt-BR")} m²`} />
+              <Row
+                k="Largura × profundidade"
+                v={`${shed.footprint.width} × ${shed.footprint.depth} m`}
+              />
+              <Row k="Pé-direito útil" v={`${shed.structure.clearHeight} m`} />
+              <Row k="Padrão" v={shed.standard} />
+            </Section>
+
+            <Section title="Estrutura">
+              <Row k="Sistema" v={shed.structure.system} />
+              <Row
+                k="Pórticos"
+                v={`${shed.structure.bayCount} × ${shed.structure.baySpacing} m`}
+              />
+              <Row k="Vão livre" v={`${shed.structure.freeSpan} m`} />
+              <Row k="Cobertura" v={shed.structure.roofStructure} />
+              <Row k="Perfil colunas" v={shed.structure.columnProfile} />
+            </Section>
+
+            <Section title="Telhado">
+              <Row k="Tipo" v={shed.roof.type} />
+              <Row k="Inclinação" v={`${shed.roof.slopePct}%`} />
+              <Row k="Cobertura" v={shed.roof.cover} />
+              <Row k="Skylight" v={`${shed.roof.skylightPct}%`} />
+            </Section>
+
+            <Section title="Envoltória / Piso">
+              <Row k="Paredes" v={shed.envelope.walls} />
+              <Row k="Base alvenaria" v={`${shed.envelope.wallBaseHeight} m`} />
+              <Row k="Isolamento" v={shed.envelope.insulation} />
+              <Row
+                k="Piso"
+                v={`${shed.floor.type} · ${shed.floor.load_kN_m2} kN/m²`}
+              />
+            </Section>
+
+            <Section title="Zonas / Programa">
+              {shed.zones.length === 0 ? (
+                <Row k="—" v="sem zonas" />
+              ) : (
+                shed.zones.map((z, i) => (
+                  <Row
+                    key={i}
+                    k={`${z.type}`}
+                    v={`${z.name} · ${Math.round(z.width * z.depth)} m² · h=${z.height} m`}
+                  />
+                ))
+              )}
+              {shed.mezzanine && (
+                <Row
+                  k="mezanino"
+                  v={`${Math.round(shed.mezzanine.width * shed.mezzanine.depth)} m² · cota ${shed.mezzanine.height} m · ${shed.mezzanine.load_kN_m2} kN/m²`}
+                />
+              )}
+            </Section>
+
+            <Section title="Operação">
+              <Row k="Docas" v={`${shed.docks.length}`} />
+              <Row
+                k="Aberturas"
+                v={shed.openings.map((o) => o.type).join(", ") || "—"}
+              />
+              <Row k="Vagas (carro)" v={`${shed.yard.parkingCars}`} />
+              <Row k="Vagas (caminhão)" v={`${shed.yard.parkingTrucks}`} />
+              <Row k="Raio caminhão" v={`${shed.yard.truckCircle_m} m`} />
+            </Section>
+
+            <Section title="Segurança / Utilidades">
+              <Row
+                k="AVCB"
+                v={shed.safety.avcbRequired ? "exigido" : "não exigido"}
+              />
+              <Row
+                k="Saídas"
+                v={`${shed.safety.exitsCount} · ${shed.safety.exitsWidthTotal} m`}
+              />
+              <Row k="Hidrantes" v={`${shed.utilities.hydrants}`} />
+              <Row k="Potência" v={`${shed.utilities.power_kVA} kVA`} />
+              <Row
+                k="Sprinklers"
+                v={shed.utilities.sprinklers ? "sim" : "não"}
+              />
+            </Section>
+
+            <Section title="Estimativa">
+              <Row
+                k="Custo /m²"
+                v={`R$ ${shed.estimate.costPerM2.toLocaleString("pt-BR")}`}
+              />
+              <Row
+                k="Custo total"
+                v={`R$ ${shed.estimate.totalCost.toLocaleString("pt-BR")}`}
+              />
+              <Row
+                k="Aço"
+                v={`${shed.estimate.steelKg.toLocaleString("pt-BR")} kg`}
+              />
+              <Row k="Confiança" v={`${Math.round(shed.confidence * 100)}%`} />
+            </Section>
+          </article>
+        );
+      })}
+    </div>
+  );
+}
+
+function Section({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section>
+      <div
+        style={{
+          fontSize: 10,
+          letterSpacing: 1,
+          color: "#64748b",
+          textTransform: "uppercase",
+          marginBottom: 4,
+        }}
+      >
+        {title}
+      </div>
+      <dl style={{ margin: 0, fontSize: 12, lineHeight: 1.6 }}>{children}</dl>
+    </section>
+  );
+}
+
+function Row({ k, v }: { k: string; v: React.ReactNode }) {
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+      <dt style={{ color: "#94a3b8" }}>{k}</dt>
+      <dd style={{ margin: 0, color: "#e2e8f0", textAlign: "right" }}>{v}</dd>
     </div>
   );
 }

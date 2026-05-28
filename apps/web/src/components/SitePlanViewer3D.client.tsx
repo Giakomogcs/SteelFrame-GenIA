@@ -17,6 +17,12 @@ interface Props {
   site: SitePlan;
   shedsById?: Record<string, IndustrialShed>;
   lod?: Lod;
+  /**
+   * When true (default), buildings without a linked shed are rendered with
+   * an in-memory shed derived from their footprint/use so walls, roof, docks,
+   * skylights, office annex etc. show up.
+   */
+  synthesizeShed?: boolean;
 }
 
 function disposeRoot(root: THREE.Object3D) {
@@ -31,7 +37,8 @@ function disposeRoot(root: THREE.Object3D) {
 export default function SitePlanViewer3D({
   site,
   shedsById,
-  lod = "structural",
+  lod = "architectural",
+  synthesizeShed = true,
 }: Props) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
@@ -120,10 +127,10 @@ export default function SitePlanViewer3D({
       scene.remove(currentGroupRef.current);
       currentGroupRef.current = null;
     }
-    const group = sitePlanTo3D(site, { shedsById, lod });
+    const group = sitePlanTo3D(site, { shedsById, lod, synthesizeShed });
     currentGroupRef.current = group;
     scene.add(group);
-  }, [site, shedsById, lod]);
+  }, [site, shedsById, lod, synthesizeShed]);
 
   return (
     <div
