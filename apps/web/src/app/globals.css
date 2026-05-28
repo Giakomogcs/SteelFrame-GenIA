@@ -4809,7 +4809,9 @@ textarea {
   align-items: center;
   justify-content: center;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
-  transition: transform 100ms ease, box-shadow 100ms ease;
+  transition:
+    transform 100ms ease,
+    box-shadow 100ms ease;
 }
 .building-drag-handle::after {
   content: "\2725";
@@ -4845,7 +4847,9 @@ textarea {
   padding: var(--space-1) var(--space-2);
   cursor: pointer;
   font-family: var(--font-body);
-  transition: color 120ms ease, border-color 120ms ease;
+  transition:
+    color 120ms ease,
+    border-color 120ms ease;
 }
 .briefing-v2__building-reset-all:hover,
 .briefing-v2__building-reset:hover {
@@ -4860,7 +4864,9 @@ textarea {
   border-radius: var(--radius-md);
   background: var(--color-background);
   overflow: hidden;
-  transition: border-color 120ms ease, box-shadow 120ms ease;
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease;
 }
 .briefing-v2__building-card.selected {
   border-color: var(--color-primary-500);

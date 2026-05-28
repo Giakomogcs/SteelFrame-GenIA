@@ -377,7 +377,13 @@ export default async function ReportDetailPage({
 
       <section
         className="card"
-        style={{ padding: 0, overflow: "hidden", marginTop: 16, height: 560, borderRadius: 12 }}
+        style={{
+          padding: 0,
+          overflow: "hidden",
+          marginTop: 16,
+          height: 560,
+          borderRadius: 12,
+        }}
       >
         {site ? (
           <SitePlanViewer3D

@@ -130,8 +130,10 @@ function Foundation({ shed }: { shed: IndustrialShed }) {
   const { footprint, structure } = shed;
   const w = footprint.width;
   const d = footprint.depth;
-  const bays = structure.bayCount;
-  const spacing = structure.baySpacing;
+  const bays = Math.max(1, structure.bayCount);
+  // Distribui as sapatas/pórticos exatamente sobre a profundidade do galpão
+  // (evita que `baySpacing` desatualizado faça a estrutura ultrapassar `d`).
+  const spacing = d / bays;
   const blocks: JSX.Element[] = [];
   // Sapatas isoladas: 2 por pórtico.
   for (let i = 0; i < bays; i++) {
@@ -177,8 +179,10 @@ function Structure({ shed }: { shed: IndustrialShed }) {
   const { footprint, structure, roof } = shed;
   const w = footprint.width;
   const d = footprint.depth;
-  const bays = structure.bayCount;
-  const spacing = structure.baySpacing;
+  const bays = Math.max(1, structure.bayCount);
+  // Mesmo motivo de Foundation: recompute spacing a partir de `d` para
+  // garantir que os pórticos fiquem dentro do volume do galpão.
+  const spacing = d / bays;
   const ch = structure.clearHeight;
   const rise = roof.type === "gable" ? (w / 2) * (roof.slopePct / 100) : 0.3;
   const col = 0.32;

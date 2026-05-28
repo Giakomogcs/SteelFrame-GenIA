@@ -328,7 +328,12 @@ export default function SitePlanViewer3D({
         box.getCenter(center);
         grid.position.set(center.x, -0.01, center.z);
         // Substitui a grid por uma do tamanho certo (cheap recreate).
-        const newGrid = new THREE.GridHelper(span, Math.min(80, Math.max(20, Math.round(span / 10))), 0x1f2937, 0x111827);
+        const newGrid = new THREE.GridHelper(
+          span,
+          Math.min(80, Math.max(20, Math.round(span / 10))),
+          0x1f2937,
+          0x111827,
+        );
         newGrid.position.copy(grid.position);
         (newGrid.material as THREE.Material).opacity = 0.45;
         (newGrid.material as THREE.Material).transparent = true;
@@ -450,7 +455,12 @@ export default function SitePlanViewer3D({
     // Preferência: bbox real da cena renderizada (calculado após
     // sitePlanTo3D). Cai para footprint dos prédios e, por último, para o lote.
     const box = sceneBoxRef.current;
-    let cx: number, cy: number, cz: number, width: number, depth: number, maxY: number;
+    let cx: number,
+      cy: number,
+      cz: number,
+      width: number,
+      depth: number,
+      maxY: number;
     if (box && !box.isEmpty()) {
       const size = new THREE.Vector3();
       const center = new THREE.Vector3();
@@ -466,14 +476,22 @@ export default function SitePlanViewer3D({
       maxY = Math.max(4, size.y);
     } else {
       // Fallback: bbox dos polygons do lote.
-      let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+      let minX = Infinity,
+        maxX = -Infinity,
+        minZ = Infinity,
+        maxZ = -Infinity;
       for (const p of site.lotPolygonLocal) {
         if (p.x < minX) minX = p.x;
         if (p.x > maxX) maxX = p.x;
         if (p.z < minZ) minZ = p.z;
         if (p.z > maxZ) maxZ = p.z;
       }
-      if (!isFinite(minX)) { minX = -20; maxX = 20; minZ = -20; maxZ = 20; }
+      if (!isFinite(minX)) {
+        minX = -20;
+        maxX = 20;
+        minZ = -20;
+        maxZ = 20;
+      }
       cx = (minX + maxX) / 2;
       cz = (minZ + maxZ) / 2;
       cy = 4;
@@ -794,11 +812,16 @@ export default function SitePlanViewer3D({
             title="Esconde o telhado para mostrar o interior do galpão"
           >
             Sem teto
-          </button>          {compact &&
+          </button>{" "}
+          {compact &&
             (
               [
                 { id: "iso", label: "Iso", title: "Câmera isométrica" },
-                { id: "top", label: "Planta", title: "Câmera de cima (planta)" },
+                {
+                  id: "top",
+                  label: "Planta",
+                  title: "Câmera de cima (planta)",
+                },
                 { id: "front", label: "Lateral", title: "Câmera lateral" },
               ] as const
             ).map((m) => (
@@ -812,7 +835,8 @@ export default function SitePlanViewer3D({
               >
                 {m.label}
               </button>
-            ))}          {allowFullscreen && (
+            ))}{" "}
+          {allowFullscreen && (
             <button
               type="button"
               onClick={toggleFullscreen}
@@ -852,156 +876,159 @@ export default function SitePlanViewer3D({
 
       {/* ----- Layer rail (esquerda, centralizado verticalmente) ---------- */}
       {!compact && (
-      <div
-        className="viewer-3d__panel viewer-3d__layer-rail"
-        aria-label="Camadas construtivas"
-      >
-        <div className="viewer-3d__panel-head">
-          <span>Camadas</span>
-          <strong>{LAYER_META.length}</strong>
-        </div>
-        {LAYER_META.map((l) => {
-          const visible = layerVisible[l.key];
-          const isActive = isolatedLayer === l.key;
-          return (
-            <button
-              key={l.key}
-              type="button"
-              className={`viewer-3d__layer-chip lc-${l.key}`}
-              aria-pressed={visible}
-              data-active={isActive}
-              onClick={() =>
-                setIsolatedLayer((cur) => (cur === l.key ? null : l.key))
-              }
-              title={`${l.name} — clique para isolar (Esc para voltar)`}
-            >
-              <span className="viewer-3d__lc-idx">{l.idx}</span>
-              <span>
-                <div className="viewer-3d__lc-name">{l.name}</div>
-                <div className="viewer-3d__lc-meta">{l.tag}</div>
-              </span>
-              <span
-                className="viewer-3d__lc-toggle"
-                role="checkbox"
-                aria-checked={visible}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setLayerVisible((cur) => ({ ...cur, [l.key]: !cur[l.key] }));
-                }}
-                title={visible ? "Ocultar camada" : "Mostrar camada"}
-              >
-                {visible ? "✓" : ""}
-              </span>
-            </button>
-          );
-        })}
-        <div className="viewer-3d__layer-rail-foot">
-          <label
-            style={{
-              fontFamily: "var(--font-mono)",
-              fontSize: 10,
-              color: "var(--color-text-secondary)",
-              textTransform: "uppercase",
-              letterSpacing: "0.08em",
-            }}
-          >
-            Explodir
-          </label>
-          <input
-            type="range"
-            min={0}
-            max={100}
-            value={Math.round(explodeAmount * 100)}
-            onChange={(e) => setExplodeAmount(Number(e.target.value) / 100)}
-            style={{ flex: 1, accentColor: "var(--color-primary-500)" }}
-            aria-label="Explodir camadas"
-          />
-          <output
-            style={{
-              fontFamily: "var(--font-mono)",
-              fontSize: 11,
-              color: "var(--color-text-primary)",
-              minWidth: 32,
-              textAlign: "right",
-            }}
-          >
-            {Math.round(explodeAmount * 100)}%
-          </output>
-        </div>
-        <button
-          type="button"
-          className="viewer-3d__layer-reset"
-          onClick={() => {
-            setLayerVisible({
-              foundation: true,
-              structure: true,
-              floor: true,
-              services: true,
-              cladding: true,
-              roof: true,
-            });
-            setIsolatedLayer(null);
-            setExplodeAmount(0);
-          }}
+        <div
+          className="viewer-3d__panel viewer-3d__layer-rail"
+          aria-label="Camadas construtivas"
         >
-          Restaurar todas
-        </button>
-      </div>
+          <div className="viewer-3d__panel-head">
+            <span>Camadas</span>
+            <strong>{LAYER_META.length}</strong>
+          </div>
+          {LAYER_META.map((l) => {
+            const visible = layerVisible[l.key];
+            const isActive = isolatedLayer === l.key;
+            return (
+              <button
+                key={l.key}
+                type="button"
+                className={`viewer-3d__layer-chip lc-${l.key}`}
+                aria-pressed={visible}
+                data-active={isActive}
+                onClick={() =>
+                  setIsolatedLayer((cur) => (cur === l.key ? null : l.key))
+                }
+                title={`${l.name} — clique para isolar (Esc para voltar)`}
+              >
+                <span className="viewer-3d__lc-idx">{l.idx}</span>
+                <span>
+                  <div className="viewer-3d__lc-name">{l.name}</div>
+                  <div className="viewer-3d__lc-meta">{l.tag}</div>
+                </span>
+                <span
+                  className="viewer-3d__lc-toggle"
+                  role="checkbox"
+                  aria-checked={visible}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setLayerVisible((cur) => ({
+                      ...cur,
+                      [l.key]: !cur[l.key],
+                    }));
+                  }}
+                  title={visible ? "Ocultar camada" : "Mostrar camada"}
+                >
+                  {visible ? "✓" : ""}
+                </span>
+              </button>
+            );
+          })}
+          <div className="viewer-3d__layer-rail-foot">
+            <label
+              style={{
+                fontFamily: "var(--font-mono)",
+                fontSize: 10,
+                color: "var(--color-text-secondary)",
+                textTransform: "uppercase",
+                letterSpacing: "0.08em",
+              }}
+            >
+              Explodir
+            </label>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              value={Math.round(explodeAmount * 100)}
+              onChange={(e) => setExplodeAmount(Number(e.target.value) / 100)}
+              style={{ flex: 1, accentColor: "var(--color-primary-500)" }}
+              aria-label="Explodir camadas"
+            />
+            <output
+              style={{
+                fontFamily: "var(--font-mono)",
+                fontSize: 11,
+                color: "var(--color-text-primary)",
+                minWidth: 32,
+                textAlign: "right",
+              }}
+            >
+              {Math.round(explodeAmount * 100)}%
+            </output>
+          </div>
+          <button
+            type="button"
+            className="viewer-3d__layer-reset"
+            onClick={() => {
+              setLayerVisible({
+                foundation: true,
+                structure: true,
+                floor: true,
+                services: true,
+                cladding: true,
+                roof: true,
+              });
+              setIsolatedLayer(null);
+              setExplodeAmount(0);
+            }}
+          >
+            Restaurar todas
+          </button>
+        </div>
       )}
 
       {/* ----- Env-control: basemap + opacidade (bottom-left) ------------- */}
       {!compact && (
-      <div
-        className="viewer-3d__panel viewer-3d__env"
-        aria-label="Contexto cartográfico"
-      >
-        <div className="viewer-3d__panel-head">
-          <span>Contexto</span>
-          <strong>
-            {currentMapStyle === "off"
-              ? "Off"
-              : MAP_STYLES[currentMapStyle].label}
-          </strong>
+        <div
+          className="viewer-3d__panel viewer-3d__env"
+          aria-label="Contexto cartográfico"
+        >
+          <div className="viewer-3d__panel-head">
+            <span>Contexto</span>
+            <strong>
+              {currentMapStyle === "off"
+                ? "Off"
+                : MAP_STYLES[currentMapStyle].label}
+            </strong>
+          </div>
+          <div className="viewer-3d__env-pills" role="tablist">
+            <button
+              type="button"
+              className="viewer-3d__env-pill"
+              aria-pressed={currentMapStyle === "off"}
+              onClick={() => setCurrentMapStyle("off")}
+              title="Sem mapa (grid abstrato)"
+            >
+              Off
+            </button>
+            {(Object.keys(MAP_STYLES) as Array<keyof typeof MAP_STYLES>).map(
+              (key) => (
+                <button
+                  key={key}
+                  type="button"
+                  className="viewer-3d__env-pill"
+                  aria-pressed={currentMapStyle === key}
+                  onClick={() => setCurrentMapStyle(key)}
+                  title={MAP_STYLES[key].title}
+                >
+                  {MAP_STYLES[key].label}
+                </button>
+              ),
+            )}
+          </div>
+          <div className="viewer-3d__slider-row">
+            <label htmlFor="viewer-3d-opacity">Opacidade</label>
+            <input
+              id="viewer-3d-opacity"
+              type="range"
+              min={0}
+              max={100}
+              value={Math.round(mapOpacity * 100)}
+              onChange={(e) => setMapOpacity(Number(e.target.value) / 100)}
+              disabled={currentMapStyle === "off"}
+            />
+            <output>{Math.round(mapOpacity * 100)}%</output>
+          </div>
         </div>
-        <div className="viewer-3d__env-pills" role="tablist">
-          <button
-            type="button"
-            className="viewer-3d__env-pill"
-            aria-pressed={currentMapStyle === "off"}
-            onClick={() => setCurrentMapStyle("off")}
-            title="Sem mapa (grid abstrato)"
-          >
-            Off
-          </button>
-          {(Object.keys(MAP_STYLES) as Array<keyof typeof MAP_STYLES>).map(
-            (key) => (
-              <button
-                key={key}
-                type="button"
-                className="viewer-3d__env-pill"
-                aria-pressed={currentMapStyle === key}
-                onClick={() => setCurrentMapStyle(key)}
-                title={MAP_STYLES[key].title}
-              >
-                {MAP_STYLES[key].label}
-              </button>
-            ),
-          )}
-        </div>
-        <div className="viewer-3d__slider-row">
-          <label htmlFor="viewer-3d-opacity">Opacidade</label>
-          <input
-            id="viewer-3d-opacity"
-            type="range"
-            min={0}
-            max={100}
-            value={Math.round(mapOpacity * 100)}
-            onChange={(e) => setMapOpacity(Number(e.target.value) / 100)}
-            disabled={currentMapStyle === "off"}
-          />
-          <output>{Math.round(mapOpacity * 100)}%</output>
-        </div>
-      </div>
       )}
 
       {/* ----- Layer focus callout (top-center quando isolado) ------------ */}
@@ -1024,30 +1051,30 @@ export default function SitePlanViewer3D({
 
       {/* ----- Bottom-center camera pill (Iso/Planta/Lateral) ------------- */}
       {!compact && (
-      <div
-        className="viewer-3d__camera-pill"
-        role="toolbar"
-        aria-label="Câmera"
-      >
-        {(
-          [
-            { id: "iso", label: "Iso", title: "Câmera isométrica" },
-            { id: "top", label: "Planta", title: "Câmera de cima (planta)" },
-            { id: "front", label: "Lateral", title: "Câmera lateral" },
-          ] as const
-        ).map((m) => (
-          <button
-            key={m.id}
-            type="button"
-            onClick={() => setCameraMode(m.id)}
-            className="viewer-3d__btn"
-            aria-pressed={cameraMode === m.id}
-            title={m.title}
-          >
-            {m.label}
-          </button>
-        ))}
-      </div>
+        <div
+          className="viewer-3d__camera-pill"
+          role="toolbar"
+          aria-label="Câmera"
+        >
+          {(
+            [
+              { id: "iso", label: "Iso", title: "Câmera isométrica" },
+              { id: "top", label: "Planta", title: "Câmera de cima (planta)" },
+              { id: "front", label: "Lateral", title: "Câmera lateral" },
+            ] as const
+          ).map((m) => (
+            <button
+              key={m.id}
+              type="button"
+              onClick={() => setCameraMode(m.id)}
+              className="viewer-3d__btn"
+              aria-pressed={cameraMode === m.id}
+              title={m.title}
+            >
+              {m.label}
+            </button>
+          ))}
+        </div>
       )}
     </div>
   );
