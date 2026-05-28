@@ -67,7 +67,6 @@ const STEPS: StepDef[] = [
   { id: "terreno", label: "Terreno & rua", description: "Arestas e recuos" },
   { id: "perimetro", label: "Perímetro", description: "Muros e portões" },
   { id: "programa", label: "Programa & Galpões", description: "Uso, dimensões e tipologia" },
-  { id: "circulacao", label: "Circulação", description: "Vagas e vias" },
   { id: "revisao", label: "Revisão", description: "Validar e gerar 3D" },
 ];
 
@@ -601,13 +600,6 @@ export default function BriefingClient({
             />
           )}
           {step === 3 && (
-            <StepCirculation
-              carStalls={state.carStalls}
-              truckStalls={state.truckStalls}
-              onChange={(patch) => setState((s) => ({ ...s, ...patch }))}
-            />
-          )}
-          {step === 4 && (
             <StepReview report={candidate.report} error={candidate.error} />
           )}
 
@@ -1021,43 +1013,6 @@ function StepPerimeter({
           step={0.5}
           value={gateWidth}
           onChange={(e) => onChange({ gateWidth: Number(e.target.value) })}
-        />
-      </label>
-    </div>
-  );
-}
-
-function StepCirculation({
-  carStalls,
-  truckStalls,
-  onChange,
-}: {
-  carStalls: number;
-  truckStalls: number;
-  onChange: (
-    patch: Partial<{ carStalls: number; truckStalls: number }>,
-  ) => void;
-}) {
-  return (
-    <div className="briefing-v2__fields">
-      <label className="briefing-v2__field">
-        <span>Vagas de carro</span>
-        <input
-          type="number"
-          min={0}
-          max={500}
-          value={carStalls}
-          onChange={(e) => onChange({ carStalls: Number(e.target.value) })}
-        />
-      </label>
-      <label className="briefing-v2__field">
-        <span>Vagas de caminhão</span>
-        <input
-          type="number"
-          min={0}
-          max={100}
-          value={truckStalls}
-          onChange={(e) => onChange({ truckStalls: Number(e.target.value) })}
         />
       </label>
     </div>
