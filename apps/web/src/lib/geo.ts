@@ -55,6 +55,20 @@ export function toLocalMeters(
   }));
 }
 
+/** Inverso de `toLocalMeters`: metros locais → lat/lng. */
+export function fromLocalMeters(
+  pts: { x: number; y: number }[],
+  ref: LngLat,
+): LngLat[] {
+  const [refLng, refLat] = ref;
+  const cosLat = Math.cos(toRad(refLat));
+  const toDeg = (rad: number) => (rad * 180) / Math.PI;
+  return pts.map(({ x, y }) => [
+    refLng + toDeg(x / (EARTH_RADIUS * cosLat)),
+    refLat + toDeg(y / EARTH_RADIUS),
+  ]);
+}
+
 /** Bounding box alinhado a eixos do polígono em metros locais */
 export function localBBox(localPts: { x: number; y: number }[]) {
   let minX = Infinity,

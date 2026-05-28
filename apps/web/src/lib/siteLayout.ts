@@ -32,11 +32,13 @@ export interface FitOptions {
   requests: BuildingRequest[];
   /** Truck turning circle radius (m). Defaults to constraint minimum. */
   truckGapM?: number;
+  /** Rotation angle (radians) to apply to all building footprints. */
+  rotationRad?: number;
 }
 
 export type FitResult =
   | { ok: true; placements: BuildingPlacement[] }
-  | { ok: false; reason: string };
+  | { ok: false; reason: string; placements: BuildingPlacement[] };
 
 // ---- Helpers -------------------------------------------------------------
 
@@ -56,6 +58,16 @@ function footprintInside(
   region: readonly V[],
 ): boolean {
   return footprint.every((v) => pointInPolygon(v, region));
+}
+
+function rotatePolygon(poly: V[], cx: number, cz: number, rad: number): V[] {
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+  return poly.map((p) => {
+    const dx = p.x - cx;
+    const dz = p.z - cz;
+    return { x: cx + dx * cos - dz * sin, z: cz + dx * sin + dz * cos };
+  });
 }
 
 /** Picks width/depth so that w*d ≈ target, respecting min side and ratio. */
@@ -88,6 +100,7 @@ export function fitBuildings(opts: FitOptions): FitResult {
   const gap = SITE_CONSTRAINTS.building.minGapBetweenM;
   const truckGap = opts.truckGapM ?? SITE_CONSTRAINTS.circulation.truckLaneMin;
   const minSide = SITE_CONSTRAINTS.building.minSideM;
+  const rotationRad = opts.rotationRad ?? 0;
 
   // Layout grid (cols × rows). Prefer columns when buildable is wider.
   const n = opts.requests.length;
@@ -115,11 +128,10 @@ export function fitBuildings(opts: FitOptions): FitResult {
   // Available cell size (subtracting inter-building gaps).
   const cellW = (bb.width - gap * (cols - 1)) / cols;
   const cellD = (bb.depth - truckGap * (rows - 1)) / rows;
+
+  let fitError: string | null = null;
   if (cellW < minSide || cellD < minSide) {
-    return {
-      ok: false,
-      reason: `Buildable region too small for ${n} galpões (célula ${cellW.toFixed(1)}×${cellD.toFixed(1)} m < mínimo ${minSide} m).`,
-    };
+    fitError = `Região construtível insuficiente para ${n} galpões (célula ${cellW.toFixed(1)}×${cellD.toFixed(1)} m < mínimo ${minSide} m).`;
   }
 
   const originX = bb.minX;
@@ -131,25 +143,32 @@ export function fitBuildings(opts: FitOptions): FitResult {
     const col = i % cols;
     const row = Math.floor(i / cols);
 
-    const preferredRatio = req.preferredRatio ?? cellW / cellD;
+    const effectiveCellW = Math.max(cellW, minSide);
+    const effectiveCellD = Math.max(cellD, minSide);
+    const preferredRatio =
+      req.preferredRatio ?? effectiveCellW / effectiveCellD;
     const { w: targetW, d: targetD } = dimensionsFor(
       req.targetAreaM2,
       preferredRatio,
       minSide,
     );
-    // Clamp to cell.
-    const w = Math.min(targetW, cellW);
-    const d = Math.min(targetD, cellD);
+    // Use full requested size — don't clamp to cell.
+    const w = targetW;
+    const d = targetD;
 
-    const cx = originX + col * (cellW + gap) + cellW / 2;
-    const cz = originZ + row * (cellD + truckGap) + cellD / 2;
-    const footprint = rectFootprint(cx, cz, w, d);
+    const cx = originX + col * (effectiveCellW + gap) + effectiveCellW / 2;
+    const cz = originZ + row * (effectiveCellD + truckGap) + effectiveCellD / 2;
+    let footprint = rectFootprint(cx, cz, w, d);
+
+    // Apply rotation around centroid if specified.
+    if (rotationRad !== 0) {
+      footprint = rotatePolygon(footprint, cx, cz, rotationRad);
+    }
 
     if (!footprintInside(footprint, opts.buildable)) {
-      return {
-        ok: false,
-        reason: `Galpão "${req.name}" não cabe na região construtível após recuos. Reduza nº/área.`,
-      };
+      fitError =
+        fitError ??
+        `Galpão "${req.name}" ultrapassa a região construtível. Reduza área, nº de galpões ou ajuste a rotação.`;
     }
 
     placements.push({
@@ -159,10 +178,13 @@ export function fitBuildings(opts: FitOptions): FitResult {
       use: req.use ?? "logistics",
       targetAreaM2: req.targetAreaM2,
       footprintPolygon: footprint,
-      rotationRad: 0,
+      rotationRad,
       z0: 0,
     });
   }
 
+  if (fitError) {
+    return { ok: false, reason: fitError, placements };
+  }
   return { ok: true, placements };
 }

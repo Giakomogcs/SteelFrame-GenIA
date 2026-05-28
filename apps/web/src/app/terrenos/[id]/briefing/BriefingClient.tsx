@@ -3,7 +3,7 @@
 /**
  * BriefingClient (v2 — PRD §10.1)
  *
- * Wizard horizontal de 5 passos. AC1: nunca monta `ShedViewer` nem cria
+ * Wizard horizontal de 6 passos. AC1: nunca monta `ShedViewer` nem cria
  * `Building`/`SitePlan` materializado antes do submit do step 6. A coluna
  * direita exibe apenas o `LotPreviewSvg` (planta 2D) até o estudo ser
  * gerado. Persistência incremental em `assumptions` via PATCH
@@ -12,6 +12,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { LngLat } from "@/lib/geo";
+import { fromLocalMeters } from "@/lib/geo";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { BriefingStepper, type StepDef } from "@/components/BriefingStepper";
 import {
@@ -35,16 +36,13 @@ import {
   type SitePlan,
   type ValidationReport,
 } from "@/lib/sitePlanSchema";
-import TerrainThumb from "@/components/TerrainThumb";
+import MapBackground from "@/components/MapBackground";
 
 const STEPS: StepDef[] = [
-  {
-    id: "programa",
-    label: "Programa",
-    description: "Nº de galpões, uso e dimensões",
-  },
+  { id: "programa", label: "Programa", description: "Nº de galpões, uso" },
   { id: "terreno", label: "Terreno & rua", description: "Arestas e recuos" },
   { id: "perimetro", label: "Perímetro", description: "Muros e portões" },
+  { id: "galpoes", label: "Galpões", description: "Dimensões e tipologia" },
   { id: "circulacao", label: "Circulação", description: "Vagas e vias" },
   { id: "revisao", label: "Revisão", description: "Validar e gerar 3D" },
 ];
@@ -73,6 +71,7 @@ interface BriefingState {
   clearHeight: number;
   carStalls: number;
   truckStalls: number;
+  rotationDeg: number;
 }
 
 const initial = (): BriefingState => ({
@@ -85,6 +84,7 @@ const initial = (): BriefingState => ({
   clearHeight: 8,
   carStalls: 0,
   truckStalls: 0,
+  rotationDeg: 0,
 });
 
 interface Props {
@@ -174,22 +174,17 @@ export default function BriefingClient({
 
   // ---- Buildable area (m²) and per-building max --------------------------
 
-  const buildableRegion = useMemo(() => {
-    try {
-      return buildBuildableRegion(lot.local, {
+  const buildableRegion = useMemo(
+    () =>
+      buildBuildableRegion(lot.local, {
         setbacks: state.setbacks,
         streetEdges: state.streetEdges,
         laneBufferM: state.truckAccess
           ? SITE_CONSTRAINTS.circulation.truckLaneMin
           : SITE_CONSTRAINTS.circulation.carLaneMin,
-      });
-    } catch {
-      // Setbacks + lane buffer exceed lot's inscribed radius → no buildable
-      // area. Return [] so downstream calculations degrade gracefully and the
-      // UI can surface the error rather than crash the render.
-      return [] as { x: number; z: number }[];
-    }
-  }, [lot.local, state.setbacks, state.streetEdges, state.truckAccess]);
+      }),
+    [lot.local, state.setbacks, state.streetEdges, state.truckAccess],
+  );
 
   const buildableAreaM2 = useMemo(
     () => (buildableRegion.length >= 3 ? polygonAreaLocal(buildableRegion) : 0),
@@ -391,7 +386,9 @@ export default function BriefingClient({
               {areaM2.toLocaleString("pt-BR", { maximumFractionDigits: 0 })} m²
             </span>
           </div>
-          {terrainAddress && <p className="text-sm muted">{terrainAddress}</p>}
+          {terrainAddress && (
+            <p className="text-sm muted">{terrainAddress}</p>
+          )}
         </div>
       </header>
 
@@ -424,8 +421,6 @@ export default function BriefingClient({
               onChange={(p) => setState((s) => ({ ...s, programa: p }))}
               maxTargetArea={maxTargetArea}
               buildableAreaM2={buildableAreaM2}
-              clearHeight={state.clearHeight}
-              onClearHeight={(v) => setState((s) => ({ ...s, clearHeight: v }))}
             />
           )}
           {step === 1 && (
@@ -453,13 +448,21 @@ export default function BriefingClient({
             />
           )}
           {step === 3 && (
+            <StepBuildings
+              clearHeight={state.clearHeight}
+              programa={state.programa}
+              onClearHeight={(v) => setState((s) => ({ ...s, clearHeight: v }))}
+              onProgram={(p) => setState((s) => ({ ...s, programa: p }))}
+            />
+          )}
+          {step === 4 && (
             <StepCirculation
               carStalls={state.carStalls}
               truckStalls={state.truckStalls}
               onChange={(patch) => setState((s) => ({ ...s, ...patch }))}
             />
           )}
-          {step === 4 && (
+          {step === 5 && (
             <StepReview report={candidate.report} error={candidate.error} />
           )}
 
@@ -482,6 +485,7 @@ export default function BriefingClient({
           </div>
           <LotPreviewSvg
             polygon={polygon}
+            lotRef={lot.ref}
             polygonLocal={lot.local}
             edges={edges}
             streetEdges={state.streetEdges}
@@ -572,15 +576,11 @@ function StepProgram({
   onChange,
   maxTargetArea,
   buildableAreaM2,
-  clearHeight,
-  onClearHeight,
 }: {
   value: Programa;
   onChange: (v: Programa) => void;
   maxTargetArea: number;
   buildableAreaM2: number;
-  clearHeight: number;
-  onClearHeight: (v: number) => void;
 }) {
   return (
     <div className="briefing-v2__fields">
@@ -643,7 +643,7 @@ function StepProgram({
       <div className="briefing-v2__field">
         <span>Padrão construtivo</span>
         <div className="briefing-v2__seg" role="group">
-          {(["economico", "medio", "alto"] as const).map((s) => (
+          {([ "economico", "medio", "alto"] as const).map((s) => (
             <button
               key={s}
               type="button"
@@ -655,20 +655,6 @@ function StepProgram({
           ))}
         </div>
       </div>
-      <label className="briefing-v2__field">
-        <span className="briefing-v2__field-label">
-          Pé-direito útil
-          <span className="briefing-v2__field-value">{clearHeight} m</span>
-        </span>
-        <input
-          type="range"
-          min={SLIDER_RANGES.clearHeight.min}
-          max={SLIDER_RANGES.clearHeight.max}
-          step={0.5}
-          value={clearHeight}
-          onChange={(e) => onClearHeight(Number(e.target.value))}
-        />
-      </label>
     </div>
   );
 }
@@ -686,11 +672,7 @@ function StepTerrain({
   onToggleEdge: (idx: number) => void;
   onSetbacks: (sb: { front: number; sides: number; back: number }) => void;
 }) {
-  const labels = {
-    front: "frontal",
-    sides: "laterais",
-    back: "fundos",
-  } as const;
+  const labels = { front: "frontal", sides: "laterais", back: "fundos" } as const;
   return (
     <div className="briefing-v2__fields">
       <div className="briefing-v2__field">
@@ -803,6 +785,50 @@ function StepPerimeter({
   );
 }
 
+function StepBuildings({
+  clearHeight,
+  programa,
+  onClearHeight,
+  onProgram,
+}: {
+  clearHeight: number;
+  programa: Programa;
+  onClearHeight: (v: number) => void;
+  onProgram: (p: Programa) => void;
+}) {
+  return (
+    <div className="briefing-v2__fields">
+      <label className="briefing-v2__field">
+        <span className="briefing-v2__field-label">
+          Pé-direito útil
+          <span className="briefing-v2__field-value">{clearHeight} m</span>
+        </span>
+        <input
+          type="range"
+          min={SLIDER_RANGES.clearHeight.min}
+          max={SLIDER_RANGES.clearHeight.max}
+          step={0.5}
+          value={clearHeight}
+          onChange={(e) => onClearHeight(Number(e.target.value))}
+        />
+      </label>
+      <label className="briefing-v2__field">
+        <span>Área alvo por galpão (m²)</span>
+        <input
+          type="number"
+          min={300}
+          max={20000}
+          step={50}
+          value={programa.targetAreaM2}
+          onChange={(e) =>
+            onProgram({ ...programa, targetAreaM2: Number(e.target.value) })
+          }
+        />
+      </label>
+    </div>
+  );
+}
+
 function StepCirculation({
   carStalls,
   truckStalls,
@@ -886,6 +912,7 @@ interface PreviewBuilding {
 
 function LotPreviewSvg({
   polygon,
+  lotRef,
   polygonLocal,
   edges,
   streetEdges,
@@ -897,6 +924,7 @@ function LotPreviewSvg({
   clearHeight,
 }: {
   polygon: LngLat[];
+  lotRef: LngLat;
   polygonLocal: { x: number; z: number }[];
   edges: ReturnType<typeof getEdges>;
   streetEdges: number[];
@@ -913,30 +941,46 @@ function LotPreviewSvg({
   const vbZ = bb.minZ - pad;
   const vbW = bb.width + pad * 2;
   const vbH = bb.depth + pad * 2;
+  // Flip Y: norte (z crescente) deve aparecer no topo do SVG (y menor).
+  const Y = (z: number) => -z;
+  const vbMinY = -(vbZ + vbH);
+
+  // Bounds geográficos do viewBox (mesma origem da projeção local em
+  // BriefingClient) — usados pela camada satélite para alinhar pixel a
+  // pixel com o SVG.
+  const mapBounds = useMemo<[LngLat, LngLat]>(() => {
+    const corners = fromLocalMeters(
+      [
+        { x: vbX, y: vbZ },
+        { x: vbX + vbW, y: vbZ + vbH },
+      ],
+      lotRef,
+    );
+    const [sw, ne] = corners;
+    return [sw, ne];
+  }, [vbX, vbZ, vbW, vbH, lotRef]);
+
   const pts = (poly: { x: number; z: number }[]) =>
-    poly.map((p) => `${p.x.toFixed(2)},${p.z.toFixed(2)}`).join(" ");
+    poly.map((p) => `${p.x.toFixed(2)},${Y(p.z).toFixed(2)}`).join(" ");
   const streetSet = new Set(streetEdges);
 
   // Pick a nice scale-bar length (≈ 20% of view width, snapped to 5/10/20/50/100 m).
   const scaleTarget = vbW * 0.2;
   const nice = [1, 2, 5, 10, 20, 50, 100, 200, 500];
-  const scaleM = nice.find((n) => n >= scaleTarget) ?? nice[nice.length - 1];
+  const scaleM =
+    nice.find((n) => n >= scaleTarget) ?? nice[nice.length - 1];
 
   // Setback labels: classify edges as front/back/sides based on streetEdges
   // and pick midpoints. For brevity we render the setback value as a tiny
   // label slightly offset inward along the edge normal.
   const setbackByEdge = (edgeIdx: number): { value: number; key: string } => {
     if (streetSet.has(edgeIdx)) return { value: setbacks.front, key: "frente" };
-    // "back" = edge whose midpoint is farthest from the average street edge mid.
     if (streetSet.size > 0) {
       const streetMids = edges
         .filter((e) => streetSet.has(e.index))
         .map((e) => e.mid);
       const avg = streetMids.reduce(
-        (a, m) => ({
-          x: a.x + m.x / streetMids.length,
-          z: a.z + m.z / streetMids.length,
-        }),
+        (a, m) => ({ x: a.x + m.x / streetMids.length, z: a.z + m.z / streetMids.length }),
         { x: 0, z: 0 },
       );
       const e = edges[edgeIdx];
@@ -952,22 +996,20 @@ function LotPreviewSvg({
     return { value: setbacks.sides, key: "lateral" };
   };
 
-  // North arrow position (top-right of viewbox)
+  // North arrow position (top-right of viewbox, em coords locais antes do flip).
   const northX = vbX + vbW - pad * 0.5;
-  const northZ = vbZ + pad * 0.7;
+  const northZ = vbZ + vbH - pad * 0.7; // norte = maior z (após flip vira topo)
 
-  // Scale bar position (bottom-left)
+  // Scale bar position (bottom-left visual = menor z após flip).
   const scaleX = vbX + pad * 0.5;
-  const scaleZ = vbZ + vbH - pad * 0.4;
+  const scaleZ = vbZ + pad * 0.4;
 
   return (
-    <div
-      className={`briefing-v2__map-wrap${hasFitError ? " briefing-v2__svg--error" : ""}`}
-    >
-      <TerrainThumb polygon={polygon} showPolygon={false} />
+    <div className={`briefing-v2__map-wrap${hasFitError ? " briefing-v2__svg--error" : ""}`}>
+      <MapBackground bounds={mapBounds} />
       <svg
         className="briefing-v2__svg"
-        viewBox={`${vbX} ${vbZ} ${vbW} ${vbH}`}
+        viewBox={`${vbX} ${vbMinY} ${vbW} ${vbH}`}
         preserveAspectRatio="xMidYMid meet"
         role="img"
         aria-label="Planta esquemática do terreno"
@@ -985,9 +1027,9 @@ function LotPreviewSvg({
             key={e.index}
             className={`edge${streetSet.has(e.index) ? " edge--street" : ""}`}
             x1={e.a.x}
-            y1={e.a.z}
+            y1={Y(e.a.z)}
             x2={e.b.x}
-            y2={e.b.z}
+            y2={Y(e.b.z)}
           />
         ))}
 
@@ -1002,7 +1044,7 @@ function LotPreviewSvg({
               key={`sb-${e.index}`}
               className="setback-label"
               x={tx}
-              y={tz}
+              y={Y(tz)}
               textAnchor="middle"
               dominantBaseline="middle"
             >
@@ -1026,7 +1068,7 @@ function LotPreviewSvg({
               <text
                 className="dim-label"
                 x={cx}
-                y={cz - 6}
+                y={Y(cz) - 6}
                 textAnchor="middle"
                 dominantBaseline="middle"
               >
@@ -1035,7 +1077,7 @@ function LotPreviewSvg({
               <text
                 className="area-label"
                 x={cx}
-                y={cz + 6}
+                y={Y(cz) + 6}
                 textAnchor="middle"
                 dominantBaseline="middle"
               >
@@ -1060,9 +1102,9 @@ function LotPreviewSvg({
               key={i}
               className="gate"
               x1={cx - ux * hw}
-              y1={cz - uz * hw}
+              y1={Y(cz - uz * hw)}
               x2={cx + ux * hw}
-              y2={cz + uz * hw}
+              y2={Y(cz + uz * hw)}
             />
           );
         })}
@@ -1072,7 +1114,7 @@ function LotPreviewSvg({
           <text
             className="north"
             x={northX}
-            y={northZ}
+            y={Y(northZ)}
             textAnchor="middle"
             dominantBaseline="middle"
           >
@@ -1081,9 +1123,9 @@ function LotPreviewSvg({
           <line
             className="north-arrow"
             x1={northX}
-            y1={northZ + pad * 0.15}
+            y1={Y(northZ) + pad * 0.15}
             x2={northX}
-            y2={northZ + pad * 0.55}
+            y2={Y(northZ) + pad * 0.55}
           />
         </g>
 
@@ -1092,28 +1134,28 @@ function LotPreviewSvg({
           <line
             className="scale-bar"
             x1={scaleX}
-            y1={scaleZ}
+            y1={Y(scaleZ)}
             x2={scaleX + scaleM}
-            y2={scaleZ}
+            y2={Y(scaleZ)}
           />
           <line
             className="scale-bar"
             x1={scaleX}
-            y1={scaleZ - pad * 0.08}
+            y1={Y(scaleZ) - pad * 0.08}
             x2={scaleX}
-            y2={scaleZ + pad * 0.08}
+            y2={Y(scaleZ) + pad * 0.08}
           />
           <line
             className="scale-bar"
             x1={scaleX + scaleM}
-            y1={scaleZ - pad * 0.08}
+            y1={Y(scaleZ) - pad * 0.08}
             x2={scaleX + scaleM}
-            y2={scaleZ + pad * 0.08}
+            y2={Y(scaleZ) + pad * 0.08}
           />
           <text
             className="scale-bar-label"
             x={scaleX + scaleM / 2}
-            y={scaleZ + pad * 0.28}
+            y={Y(scaleZ) - pad * 0.28}
             textAnchor="middle"
           >
             {scaleM} m
