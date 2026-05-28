@@ -18,9 +18,10 @@ export async function POST(
     return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
   }
 
-  const name = typeof body.name === "string" && body.name.trim().length > 0
-    ? body.name.trim()
-    : "Galpão gerado por IA";
+  const name =
+    typeof body.name === "string" && body.name.trim().length > 0
+      ? body.name.trim()
+      : "Galpão gerado por IA";
 
   const normalized = normalizeRawShed(body.shed);
   const parsed = IndustrialShedSchema.safeParse(normalized);
@@ -32,7 +33,11 @@ export async function POST(
   }
 
   const terrain = await prisma.terrain.findUnique({ where: { id: params.id } });
-  if (!terrain) return NextResponse.json({ error: "Terreno não encontrado" }, { status: 404 });
+  if (!terrain)
+    return NextResponse.json(
+      { error: "Terreno não encontrado" },
+      { status: 404 },
+    );
 
   const shed = recomputeEstimate(parsed.data);
 

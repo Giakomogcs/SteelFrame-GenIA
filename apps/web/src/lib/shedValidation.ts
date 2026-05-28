@@ -144,14 +144,17 @@ export function findShedValidationErrors(shed: IndustrialShed): string[] {
 
   // Bay count × spacing ≈ depth
   const expectedDepth = structure.bayCount * structure.baySpacing;
-  if (Math.abs(expectedDepth - footprint.depth) > Math.max(2, footprint.depth * 0.1)) {
+  if (
+    Math.abs(expectedDepth - footprint.depth) >
+    Math.max(2, footprint.depth * 0.1)
+  ) {
     errors.push(
       `bayCount(${structure.bayCount}) × baySpacing(${structure.baySpacing}) ≠ depth(${footprint.depth})`,
     );
   }
 
   // Footprint deve caber no lote considerando recuos
-  const lotInnerW = lot.width - (setbacks.sides * 2);
+  const lotInnerW = lot.width - setbacks.sides * 2;
   const lotInnerD = lot.depth - setbacks.front - setbacks.back;
   if (footprint.width > lotInnerW + 0.5) {
     errors.push(
@@ -180,8 +183,10 @@ export function findShedValidationErrors(shed: IndustrialShed): string[] {
     for (let j = i + 1; j < zones.length; j++) {
       const a = zones[i];
       const b = zones[j];
-      const overlapX = Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x);
-      const overlapZ = Math.min(a.z + a.depth, b.z + b.depth) - Math.max(a.z, b.z);
+      const overlapX =
+        Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x);
+      const overlapZ =
+        Math.min(a.z + a.depth, b.z + b.depth) - Math.max(a.z, b.z);
       if (overlapX > 0.2 && overlapZ > 0.2) {
         errors.push(`zonas sobrepostas: "${a.name}" × "${b.name}"`);
       }
@@ -202,7 +207,10 @@ export function findShedValidationErrors(shed: IndustrialShed): string[] {
   }
 
   // Docas: pelo menos 1 para logística/cross_dock
-  if ((shed.use === "logistics" || shed.use === "cross_dock") && docks.length === 0) {
+  if (
+    (shed.use === "logistics" || shed.use === "cross_dock") &&
+    docks.length === 0
+  ) {
     errors.push("uso logístico exige pelo menos 1 doca");
   }
 

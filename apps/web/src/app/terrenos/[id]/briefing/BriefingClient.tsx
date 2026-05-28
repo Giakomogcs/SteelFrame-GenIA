@@ -36,8 +36,7 @@ export default function BriefingClient({
   const router = useRouter();
   const [prompt, setPrompt] = useState("");
   const [use, setUse] = useState<IndustrialShed["use"]>("logistics");
-  const [standard, setStandard] =
-    useState<IndustrialShed["standard"]>("medio");
+  const [standard, setStandard] = useState<IndustrialShed["standard"]>("medio");
   const [streaming, setStreaming] = useState(false);
   const [thinkingText, setThinkingText] = useState("");
   const [streamText, setStreamText] = useState("");
@@ -157,8 +156,8 @@ export default function BriefingClient({
                 content:
                   d.source === "ai"
                     ? "Projeto gerado pela IA. Você pode salvar ou refinar."
-                    : d.error ??
-                      "Projeto gerado por fallback determinístico.",
+                    : (d.error ??
+                      "Projeto gerado por fallback determinístico."),
               },
             ]);
           }
@@ -205,7 +204,10 @@ export default function BriefingClient({
     return [
       { label: "Uso", value: shed.use },
       { label: "Padrão", value: shed.standard },
-      { label: "Área coberta", value: `${coveredArea.toLocaleString("pt-BR")} m²` },
+      {
+        label: "Área coberta",
+        value: `${coveredArea.toLocaleString("pt-BR")} m²`,
+      },
       {
         label: "Pé-direito",
         value: `${shed.structure.clearHeight} m`,
@@ -242,7 +244,10 @@ export default function BriefingClient({
             <div className="text-xs text-white/60">{terrainAddress}</div>
           )}
           <div className="mt-2 text-xs text-white/60">
-            Área: <b>{areaM2.toLocaleString("pt-BR", { maximumFractionDigits: 0 })} m²</b>
+            Área:{" "}
+            <b>
+              {areaM2.toLocaleString("pt-BR", { maximumFractionDigits: 0 })} m²
+            </b>
           </div>
         </div>
 
@@ -252,12 +257,16 @@ export default function BriefingClient({
               Uso
               <select
                 value={use}
-                onChange={(e) => setUse(e.target.value as IndustrialShed["use"])}
+                onChange={(e) =>
+                  setUse(e.target.value as IndustrialShed["use"])
+                }
                 className="mt-1 w-full rounded-md border border-white/10 bg-[#1f1c23] px-2 py-1.5 text-sm text-white"
                 disabled={streaming}
               >
                 <option value="logistics">Logístico</option>
-                <option value="distribution_center">Centro de Distribuição</option>
+                <option value="distribution_center">
+                  Centro de Distribuição
+                </option>
                 <option value="cross_dock">Cross-dock</option>
                 <option value="industrial">Industrial</option>
                 <option value="manufacturing">Manufatura</option>
@@ -284,8 +293,8 @@ export default function BriefingClient({
           <div className="max-h-[28vh] space-y-2 overflow-y-auto rounded-md border border-white/5 bg-[#16131a] p-2 text-sm">
             {turns.length === 0 && (
               <div className="text-xs text-white/40">
-                Descreva o galpão que precisa. Ex.: dimensões, uso, docas,
-                ponte rolante, padrão, AVCB.
+                Descreva o galpão que precisa. Ex.: dimensões, uso, docas, ponte
+                rolante, padrão, AVCB.
               </div>
             )}
             {turns.map((t, i) => (
@@ -456,7 +465,8 @@ export default function BriefingClient({
                 Aguardando briefing
               </div>
               <div className="mt-1 text-xs">
-                Descreva o galpão para que o agente gere o modelo 3D paramétrico.
+                Descreva o galpão para que o agente gere o modelo 3D
+                paramétrico.
               </div>
             </div>
           </div>

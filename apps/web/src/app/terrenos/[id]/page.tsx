@@ -29,8 +29,10 @@ export default async function TerrainPage({
             <p className="text-sm text-slate-400">{terrain.address}</p>
           )}
           <p className="text-sm text-brand-400">
-            {terrain.areaM2.toLocaleString("pt-BR", { maximumFractionDigits: 0 })} m²
-            · {terrain.buildings.length} construção(ões)
+            {terrain.areaM2.toLocaleString("pt-BR", {
+              maximumFractionDigits: 0,
+            })}{" "}
+            m² · {terrain.buildings.length} construção(ões)
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -59,7 +61,8 @@ export default async function TerrainPage({
         <h2 className="text-lg font-semibold">Construções neste terreno</h2>
         {terrain.buildings.length === 0 ? (
           <p className="rounded-xl border border-dashed border-white/10 bg-slate-900/40 p-6 text-center text-slate-400">
-            Nenhuma construção gerada. Clique em <b>Construir</b> para iniciar o wizard.
+            Nenhuma construção gerada. Clique em <b>Construir</b> para iniciar o
+            wizard.
           </p>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

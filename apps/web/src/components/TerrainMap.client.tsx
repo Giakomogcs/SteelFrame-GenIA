@@ -65,7 +65,9 @@ export default function TerrainMapClient({
 }: Props) {
   const [polygon, setPolygon] = useState<LngLat[]>(initialPolygon);
   const [closed, setClosed] = useState(initialPolygon.length >= 3);
-  const [drawing, setDrawing] = useState(editable && initialPolygon.length === 0);
+  const [drawing, setDrawing] = useState(
+    editable && initialPolygon.length === 0,
+  );
   const [search, setSearch] = useState("");
   const [searchTarget, setSearchTarget] = useState<LngLat | null>(null);
   const [searching, setSearching] = useState(false);
@@ -198,7 +200,7 @@ export default function TerrainMapClient({
           {baseLayer === "satellite" && (
             <>
               <TileLayer
-                attribution='Tiles &copy; Esri'
+                attribution="Tiles &copy; Esri"
                 url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
                 maxZoom={20}
               />
@@ -211,7 +213,7 @@ export default function TerrainMapClient({
           )}
           {baseLayer === "street" && (
             <TileLayer
-              attribution='&copy; OpenStreetMap'
+              attribution="&copy; OpenStreetMap"
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
               maxZoom={19}
             />
@@ -220,7 +222,7 @@ export default function TerrainMapClient({
             <>
               {/* OpenTopoMap: curvas de nível + relevo sombreado (SRTM) */}
               <TileLayer
-                attribution='Map data: &copy; OpenStreetMap, SRTM | Style: &copy; OpenTopoMap (CC-BY-SA)'
+                attribution="Map data: &copy; OpenStreetMap, SRTM | Style: &copy; OpenTopoMap (CC-BY-SA)"
                 url="https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png"
                 maxZoom={17}
               />
@@ -228,7 +230,7 @@ export default function TerrainMapClient({
           )}
           {showHillshade && (
             <TileLayer
-              attribution='Hillshade &copy; Esri'
+              attribution="Hillshade &copy; Esri"
               url="https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/{z}/{y}/{x}"
               maxZoom={19}
               opacity={0.5}

@@ -40,7 +40,8 @@ export default async function BuildingPage({
               {building.name}
             </h1>
             <p className="text-sm text-white/60">
-              {shed.footprint.width.toFixed(1)} × {shed.footprint.depth.toFixed(1)} m ·{" "}
+              {shed.footprint.width.toFixed(1)} ×{" "}
+              {shed.footprint.depth.toFixed(1)} m ·{" "}
               {shed.estimate.coveredAreaM2.toLocaleString("pt-BR")} m² ·{" "}
               {shed.structure.bayCount} pórticos · pé-direito{" "}
               {shed.structure.clearHeight} m
@@ -73,7 +74,9 @@ export default async function BuildingPage({
           <Block title="Docas">{shed.docks.length}</Block>
           <Block title="Mezanino">{shed.mezzanine ? "Sim" : "Não"}</Block>
           <Block title="Aberturas">{shed.openings.length}</Block>
-          <Block title="AVCB">{shed.safety.avcbRequired ? "Obrigatório" : "Dispensado"}</Block>
+          <Block title="AVCB">
+            {shed.safety.avcbRequired ? "Obrigatório" : "Dispensado"}
+          </Block>
         </section>
 
         {shed.assumptions.length > 0 && (
@@ -112,8 +115,10 @@ export default async function BuildingPage({
           </Link>
           <h1 className="text-2xl font-semibold">{building.name}</h1>
           <p className="text-sm text-slate-400">
-            {model.footprint.width.toFixed(1)} × {model.footprint.depth.toFixed(1)} m ·{" "}
-            {model.footprint.areaM2.toLocaleString("pt-BR")} m² · {model.bays} pórticos
+            {model.footprint.width.toFixed(1)} ×{" "}
+            {model.footprint.depth.toFixed(1)} m ·{" "}
+            {model.footprint.areaM2.toLocaleString("pt-BR")} m² · {model.bays}{" "}
+            pórticos
           </p>
         </div>
         <div className="rounded-xl border border-white/10 bg-slate-900/60 px-4 py-3 text-right text-sm">
@@ -136,7 +141,13 @@ export default async function BuildingPage({
   );
 }
 
-function Block({ title, children }: { title: string; children: React.ReactNode }) {
+function Block({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
   return (
     <div className="rounded-md border border-white/10 bg-[#1f1c23] p-3">
       <div className="text-[10px] uppercase tracking-wide text-white/50">

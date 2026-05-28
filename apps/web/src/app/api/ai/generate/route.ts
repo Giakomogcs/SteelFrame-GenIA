@@ -46,7 +46,9 @@ export async function POST(req: NextRequest) {
     | undefined;
 
   if (terrainId) {
-    const terrain = await prisma.terrain.findUnique({ where: { id: terrainId } });
+    const terrain = await prisma.terrain.findUnique({
+      where: { id: terrainId },
+    });
     if (terrain) {
       terrainContext = {
         areaM2: terrain.areaM2,

@@ -7,7 +7,12 @@ import { z } from "zod";
 export const LotSchema = z.object({
   width: z.number().min(10).max(800).describe("Largura do lote (m)"),
   depth: z.number().min(10).max(1500).describe("Profundidade do lote (m)"),
-  slopePct: z.number().min(0).max(40).default(0).describe("Inclinação média (%)"),
+  slopePct: z
+    .number()
+    .min(0)
+    .max(40)
+    .default(0)
+    .describe("Inclinação média (%)"),
 });
 
 export const SetbacksSchema = z.object({
@@ -17,8 +22,16 @@ export const SetbacksSchema = z.object({
 });
 
 export const FootprintSchema = z.object({
-  width: z.number().min(6).max(500).describe("Largura (m) — vão livre principal"),
-  depth: z.number().min(6).max(800).describe("Profundidade (m) — eixo dos pórticos"),
+  width: z
+    .number()
+    .min(6)
+    .max(500)
+    .describe("Largura (m) — vão livre principal"),
+  depth: z
+    .number()
+    .min(6)
+    .max(800)
+    .describe("Profundidade (m) — eixo dos pórticos"),
 });
 
 export const StructureSchema = z.object({
@@ -26,7 +39,11 @@ export const StructureSchema = z.object({
     .enum(["steel_frame_light", "porticos_aco", "trelicado"])
     .default("porticos_aco"),
   bayCount: z.number().int().min(1).max(60).describe("Nº de pórticos"),
-  baySpacing: z.number().min(4).max(12).describe("Espaçamento entre pórticos (m)"),
+  baySpacing: z
+    .number()
+    .min(4)
+    .max(12)
+    .describe("Espaçamento entre pórticos (m)"),
   freeSpan: z.number().min(6).max(80).describe("Vão livre (m)"),
   clearHeight: z.number().min(4).max(20).describe("Pé-direito útil (m)"),
   columnProfile: z.string().default("W250x32").describe("Perfil das colunas"),
@@ -205,9 +222,7 @@ export const ComplianceSchema = z.object({
       "NBR 5626",
       "NBR 9077",
     ]),
-  costSources: z
-    .array(z.string())
-    .default(["SINAPI", "CUB Sinduscon-SP"]),
+  costSources: z.array(z.string()).default(["SINAPI", "CUB Sinduscon-SP"]),
 });
 
 // ---- Main schema --------------------------------------------------------

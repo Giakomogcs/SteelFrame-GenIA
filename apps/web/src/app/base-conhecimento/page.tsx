@@ -71,13 +71,7 @@ const NORMS: { code: string; use: string }[] = [
   { code: "NBR 9077", use: "Saídas de emergência" },
 ];
 
-function Card({
-  title,
-  items,
-}: {
-  title: string;
-  items: Source[];
-}) {
+function Card({ title, items }: { title: string; items: Source[] }) {
   return (
     <section className="dt-card p-5">
       <h2 className="text-sm font-bold uppercase tracking-wide text-white/80">

@@ -1,7 +1,14 @@
 "use client";
 
 import { Canvas } from "@react-three/fiber";
-import { OrbitControls, Grid, Environment, Html, GizmoHelper, GizmoViewport } from "@react-three/drei";
+import {
+  OrbitControls,
+  Grid,
+  Environment,
+  Html,
+  GizmoHelper,
+  GizmoViewport,
+} from "@react-three/drei";
 import * as THREE from "three";
 import { useMemo } from "react";
 import type { IndustrialShed } from "@/lib/shedSchema";
@@ -63,7 +70,10 @@ function Frames({ shed }: { shed: IndustrialShed }) {
     // Tesoura (banzo inferior + 2 inclinadas + montante central)
     const span = footprint.width;
     beams.push(
-      <group key={`t-${i}`} position={[footprint.width / 2, structure.clearHeight, z]}>
+      <group
+        key={`t-${i}`}
+        position={[footprint.width / 2, structure.clearHeight, z]}
+      >
         <mesh>
           <boxGeometry args={[span, BEAM, BEAM]} />
           <PBRMat def={mat("aco_galvanizado")} />
@@ -113,7 +123,9 @@ function Roof({ shed }: { shed: IndustrialShed }) {
   if (roof.type === "flat") {
     return (
       <mesh position={[w / 2, baseY + 0.05, d / 2]} receiveShadow castShadow>
-        <boxGeometry args={[w + roof.overhang * 2, 0.1, d + roof.overhang * 2]} />
+        <boxGeometry
+          args={[w + roof.overhang * 2, 0.1, d + roof.overhang * 2]}
+        />
         <PBRMat def={cover} side={THREE.DoubleSide} />
       </mesh>
     );
@@ -121,7 +133,7 @@ function Roof({ shed }: { shed: IndustrialShed }) {
 
   if (roof.type === "shed") {
     const slope = Math.atan2(rise * 2, w);
-    const len = Math.sqrt(w * w + (rise * 2) * (rise * 2));
+    const len = Math.sqrt(w * w + rise * 2 * (rise * 2));
     return (
       <mesh
         position={[w / 2, baseY + rise, d / 2]}
@@ -141,7 +153,9 @@ function Roof({ shed }: { shed: IndustrialShed }) {
     for (let i = 0; i < teeth; i++) {
       const z = i * toothDepth + toothDepth / 2;
       const slope = Math.atan2(rise * 1.4, toothDepth);
-      const len = Math.sqrt(toothDepth * toothDepth + (rise * 1.4) * (rise * 1.4));
+      const len = Math.sqrt(
+        toothDepth * toothDepth + rise * 1.4 * (rise * 1.4),
+      );
       items.push(
         <mesh
           key={i}
@@ -292,7 +306,9 @@ function Walls({ shed }: { shed: IndustrialShed }) {
             position={[(s + e) / 2, baseH + (h - baseH) / 2, 0]}
             castShadow
           >
-            <boxGeometry args={[Math.max(0.01, e - s), Math.max(0.01, h - baseH), 0.12]} />
+            <boxGeometry
+              args={[Math.max(0.01, e - s), Math.max(0.01, h - baseH), 0.12]}
+            />
             <PBRMat def={upperMat} />
           </mesh>
         ))}
@@ -322,7 +338,8 @@ function OpeningMesh({
   wallLen: number;
 }) {
   void wallLen;
-  const isPortao = op.type === "portao_seccional" || op.type === "portao_enrolar";
+  const isPortao =
+    op.type === "portao_seccional" || op.type === "portao_enrolar";
   const isPorta = op.type.startsWith("porta");
   const isJanela = op.type === "janela_alta" || op.type === "lanternim";
   const material = isPortao
@@ -494,11 +511,7 @@ function Yard({ shed }: { shed: IndustrialShed }) {
             </mesh>
           );
         return (
-          <mesh
-            key="W"
-            position={[0, h / 2, lot.depth / 2]}
-            castShadow
-          >
+          <mesh key="W" position={[0, h / 2, lot.depth / 2]} castShadow>
             <boxGeometry args={[0.2, h, lot.depth]} />
             <PBRMat def={mat(perimeter.fenceType)} />
           </mesh>
@@ -606,12 +619,16 @@ export default function ShedViewer({ shed, polygon, height }: Props) {
         )}
 
         <Html
-          position={[footprint.width / 2, shed.structure.clearHeight + 5, footprint.depth / 2]}
+          position={[
+            footprint.width / 2,
+            shed.structure.clearHeight + 5,
+            footprint.depth / 2,
+          ]}
           center
         >
           <div className="rounded-md bg-[#1f1c23]/95 px-3 py-1.5 text-[11px] font-medium uppercase tracking-wide text-white shadow-lg">
-            {footprint.width.toFixed(1)} × {footprint.depth.toFixed(1)} m · pé-direito{" "}
-            {shed.structure.clearHeight} m
+            {footprint.width.toFixed(1)} × {footprint.depth.toFixed(1)} m ·
+            pé-direito {shed.structure.clearHeight} m
           </div>
         </Html>
 

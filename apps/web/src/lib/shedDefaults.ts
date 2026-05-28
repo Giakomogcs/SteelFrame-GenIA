@@ -24,7 +24,9 @@ export const STEEL_KG_PER_M2: Record<string, number> = {
   trelicado: 38,
 };
 
-export function generateFallbackShed(ctx: FallbackContext = {}): IndustrialShed {
+export function generateFallbackShed(
+  ctx: FallbackContext = {},
+): IndustrialShed {
   const standard = ctx.standard ?? "medio";
   const use = ctx.use ?? "logistics";
   const lotArea = Math.max(2000, ctx.areaM2 ?? 6000);
@@ -38,7 +40,8 @@ export function generateFallbackShed(ctx: FallbackContext = {}): IndustrialShed 
   const depth = Math.min(150, Math.round(depthGuess));
   const baySpacing = use === "industrial" ? 7 : 8;
   const bayCount = Math.max(3, Math.round(depth / baySpacing));
-  const clearHeight = use === "logistics" ? 10 : use === "cold_storage" ? 12 : 8;
+  const clearHeight =
+    use === "logistics" ? 10 : use === "cold_storage" ? 12 : 8;
 
   const coveredArea = width * depth;
   const costPerM2 = COST_PER_M2[standard];
@@ -114,14 +117,16 @@ export function generateFallbackShed(ctx: FallbackContext = {}): IndustrialShed 
         floorLoad_kN_m2: 5,
       },
     ],
-    docks: Array.from({ length: Math.min(6, Math.round(width / 8)) }).map((_, i) => ({
-      x: 4 + i * 8,
-      z: depth,
-      wall: "north" as const,
-      type: "nivelada" as const,
-      levelers: true,
-      seal: true,
-    })),
+    docks: Array.from({ length: Math.min(6, Math.round(width / 8)) }).map(
+      (_, i) => ({
+        x: 4 + i * 8,
+        z: depth,
+        wall: "north" as const,
+        type: "nivelada" as const,
+        levelers: true,
+        seal: true,
+      }),
+    ),
     craneRails: [],
     openings: [
       {
@@ -226,7 +231,10 @@ export function recomputeEstimate(shed: IndustrialShed): IndustrialShed {
         ? 1.05
         : 1;
   const costPerM2 = Math.round(
-    COST_PER_M2[shed.standard] * factorStandard * factorSlope * factorInsulation,
+    COST_PER_M2[shed.standard] *
+      factorStandard *
+      factorSlope *
+      factorInsulation,
   );
   const steelKg = Math.round(
     covered * (STEEL_KG_PER_M2[shed.structure.system] ?? 45),

@@ -208,7 +208,10 @@ function buildUserMessage(opts: ShedPromptOptions): string {
     parts.push(
       `CONTEXTO DO TERRENO: área ≈ ${ctx.areaM2.toFixed(0)} m² | endereço: ${ctx.address ?? "não informado"} | inclinação: ${ctx.slopePct ?? 0}%`,
     );
-    if (typeof ctx.centerLat === "number" && typeof ctx.centerLng === "number") {
+    if (
+      typeof ctx.centerLat === "number" &&
+      typeof ctx.centerLng === "number"
+    ) {
       parts.push(
         `Coordenadas: ${ctx.centerLat.toFixed(5)}, ${ctx.centerLng.toFixed(5)}`,
       );
@@ -221,7 +224,9 @@ function buildUserMessage(opts: ShedPromptOptions): string {
   return parts.join("\n\n");
 }
 
-async function tryParse(content: string): Promise<
+async function tryParse(
+  content: string,
+): Promise<
   | { ok: true; shed: IndustrialShed }
   | { ok: false; errors: string[]; raw: unknown }
 > {
@@ -231,9 +236,7 @@ async function tryParse(content: string): Promise<
   } catch (err) {
     return {
       ok: false,
-      errors: [
-        `JSON inválido: ${(err as Error).message}`,
-      ],
+      errors: [`JSON inválido: ${(err as Error).message}`],
       raw: null,
     };
   }
@@ -359,7 +362,10 @@ export async function* promptToShedStream(
 
       // Re-prompt com correção
       messages.push({ role: "assistant", content });
-      messages.push({ role: "user", content: CORRECTION_PROMPT(result.errors, content) });
+      messages.push({
+        role: "user",
+        content: CORRECTION_PROMPT(result.errors, content),
+      });
     }
 
     yield {
