@@ -117,9 +117,11 @@ describe("sitePlanTo3D — group structure", () => {
     } as never;
     const g = buildShedMesh(placement, shed);
     const trusses = g.children.filter((c) => c.name.startsWith("truss:"));
-    expect(trusses).toHaveLength(5); // bayCount + 1
+    // bayCount = "Nº de pórticos" (schema): criamos exatamente esse número
+    // de pórticos, distribuídos sobre a profundidade real do placement.
+    expect(trusses).toHaveLength(4);
     const columns = g.children.filter((c) => c.name.startsWith("column:"));
-    expect(columns).toHaveLength(2 * 5); // L + R per bay frame
+    expect(columns).toHaveLength(2 * 4); // L + R por pórtico
   });
 });
 
