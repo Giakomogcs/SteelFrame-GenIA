@@ -7,11 +7,12 @@ import {
   Polygon,
   Polyline,
   Tooltip,
+  Marker,
   useMap,
 } from "react-leaflet";
 import L from "leaflet";
 import type { LngLat } from "@/lib/geo";
-import { fromLocalMeters, MAX_MAP_ZOOM } from "@/lib/geo";
+import { fromLocalMeters, toLocalMeters, MAX_MAP_ZOOM } from "@/lib/geo";
 import type { BuildingUse } from "@/lib/sitePlanSchema";
 import type { Edge } from "@/lib/siteGeometry";
 import { polygonBBox } from "@/lib/siteGeometry";
@@ -19,6 +20,7 @@ import { polygonBBox } from "@/lib/siteGeometry";
 // ---- Types ---------------------------------------------------------------
 
 interface PreviewBuilding {
+  id: string;
   polygon: { x: number; z: number }[];
   use: BuildingUse;
   name: string;
@@ -36,6 +38,12 @@ export interface LotPreviewMapProps {
   gates: { edgeIndex: number; tAlongEdge: number; width: number }[];
   hasFitError: boolean;
   clearHeight: number;
+  /** Called when a building is dragged. dx/dz are incremental local meters. */
+  onBuildingMove?: (id: string, dx: number, dz: number) => void;
+  /** Called when a building is clicked. */
+  onBuildingSelect?: (id: string) => void;
+  /** Currently selected building id for highlight. */
+  selectedBuildingId?: string | null;
 }
 
 // ---- Helpers -------------------------------------------------------------
@@ -59,6 +67,18 @@ const BUILDING_COLORS: Record<string, string> = {
   cold_storage: "#6366f1",
   manufacturing: "#f59e0b",
 };
+
+function centroidLocal(poly: { x: number; z: number }[]): { x: number; z: number } {
+  const n = poly.length || 1;
+  const s = poly.reduce((a, p) => ({ x: a.x + p.x, z: a.z + p.z }), { x: 0, z: 0 });
+  return { x: s.x / n, z: s.z / n };
+}
+
+const DRAG_ICON = L.divIcon({
+  className: "building-drag-handle",
+  iconSize: [26, 26],
+  iconAnchor: [13, 13],
+});
 
 // ---- Sub-components ------------------------------------------------------
 
@@ -91,6 +111,9 @@ export default function LotPreviewMapClient({
   gates,
   hasFitError,
   clearHeight,
+  onBuildingMove,
+  onBuildingSelect,
+  selectedBuildingId,
 }: LotPreviewMapProps) {
   const terrainPositions = useMemo(
     () => polygon.map(([lng, lat]) => [lat, lng] as [number, number]),
@@ -219,16 +242,25 @@ export default function LotPreviewMapClient({
       {/* Building footprints */}
       {buildingLayers.map((b, i) => {
         const area = b.bbox.width * b.bbox.depth;
+        const bld = buildings[i];
+        const isSelected = bld && selectedBuildingId === bld.id;
         return (
           <Polygon
             key={i}
             positions={b.positions}
             pathOptions={{
-              color: hasFitError ? "#ef4444" : b.color,
+              color: isSelected
+                ? "#ffffff"
+                : hasFitError
+                  ? "#ef4444"
+                  : b.color,
               fillColor: b.color,
-              fillOpacity: hasFitError ? 0.35 : 0.45,
-              weight: hasFitError ? 2 : 1.5,
-              dashArray: hasFitError ? "6 3" : undefined,
+              fillOpacity: isSelected ? 0.55 : hasFitError ? 0.35 : 0.45,
+              weight: isSelected ? 3 : hasFitError ? 2 : 1.5,
+              dashArray: hasFitError && !isSelected ? "6 3" : undefined,
+            }}
+            eventHandlers={{
+              click: () => bld && onBuildingSelect?.(bld.id),
             }}
           >
             <Tooltip
@@ -249,6 +281,29 @@ export default function LotPreviewMapClient({
           </Polygon>
         );
       })}
+
+      {/* Draggable building handles */}
+      {onBuildingMove &&
+        buildings.map((b) => {
+          const c = centroidLocal(b.polygon);
+          const pos = localToGeo([c], lotRef)[0];
+          return (
+            <Marker
+              key={`drag-${b.id}`}
+              position={pos}
+              icon={DRAG_ICON}
+              draggable
+              eventHandlers={{
+                dragend: (e) => {
+                  const ll = (e.target as L.Marker).getLatLng();
+                  const [pt] = toLocalMeters([[ll.lng, ll.lat]], lotRef);
+                  onBuildingMove(b.id, pt.x - c.x, pt.y - c.z);
+                },
+                click: () => onBuildingSelect?.(b.id),
+              }}
+            />
+          );
+        })}
 
       {/* Gates */}
       {gates.map((g, i) => {

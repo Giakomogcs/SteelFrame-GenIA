@@ -2,10 +2,10 @@
 // siteLayout — deterministic building placements inside a
 // buildable region. Pure: no IO, no randomness, no fallbacks.
 //
-// Strategy (v1): rotate footprints to align with the buildable
-// bounding box, lay out in a regular grid (1 → centered,
-// 2 → side-by-side with 6 m gap, N → rows/cols with truck gap),
-// reject anything that would leak outside the buildable region.
+// Strategy: align buildings along the principal axis of the
+// buildable bounding box, place in a linear row along the
+// longest direction with configurable gap, then apply group
+// rotation around the buildable center.
 // ============================================================
 import { SITE_CONSTRAINTS } from "./siteConstraints";
 import { pointInPolygon, polygonBBox, type V } from "./siteGeometry";
@@ -30,11 +30,9 @@ export interface FitOptions {
   buildable: V[];
   /** Briefing requests, one per desired building. */
   requests: BuildingRequest[];
-  /** Truck turning circle radius (m). Defaults to constraint minimum. */
-  truckGapM?: number;
-  /** Gap between adjacent buildings in the same row (m). Defaults to constraint minimum (6 m). */
+  /** Gap between adjacent buildings (m). Defaults to constraint minimum (6 m). */
   gapM?: number;
-  /** Rotation angle (radians) to apply to all building footprints. */
+  /** Rotation of the entire group of buildings around the buildable center (radians). */
   rotationRad?: number;
 }
 
@@ -100,8 +98,12 @@ function dimensionsFor(
 // ---- Public API ----------------------------------------------------------
 
 /**
- * Deterministic grid layout. Returns ok=false with a structured reason when
- * the requested program does not fit — never silently shrinks.
+ * Deterministic layout. Places buildings along the principal axis of the
+ * buildable region with the user-specified gap, then rotates the entire
+ * group around the buildable center.
+ *
+ * Returns `ok=false` with `placements` populated so the UI can always
+ * render buildings (even when they overflow).
  */
 export function fitBuildings(opts: FitOptions): FitResult {
   if (opts.requests.length === 0) {
@@ -121,71 +123,63 @@ export function fitBuildings(opts: FitOptions): FitResult {
     SITE_CONSTRAINTS.building.minGapBetweenM,
     opts.gapM ?? SITE_CONSTRAINTS.building.minGapBetweenM,
   );
-  const truckGap = opts.truckGapM ?? SITE_CONSTRAINTS.circulation.truckLaneMin;
   const minSide = SITE_CONSTRAINTS.building.minSideM;
   const rotationRad = opts.rotationRad ?? 0;
-
-  // Layout grid (cols × rows). Prefer columns when buildable is wider.
   const n = opts.requests.length;
-  let cols: number;
-  let rows: number;
-  if (n === 1) {
-    cols = 1;
-    rows = 1;
-  } else if (n === 2) {
-    if (bb.width >= bb.depth) {
-      cols = 2;
-      rows = 1;
-    } else {
-      cols = 1;
-      rows = 2;
-    }
-  } else {
-    cols = Math.ceil(Math.sqrt(n));
-    rows = Math.ceil(n / cols);
-    if (bb.depth > bb.width) {
-      [cols, rows] = [rows, cols];
-    }
-  }
 
-  // Available cell size (subtracting inter-building gaps).
-  const cellW = (bb.width - gap * (cols - 1)) / cols;
-  const cellD = (bb.depth - truckGap * (rows - 1)) / rows;
+  // Principal axis: align buildings along the longest dimension.
+  const horizontal = bb.width >= bb.depth; // true = line up along X axis
+  const mainLen = horizontal ? bb.width : bb.depth;
+  const crossLen = horizontal ? bb.depth : bb.width;
+
+  // For N buildings along the main axis: total gap = (N-1)*gap,
+  // each building gets (mainLen - totalGap) / N along main axis.
+  const cellMain = (mainLen - gap * (n - 1)) / n;
+  const cellCross = crossLen;
 
   let fitError: string | null = null;
-  if (cellW < minSide || cellD < minSide) {
-    fitError = `Região construtível insuficiente para ${n} galpões (célula ${cellW.toFixed(1)}×${cellD.toFixed(1)} m < mínimo ${minSide} m).`;
+  if (cellMain < minSide || cellCross < minSide) {
+    fitError = `Região construtível insuficiente para ${n} galpões (${cellMain.toFixed(1)}×${cellCross.toFixed(1)} m < mínimo ${minSide} m).`;
   }
 
-  const originX = bb.minX;
-  const originZ = bb.minZ;
+  // Center of the buildable region (used as rotation pivot).
+  const centerX = bb.minX + bb.width / 2;
+  const centerZ = bb.minZ + bb.depth / 2;
 
   const placements: BuildingPlacement[] = [];
-  for (let i = 0; i < opts.requests.length; i++) {
+  for (let i = 0; i < n; i++) {
     const req = opts.requests[i];
-    const col = i % cols;
-    const row = Math.floor(i / cols);
 
-    const effectiveCellW = Math.max(cellW, minSide);
-    const effectiveCellD = Math.max(cellD, minSide);
+    // Building dimensions: use preferred ratio aligned to terrain direction.
+    const effectiveCellMain = Math.max(cellMain, minSide);
+    const effectiveCellCross = Math.max(cellCross, minSide);
     const preferredRatio =
-      req.preferredRatio ?? effectiveCellW / effectiveCellD;
+      req.preferredRatio ??
+      (horizontal
+        ? effectiveCellMain / effectiveCellCross
+        : effectiveCellCross / effectiveCellMain);
     const { w: targetW, d: targetD } = dimensionsFor(
       req.targetAreaM2,
       preferredRatio,
       minSide,
     );
-    // Use full requested size — don't clamp to cell.
-    const w = targetW;
-    const d = targetD;
 
-    const cx = originX + col * (effectiveCellW + gap) + effectiveCellW / 2;
-    const cz = originZ + row * (effectiveCellD + truckGap) + effectiveCellD / 2;
-    let footprint = rectFootprint(cx, cz, w, d);
+    // Position along the main axis, centered on the cross axis.
+    let cx: number;
+    let cz: number;
+    if (horizontal) {
+      cx = bb.minX + i * (effectiveCellMain + gap) + effectiveCellMain / 2;
+      cz = centerZ;
+    } else {
+      cx = centerX;
+      cz = bb.minZ + i * (effectiveCellMain + gap) + effectiveCellMain / 2;
+    }
 
-    // Apply rotation around centroid if specified.
+    let footprint = rectFootprint(cx, cz, targetW, targetD);
+
+    // Apply group rotation around the buildable center.
     if (rotationRad !== 0) {
-      footprint = rotatePolygon(footprint, cx, cz, rotationRad);
+      footprint = rotatePolygon(footprint, centerX, centerZ, rotationRad);
     }
 
     if (!footprintInside(footprint, opts.buildable)) {
