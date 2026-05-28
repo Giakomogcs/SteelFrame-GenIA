@@ -4351,7 +4351,8 @@ textarea {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: var(--space-5);
-  padding: var(--space-5) var(--space-6) var(--space-6);
+  flex: 1 1 auto;
+  min-height: 0;
 }
 @media (max-width: 1100px) {
   .briefing-v2 {
@@ -4531,6 +4532,9 @@ textarea {
   padding: var(--space-4) var(--space-6) var(--space-5);
   border-top: 1px solid var(--color-stroke);
   background: var(--color-background);
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
 }
 .briefing-v2__footer .btn {
   padding: var(--space-2) var(--space-4);

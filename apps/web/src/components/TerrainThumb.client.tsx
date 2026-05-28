@@ -43,6 +43,8 @@ interface Props {
   building?: BuildingFootprint | null;
   /** Permite arrastar/zoom (default false = miniatura estática). */
   interactive?: boolean;
+  /** Hide Leaflet polygons (useful when an SVG overlay draws them). */
+  showPolygon?: boolean;
 }
 
 const METERS_PER_DEG_LAT = 111_320;
@@ -58,6 +60,7 @@ export default function TerrainThumbClient({
   polygon,
   building,
   interactive = false,
+  showPolygon = true,
 }: Props) {
   if (!polygon || polygon.length < 3) {
     return <div className="map-placeholder" />;
@@ -104,17 +107,19 @@ export default function TerrainThumbClient({
         maxZoom={MAX_MAP_ZOOM}
       />
       <FitBounds bounds={bounds} />
-      <Polygon
-        positions={positions}
-        pathOptions={{
-          color: "#D72042",
-          fillColor: "#D72042",
-          fillOpacity: 0.12,
-          weight: 2,
-          dashArray: "6 4",
-        }}
-      />
-      {buildingPositions && (
+      {showPolygon && (
+        <Polygon
+          positions={positions}
+          pathOptions={{
+            color: "#D72042",
+            fillColor: "#D72042",
+            fillOpacity: 0.12,
+            weight: 2,
+            dashArray: "6 4",
+          }}
+        />
+      )}
+      {showPolygon && buildingPositions && (
         <Polygon
           positions={buildingPositions}
           pathOptions={{

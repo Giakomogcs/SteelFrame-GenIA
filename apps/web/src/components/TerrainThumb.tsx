@@ -13,6 +13,8 @@ interface Props {
   polygon: LngLat[];
   building?: BuildingFootprint | null;
   interactive?: boolean;
+  /** Hide Leaflet polygons (useful when an SVG overlay draws them). */
+  showPolygon?: boolean;
 }
 
 export default function TerrainThumb(props: Props) {

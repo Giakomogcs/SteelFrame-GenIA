@@ -3,7 +3,7 @@
 /**
  * BriefingClient (v2 — PRD §10.1)
  *
- * Wizard horizontal de 6 passos. AC1: nunca monta `ShedViewer` nem cria
+ * Wizard horizontal de 5 passos. AC1: nunca monta `ShedViewer` nem cria
  * `Building`/`SitePlan` materializado antes do submit do step 6. A coluna
  * direita exibe apenas o `LotPreviewSvg` (planta 2D) até o estudo ser
  * gerado. Persistência incremental em `assumptions` via PATCH
@@ -38,10 +38,9 @@ import {
 import TerrainThumb from "@/components/TerrainThumb";
 
 const STEPS: StepDef[] = [
-  { id: "programa", label: "Programa", description: "Nº de galpões, uso" },
+  { id: "programa", label: "Programa", description: "Nº de galpões, uso e dimensões" },
   { id: "terreno", label: "Terreno & rua", description: "Arestas e recuos" },
   { id: "perimetro", label: "Perímetro", description: "Muros e portões" },
-  { id: "galpoes", label: "Galpões", description: "Dimensões e tipologia" },
   { id: "circulacao", label: "Circulação", description: "Vagas e vias" },
   { id: "revisao", label: "Revisão", description: "Validar e gerar 3D" },
 ];
@@ -367,7 +366,7 @@ export default function BriefingClient({
   );
 
   return (
-    <div className="briefing-shell briefing-shell--v2">
+    <>
       <header className="page-header">
         <div className="stack-sm">
           <Breadcrumb
@@ -418,6 +417,8 @@ export default function BriefingClient({
               onChange={(p) => setState((s) => ({ ...s, programa: p }))}
               maxTargetArea={maxTargetArea}
               buildableAreaM2={buildableAreaM2}
+              clearHeight={state.clearHeight}
+              onClearHeight={(v) => setState((s) => ({ ...s, clearHeight: v }))}
             />
           )}
           {step === 1 && (
@@ -445,21 +446,13 @@ export default function BriefingClient({
             />
           )}
           {step === 3 && (
-            <StepBuildings
-              clearHeight={state.clearHeight}
-              programa={state.programa}
-              onClearHeight={(v) => setState((s) => ({ ...s, clearHeight: v }))}
-              onProgram={(p) => setState((s) => ({ ...s, programa: p }))}
-            />
-          )}
-          {step === 4 && (
             <StepCirculation
               carStalls={state.carStalls}
               truckStalls={state.truckStalls}
               onChange={(patch) => setState((s) => ({ ...s, ...patch }))}
             />
           )}
-          {step === 5 && (
+          {step === 4 && (
             <StepReview report={candidate.report} error={candidate.error} />
           )}
 
@@ -561,7 +554,7 @@ export default function BriefingClient({
           </button>
         )}
       </footer>
-    </div>
+    </>
   );
 }
 
@@ -572,11 +565,15 @@ function StepProgram({
   onChange,
   maxTargetArea,
   buildableAreaM2,
+  clearHeight,
+  onClearHeight,
 }: {
   value: Programa;
   onChange: (v: Programa) => void;
   maxTargetArea: number;
   buildableAreaM2: number;
+  clearHeight: number;
+  onClearHeight: (v: number) => void;
 }) {
   return (
     <div className="briefing-v2__fields">
@@ -651,6 +648,20 @@ function StepProgram({
           ))}
         </div>
       </div>
+      <label className="briefing-v2__field">
+        <span className="briefing-v2__field-label">
+          Pé-direito útil
+          <span className="briefing-v2__field-value">{clearHeight} m</span>
+        </span>
+        <input
+          type="range"
+          min={SLIDER_RANGES.clearHeight.min}
+          max={SLIDER_RANGES.clearHeight.max}
+          step={0.5}
+          value={clearHeight}
+          onChange={(e) => onClearHeight(Number(e.target.value))}
+        />
+      </label>
     </div>
   );
 }
@@ -775,50 +786,6 @@ function StepPerimeter({
           step={0.5}
           value={gateWidth}
           onChange={(e) => onChange({ gateWidth: Number(e.target.value) })}
-        />
-      </label>
-    </div>
-  );
-}
-
-function StepBuildings({
-  clearHeight,
-  programa,
-  onClearHeight,
-  onProgram,
-}: {
-  clearHeight: number;
-  programa: Programa;
-  onClearHeight: (v: number) => void;
-  onProgram: (p: Programa) => void;
-}) {
-  return (
-    <div className="briefing-v2__fields">
-      <label className="briefing-v2__field">
-        <span className="briefing-v2__field-label">
-          Pé-direito útil
-          <span className="briefing-v2__field-value">{clearHeight} m</span>
-        </span>
-        <input
-          type="range"
-          min={SLIDER_RANGES.clearHeight.min}
-          max={SLIDER_RANGES.clearHeight.max}
-          step={0.5}
-          value={clearHeight}
-          onChange={(e) => onClearHeight(Number(e.target.value))}
-        />
-      </label>
-      <label className="briefing-v2__field">
-        <span>Área alvo por galpão (m²)</span>
-        <input
-          type="number"
-          min={300}
-          max={20000}
-          step={50}
-          value={programa.targetAreaM2}
-          onChange={(e) =>
-            onProgram({ ...programa, targetAreaM2: Number(e.target.value) })
-          }
         />
       </label>
     </div>
@@ -982,7 +949,7 @@ function LotPreviewSvg({
 
   return (
     <div className={`briefing-v2__map-wrap${hasFitError ? " briefing-v2__svg--error" : ""}`}>
-      <TerrainThumb polygon={polygon} />
+      <TerrainThumb polygon={polygon} showPolygon={false} />
       <svg
         className="briefing-v2__svg"
         viewBox={`${vbX} ${vbZ} ${vbW} ${vbH}`}
