@@ -23,8 +23,10 @@ export default async function BriefingsPage() {
     .filter(
       (
         x,
-      ): x is { terrain: (typeof terrains)[number]; briefing: NonNullable<typeof x.briefing> } =>
-        x.terrain.buildings.length === 0 && x.briefing != null,
+      ): x is {
+        terrain: (typeof terrains)[number];
+        briefing: NonNullable<typeof x.briefing>;
+      } => x.terrain.buildings.length === 0 && x.briefing != null,
     );
 
   return (

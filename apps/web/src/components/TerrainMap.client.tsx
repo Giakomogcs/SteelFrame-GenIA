@@ -93,7 +93,13 @@ function FlyTo({ target }: { target: LngLat | null }) {
  * re-enquadra a cada clique — isso atrapalhava o desenho contínuo,
  * porque o mapa "pulava" e o cursor saa do próximo ponto.
  */
-function FitPolygon({ polygon, active }: { polygon: LngLat[]; active: boolean }) {
+function FitPolygon({
+  polygon,
+  active,
+}: {
+  polygon: LngLat[];
+  active: boolean;
+}) {
   const map = useMap();
   useEffect(() => {
     const container = map.getContainer();
@@ -185,7 +191,13 @@ export default function TerrainMapClient({
     if (!editable) return;
     function onKey(e: KeyboardEvent) {
       const target = e.target as HTMLElement | null;
-      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) return;
+      if (
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.isContentEditable)
+      )
+        return;
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
         e.preventDefault();
         setPolygon((prev) => (prev.length === 0 ? prev : prev.slice(0, -1)));
@@ -227,7 +239,9 @@ export default function TerrainMapClient({
 
   const removeVertex = (idx: number) => {
     if (!editable) return;
-    setPolygon((prev) => (prev.length <= 3 ? prev : prev.filter((_, i) => i !== idx)));
+    setPolygon((prev) =>
+      prev.length <= 3 ? prev : prev.filter((_, i) => i !== idx),
+    );
   };
 
   // Insere um vértice em `insertAt` (posição entre dois vértices existentes).
@@ -267,7 +281,10 @@ export default function TerrainMapClient({
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
-        <form onSubmit={handleSearch} className="flex flex-1 gap-2 min-w-[260px]">
+        <form
+          onSubmit={handleSearch}
+          className="flex flex-1 gap-2 min-w-[260px]"
+        >
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -389,10 +406,7 @@ export default function TerrainMapClient({
           <FlyTo target={searchTarget} />
           <FitPolygon polygon={polygon} active={!drawing} />
 
-          <MapClickHandler
-            drawing={drawing}
-            onAddPoint={handleAddPoint}
-          />
+          <MapClickHandler drawing={drawing} onAddPoint={handleAddPoint} />
 
           {positions.length >= 2 && (
             <Polygon
@@ -428,7 +442,8 @@ export default function TerrainMapClient({
               />
             ))}
 
-          {editable && closed &&
+          {editable &&
+            closed &&
             polygon.map((p, i) => {
               // Ponto-médio entre vértice i e (i+1) — clique insere vértice nesse ponto.
               const next = polygon[(i + 1) % polygon.length];
@@ -476,11 +491,13 @@ export default function TerrainMapClient({
             Base
           </div>
           <div className="grid grid-cols-3 overflow-hidden rounded-md border border-white/10">
-            {([
-              ["satellite", "Satélite"],
-              ["street", "Ruas"],
-              ["relief", "Topo"],
-            ] as const).map(([opt, label]) => (
+            {(
+              [
+                ["satellite", "Satélite"],
+                ["street", "Ruas"],
+                ["relief", "Topo"],
+              ] as const
+            ).map(([opt, label]) => (
               <button
                 key={opt}
                 type="button"

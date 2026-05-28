@@ -2863,7 +2863,9 @@ textarea {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  transition: border-color 0.15s ease, transform 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    transform 0.15s ease;
 }
 .earth-opt:hover {
   border-color: var(--color-stroke-strong);
@@ -2875,7 +2877,9 @@ textarea {
     rgba(23, 163, 74, 0.08) 0%,
     var(--color-surface-elevated) 60%
   );
-  box-shadow: 0 0 0 1px rgba(23, 163, 74, 0.18), var(--shadow-sm);
+  box-shadow:
+    0 0 0 1px rgba(23, 163, 74, 0.18),
+    var(--shadow-sm);
 }
 .earth-opt-head {
   display: flex;
@@ -4575,9 +4579,8 @@ textarea {
   border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
-
 /* ============================================================
-   TERRENO — galeria de construções (hero + tiles)
+   TERRENO ï¿½ galeria de construï¿½ï¿½es (hero + tiles)
    ============================================================ */
 
 .terrain-map-section {
@@ -4791,7 +4794,9 @@ textarea {
   border: 1.5px solid var(--color-stroke);
   border-radius: var(--radius-md);
   overflow: hidden;
-  transition: border-color 0.15s ease, transform 0.15s ease,
+  transition:
+    border-color 0.15s ease,
+    transform 0.15s ease,
     box-shadow 0.15s ease;
 }
 .building-tile:hover {
@@ -4801,7 +4806,8 @@ textarea {
 }
 .building-tile.is-selected {
   border-color: var(--color-primary-500);
-  box-shadow: 0 0 0 1px var(--color-primary-500),
+  box-shadow:
+    0 0 0 1px var(--color-primary-500),
     0 0 20px rgba(215, 32, 66, 0.22);
 }
 .building-tile-btn {
@@ -4904,7 +4910,7 @@ textarea {
   height: 100%;
 }
 
-/* Empty state ilustração */
+/* Empty state ilustraï¿½ï¿½o */
 .buildings-empty-art {
   display: flex;
   flex-direction: column;
@@ -4916,7 +4922,7 @@ textarea {
 }
 
 /* ============================================================
-   Briefings — botões de cancelar / excluir em cada card pendente
+   Briefings ï¿½ botï¿½es de cancelar / excluir em cada card pendente
    ============================================================ */
 .briefing-card-wrap {
   position: relative;
@@ -4951,7 +4957,10 @@ textarea {
   color: var(--color-text-primary);
   cursor: pointer;
   backdrop-filter: blur(10px);
-  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
 }
 .briefing-action-btn:hover {
   background: var(--color-surface-raised);
