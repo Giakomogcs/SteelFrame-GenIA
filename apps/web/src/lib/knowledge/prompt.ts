@@ -3,7 +3,12 @@
 // normas, fontes e faixas paramétricas mesmo sem rede.
 
 import { NORMS, type NormRef } from "./norms";
-import { COST_PER_M2_BY_STATE, COST_STAGES, STANDARD_FACTORS, type CostState } from "./costs";
+import {
+  COST_PER_M2_BY_STATE,
+  COST_STAGES,
+  STANDARD_FACTORS,
+  type CostState,
+} from "./costs";
 import { SOURCES } from "./sources";
 
 interface PromptKBOptions {
@@ -16,11 +21,11 @@ function fmtPct(v: number) {
 
 export function buildKnowledgeBlock(opts: PromptKBOptions = {}): string {
   const stateKey = (opts.uf?.toUpperCase() as CostState) ?? "BR";
-  const stateCosts =
-    COST_PER_M2_BY_STATE[stateKey] ?? COST_PER_M2_BY_STATE.BR;
+  const stateCosts = COST_PER_M2_BY_STATE[stateKey] ?? COST_PER_M2_BY_STATE.BR;
 
   const normsBlock = NORMS.map(
-    (n: NormRef) => `- ${n.code} (${n.domain}): ${n.title}. Aplica quando: ${n.appliesWhen}`,
+    (n: NormRef) =>
+      `- ${n.code} (${n.domain}): ${n.title}. Aplica quando: ${n.appliesWhen}`,
   ).join("\n");
 
   const sourcesBlock = SOURCES.map(

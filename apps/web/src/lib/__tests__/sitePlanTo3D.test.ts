@@ -19,7 +19,10 @@ function squareLot(side = 100) {
   ];
 }
 
-function siteFor(lotSide: number, requests: { id: string; name: string; area: number }[]) {
+function siteFor(
+  lotSide: number,
+  requests: { id: string; name: string; area: number }[],
+) {
   const lot = squareLot(lotSide);
   const buildable = buildBuildableRegion(lot, {
     setbacks: { front: 5, sides: 1.5, back: 3 },

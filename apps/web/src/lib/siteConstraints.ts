@@ -83,10 +83,10 @@ function area2(p: readonly V[]): number {
 function centroid(p: readonly V[]): V {
   const a = area2(p);
   if (a === 0) {
-    const c = p.reduce(
-      (acc, v) => ({ x: acc.x + v.x, z: acc.z + v.z }),
-      { x: 0, z: 0 },
-    );
+    const c = p.reduce((acc, v) => ({ x: acc.x + v.x, z: acc.z + v.z }), {
+      x: 0,
+      z: 0,
+    });
     return { x: c.x / p.length, z: c.z / p.length };
   }
   let cx = 0;
@@ -392,10 +392,9 @@ export const SLIDER_RANGES = {
 } as const;
 
 export function freeSpanLimit(system: string): number | undefined {
-  return (SITE_CONSTRAINTS.building.maxFreeSpanBySystem as Record<
-    string,
-    number
-  >)[system];
+  return (
+    SITE_CONSTRAINTS.building.maxFreeSpanBySystem as Record<string, number>
+  )[system];
 }
 
 /** Compatible with selecting placements/gates by id from a SitePlan. */

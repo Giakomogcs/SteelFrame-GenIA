@@ -8,15 +8,8 @@
 // reject anything that would leak outside the buildable region.
 // ============================================================
 import { SITE_CONSTRAINTS } from "./siteConstraints";
-import {
-  pointInPolygon,
-  polygonBBox,
-  type V,
-} from "./siteGeometry";
-import type {
-  BuildingPlacement,
-  BuildingUse,
-} from "./sitePlanSchema";
+import { pointInPolygon, polygonBBox, type V } from "./siteGeometry";
+import type { BuildingPlacement, BuildingUse } from "./sitePlanSchema";
 
 // ---- Inputs --------------------------------------------------------------
 
@@ -58,7 +51,10 @@ function rectFootprint(cx: number, cz: number, w: number, d: number): V[] {
   ];
 }
 
-function footprintInside(footprint: readonly V[], region: readonly V[]): boolean {
+function footprintInside(
+  footprint: readonly V[],
+  region: readonly V[],
+): boolean {
   return footprint.every((v) => pointInPolygon(v, region));
 }
 

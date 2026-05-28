@@ -44,9 +44,7 @@ export type SiteSetbacks = z.infer<typeof SiteSetbacksSchema>;
 export const PerimeterSegmentSchema = z.object({
   /** Index of the lot edge this segment belongs to (0..N-1). */
   edgeIndex: z.number().int().min(0),
-  kind: z
-    .enum(["muro", "alambrado", "concertina", "vazio"])
-    .default("muro"),
+  kind: z.enum(["muro", "alambrado", "concertina", "vazio"]).default("muro"),
   height: z.number().min(0).max(6).default(2.2),
 });
 export type PerimeterSegment = z.infer<typeof PerimeterSegmentSchema>;

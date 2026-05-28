@@ -29,16 +29,34 @@ function computeComplexityFactor(input: DemolitionInput) {
   let low = 1.0;
   let high = 1.0;
   switch (input.urbanDensity) {
-    case "media": low *= 1.05; high *= 1.15; break;
-    case "alta":  low *= 1.10; high *= 1.25; break;
+    case "media":
+      low *= 1.05;
+      high *= 1.15;
+      break;
+    case "alta":
+      low *= 1.1;
+      high *= 1.25;
+      break;
   }
   switch (input.debrisLevel) {
-    case "medio": low *= 1.03; high *= 1.08; break;
-    case "alto":  low *= 1.05; high *= 1.15; break;
+    case "medio":
+      low *= 1.03;
+      high *= 1.08;
+      break;
+    case "alto":
+      low *= 1.05;
+      high *= 1.15;
+      break;
   }
   switch (input.access) {
-    case "medio":   low *= 1.05; high *= 1.10; break;
-    case "dificil": low *= 1.10; high *= 1.20; break;
+    case "medio":
+      low *= 1.05;
+      high *= 1.1;
+      break;
+    case "dificil":
+      low *= 1.1;
+      high *= 1.2;
+      break;
   }
   return { low, high };
 }
@@ -53,7 +71,9 @@ export interface DemolitionEstimate {
 }
 
 export function estimateDemolition(input: DemolitionInput): DemolitionEstimate {
-  const base = DEMOLITION_COST_PER_M2[input.existingType] ?? DEMOLITION_COST_PER_M2.generico;
+  const base =
+    DEMOLITION_COST_PER_M2[input.existingType] ??
+    DEMOLITION_COST_PER_M2.generico;
   const cx = computeComplexityFactor(input);
   const lowM2 = base.low * cx.low;
   const highM2 = base.high * cx.high;
@@ -61,9 +81,16 @@ export function estimateDemolition(input: DemolitionInput): DemolitionEstimate {
   const notes: string[] = [
     `Base SINAPI/composições para demolição de ${input.existingType.replace("_", " ")}.`,
   ];
-  if (input.urbanDensity === "alta") notes.push("Acréscimo por região urbana densa (logística, ruído, descarte).");
-  if (input.debrisLevel === "alto") notes.push("Volume elevado de entulho — caçambas e transporte adicionais.");
-  if (input.access === "dificil") notes.push("Acesso restrito — equipamentos menores e mais ciclos de carga.");
+  if (input.urbanDensity === "alta")
+    notes.push(
+      "Acréscimo por região urbana densa (logística, ruído, descarte).",
+    );
+  if (input.debrisLevel === "alto")
+    notes.push("Volume elevado de entulho — caçambas e transporte adicionais.");
+  if (input.access === "dificil")
+    notes.push(
+      "Acesso restrito — equipamentos menores e mais ciclos de carga.",
+    );
 
   return {
     areaM2: input.areaM2,

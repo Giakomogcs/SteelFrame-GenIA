@@ -94,10 +94,10 @@ function lotShape(polygon: readonly V[]): THREE.Shape {
 }
 
 function centroidXZ(poly: readonly V[]): V {
-  const c = poly.reduce(
-    (acc, v) => ({ x: acc.x + v.x, z: acc.z + v.z }),
-    { x: 0, z: 0 },
-  );
+  const c = poly.reduce((acc, v) => ({ x: acc.x + v.x, z: acc.z + v.z }), {
+    x: 0,
+    z: 0,
+  });
   return { x: c.x / poly.length, z: c.z / poly.length };
 }
 
@@ -152,9 +152,9 @@ export function buildPerimeterLayer(
     if (seg.kind === "vazio" || seg.height <= 0) continue;
     const edge = edges[seg.edgeIndex];
     if (!edge) continue;
-    const edgeGates = (gatesByEdge.get(seg.edgeIndex) ?? []).slice().sort(
-      (a, b) => a.tAlongEdge - b.tAlongEdge,
-    );
+    const edgeGates = (gatesByEdge.get(seg.edgeIndex) ?? [])
+      .slice()
+      .sort((a, b) => a.tAlongEdge - b.tAlongEdge);
     // Split edge into sub-segments around each gate (gap = gate.width).
     let cursor = 0;
     for (const gate of edgeGates) {
@@ -266,7 +266,15 @@ export function buildShedMesh(
     const z = startZ + i * baySpacing;
     addColumn(g, -halfSpan, z, height, placement.id, i, "L");
     addColumn(g, halfSpan, z, height, placement.id, i, "R");
-    addTruss(g, z, halfSpan * 2, Math.max(1, height * 0.18), height, placement.id, i);
+    addTruss(
+      g,
+      z,
+      halfSpan * 2,
+      Math.max(1, height * 0.18),
+      height,
+      placement.id,
+      i,
+    );
   }
 
   if (lod === "architectural") {
@@ -306,10 +314,7 @@ function addTruss(
   group.position.set(0, baseY, z);
   group.name = `truss:${id}:b${bay}`;
   // Bottom chord.
-  const bot = new THREE.Mesh(
-    new THREE.BoxGeometry(span, 0.15, 0.15),
-    MAT_BEAM,
-  );
+  const bot = new THREE.Mesh(new THREE.BoxGeometry(span, 0.15, 0.15), MAT_BEAM);
   bot.name = `truss:${id}:b${bay}:bottom`;
   group.add(bot);
   // Two top slopes.
@@ -407,9 +412,7 @@ export function sitePlanTo3D(
   root.name = "site";
 
   root.add(buildTerrainLayer(site));
-  root.add(
-    buildPerimeterLayer(site, site.perimeter.segments, site.gates),
-  );
+  root.add(buildPerimeterLayer(site, site.perimeter.segments, site.gates));
   root.add(buildGatesLayer(site, site.gates));
 
   // Buildings layer.

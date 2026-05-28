@@ -99,18 +99,32 @@ export function computeViability(input: ViabilityInput): ViabilityEstimate {
   const factors: { name: string; range: Range }[] = [
     { name: `terreno_${slopeBucket}`, range: TERRAIN_FACTOR[slopeBucket] },
     { name: "padrao_" + input.standard, range: std },
-    { name: "isolamento_" + (input.insulation ?? "basico"), range: INSULATION_FACTOR[input.insulation ?? "basico"] },
-    { name: "cobertura_" + (input.roofCover ?? "telha_metalica"), range: ROOF_COVER_FACTOR[input.roofCover ?? "telha_metalica"] ?? NEUTRAL },
-    { name: "fachada_" + (input.facadeComplexity ?? "pouco"), range: FACADE_COMPLEXITY_FACTOR[input.facadeComplexity ?? "pouco"] },
+    {
+      name: "isolamento_" + (input.insulation ?? "basico"),
+      range: INSULATION_FACTOR[input.insulation ?? "basico"],
+    },
+    {
+      name: "cobertura_" + (input.roofCover ?? "telha_metalica"),
+      range: ROOF_COVER_FACTOR[input.roofCover ?? "telha_metalica"] ?? NEUTRAL,
+    },
+    {
+      name: "fachada_" + (input.facadeComplexity ?? "pouco"),
+      range: FACADE_COMPLEXITY_FACTOR[input.facadeComplexity ?? "pouco"],
+    },
     { name: "vao_livre", range: largeSpanFactor(input.freeSpanM) },
     { name: "pavimentos", range: multiStoreyFactor(input.storeys) },
     { name: "pe_direito", range: tallClearHeightFactor(input.clearHeightM) },
-    { name: "piso_industrial", range: industrialFloorFactor(input.floorLoadKnM2) },
+    {
+      name: "piso_industrial",
+      range: industrialFloorFactor(input.floorLoadKnM2),
+    },
     { name: "docas", range: docksFactor(input.docksCount) },
     { name: "avcb", range: avcbFactor(input.avcbRequired, input.areaM2) },
   ];
-  if (input.hasSounding === false) factors.push({ name: "sem_sondagem", range: NO_SOUNDING_FACTOR });
-  if (input.hasTopo === false) factors.push({ name: "sem_topografia", range: NO_TOPO_FACTOR });
+  if (input.hasSounding === false)
+    factors.push({ name: "sem_sondagem", range: NO_SOUNDING_FACTOR });
+  if (input.hasTopo === false)
+    factors.push({ name: "sem_topografia", range: NO_TOPO_FACTOR });
 
   const composed = composeFactors(...factors.map((f) => f.range));
 
@@ -136,8 +150,10 @@ export function computeViability(input: ViabilityInput): ViabilityEstimate {
   const notes: string[] = [
     "Estimativa preliminar para estudo de viabilidade — não substitui orçamento executivo.",
   ];
-  if (slopeBucket === "desconhecido") notes.push("Topografia desconhecida — aplicada contingência conservadora.");
-  if (input.hasSounding === false) notes.push("Sem sondagem — fundação estimada com contingência adicional.");
+  if (slopeBucket === "desconhecido")
+    notes.push("Topografia desconhecida — aplicada contingência conservadora.");
+  if (input.hasSounding === false)
+    notes.push("Sem sondagem — fundação estimada com contingência adicional.");
 
   let demolition: DemolitionEstimate | undefined;
   let totalWithDemolition: ViabilityEstimate["totalWithDemolition"];
@@ -151,7 +167,9 @@ export function computeViability(input: ViabilityInput): ViabilityEstimate {
     });
     totalWithDemolition = {
       low: totalCost.low + demolition.totalCost.low,
-      base: totalCost.base + Math.round((demolition.totalCost.low + demolition.totalCost.high) / 2),
+      base:
+        totalCost.base +
+        Math.round((demolition.totalCost.low + demolition.totalCost.high) / 2),
       high: totalCost.high + demolition.totalCost.high,
     };
   }

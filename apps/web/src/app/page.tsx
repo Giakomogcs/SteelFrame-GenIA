@@ -19,7 +19,7 @@ export default async function HomePage() {
         const m = b.model as { estimate?: { totalCost?: number } } | null;
         return bs + (m?.estimate?.totalCost ?? 0);
       }, 0),
-    0
+    0,
   );
   const totalBuildings = terrains.reduce((s, t) => s + t.buildings.length, 0);
   const totalCovered = terrains.reduce(
@@ -29,18 +29,20 @@ export default async function HomePage() {
         const m = b.model as { estimate?: { coveredAreaM2?: number } } | null;
         return bs + (m?.estimate?.coveredAreaM2 ?? 0);
       }, 0),
-    0
+    0,
   );
-  const avgPerM2 =
-    totalCovered > 0 ? Math.round(totalCost / totalCovered) : 0;
+  const avgPerM2 = totalCovered > 0 ? Math.round(totalCost / totalCovered) : 0;
 
   const viaveis = terrains.filter((t) => t.buildings.length > 0).length;
   const emBriefing = terrains.filter(
     (t) =>
       t.buildings.length === 0 &&
       t.briefings.some(
-        (b) => b.status === "active" || b.status === "draft" || b.status === "paused"
-      )
+        (b) =>
+          b.status === "active" ||
+          b.status === "draft" ||
+          b.status === "paused",
+      ),
   ).length;
   const semBriefing = terrains.length - viaveis - emBriefing;
 
@@ -51,7 +53,8 @@ export default async function HomePage() {
           <Breadcrumb items={[{ label: "Meus terrenos" }]} />
           <div className="page-title-row">
             <h1>
-              {terrains.length} terreno{terrains.length === 1 ? "" : "s"} em estudo
+              {terrains.length} terreno{terrains.length === 1 ? "" : "s"} em
+              estudo
             </h1>
             {viaveis > 0 && (
               <span className="pill pill-success">

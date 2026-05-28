@@ -12,11 +12,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { LngLat } from "@/lib/geo";
+import { BriefingStepper, type StepDef } from "@/components/BriefingStepper";
 import {
-  BriefingStepper,
-  type StepDef,
-} from "@/components/BriefingStepper";
-import { SITE_CONSTRAINTS, SLIDER_RANGES, validateSitePlan } from "@/lib/siteConstraints";
+  SITE_CONSTRAINTS,
+  SLIDER_RANGES,
+  validateSitePlan,
+} from "@/lib/siteConstraints";
 import {
   buildBuildableRegion,
   detectStreetEdges,
@@ -98,7 +99,9 @@ export default function BriefingClient({
   initialBriefingId = null,
 }: Props) {
   const router = useRouter();
-  const [briefingId, setBriefingId] = useState<string | null>(initialBriefingId);
+  const [briefingId, setBriefingId] = useState<string | null>(
+    initialBriefingId,
+  );
   const [state, setState] = useState<BriefingState>(initial);
   const [step, setStep] = useState(0);
   const [furthest, setFurthest] = useState(0);
@@ -253,13 +256,7 @@ export default function BriefingClient({
         error: e instanceof Error ? e.message : String(e),
       };
     }
-  }, [
-    edges,
-    lot.local,
-    polygon,
-    state,
-    terrainId,
-  ]);
+  }, [edges, lot.local, polygon, state, terrainId]);
 
   function go(next: number) {
     setStep(next);
@@ -286,14 +283,11 @@ export default function BriefingClient({
         );
       }
       const id = await ensureBriefing();
-      const save = await fetch(
-        `/api/terrenos/${terrainId}/site-plan`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ briefingId: id, data: candidate.site }),
-        },
-      );
+      const save = await fetch(`/api/terrenos/${terrainId}/site-plan`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ briefingId: id, data: candidate.site }),
+      });
       if (!save.ok) {
         const j = (await save.json().catch(() => ({}))) as { error?: string };
         throw new Error(j.error ?? "Falha ao salvar SitePlan.");
@@ -332,7 +326,10 @@ export default function BriefingClient({
       />
 
       <div className="briefing-v2" style={{ flex: 1 }}>
-        <section className="briefing-v2__panel" aria-labelledby={`step-${step}`}>
+        <section
+          className="briefing-v2__panel"
+          aria-labelledby={`step-${step}`}
+        >
           <header>
             <h3 id={`step-${step}`}>
               {step + 1}. {STEPS[step].label}
@@ -345,7 +342,10 @@ export default function BriefingClient({
           </header>
 
           {step === 0 && (
-            <StepProgram value={state.programa} onChange={(p) => setState((s) => ({ ...s, programa: p }))} />
+            <StepProgram
+              value={state.programa}
+              onChange={(p) => setState((s) => ({ ...s, programa: p }))}
+            />
           )}
           {step === 1 && (
             <StepTerrain
@@ -386,7 +386,9 @@ export default function BriefingClient({
               onChange={(patch) => setState((s) => ({ ...s, ...patch }))}
             />
           )}
-          {step === 5 && <StepReview report={candidate.report} error={candidate.error} />}
+          {step === 5 && (
+            <StepReview report={candidate.report} error={candidate.error} />
+          )}
 
           {error && (
             <p style={{ color: "#fca5a5", fontSize: 12 }} role="alert">
@@ -395,13 +397,18 @@ export default function BriefingClient({
           )}
         </section>
 
-        <aside className="briefing-v2__panel" aria-label="Pré-visualização da planta">
+        <aside
+          className="briefing-v2__panel"
+          aria-label="Pré-visualização da planta"
+        >
           <h3>Planta 2D (preview)</h3>
           <LotPreviewSvg
             polygonLocal={lot.local}
             edges={edges}
             streetEdges={state.streetEdges}
-            buildings={candidate.site?.buildings.map((b) => b.footprintPolygon) ?? []}
+            buildings={
+              candidate.site?.buildings.map((b) => b.footprintPolygon) ?? []
+            }
             gates={candidate.site?.gates ?? []}
           />
           <div style={{ fontSize: 11, color: "#64748b" }}>
@@ -429,7 +436,9 @@ export default function BriefingClient({
             className="btn btn--accept"
             onClick={handleGenerate}
             disabled={submitting || !candidate.report.ok || !candidate.site}
-            title={!candidate.report.ok ? "Corrija os erros antes de gerar." : ""}
+            title={
+              !candidate.report.ok ? "Corrija os erros antes de gerar." : ""
+            }
           >
             {submitting ? "Gerando estudo…" : "Gerar estudo 3D"}
           </button>
@@ -458,7 +467,10 @@ function StepProgram({
           max={6}
           value={value.qty}
           onChange={(e) =>
-            onChange({ ...value, qty: Math.max(1, Math.min(6, Number(e.target.value))) })
+            onChange({
+              ...value,
+              qty: Math.max(1, Math.min(6, Number(e.target.value))),
+            })
           }
         />
       </label>
@@ -478,14 +490,18 @@ function StepProgram({
         </div>
       </div>
       <label className="briefing-v2__field">
-        <span>Área alvo por galpão: {value.targetAreaM2.toLocaleString("pt-BR")} m²</span>
+        <span>
+          Área alvo por galpão: {value.targetAreaM2.toLocaleString("pt-BR")} m²
+        </span>
         <input
           type="range"
           min={300}
           max={20000}
           step={100}
           value={value.targetAreaM2}
-          onChange={(e) => onChange({ ...value, targetAreaM2: Number(e.target.value) })}
+          onChange={(e) =>
+            onChange({ ...value, targetAreaM2: Number(e.target.value) })
+          }
         />
       </label>
       <div className="briefing-v2__field">
@@ -560,7 +576,9 @@ function StepTerrain({
             max={SLIDER_RANGES.setback.max}
             step={SLIDER_RANGES.setback.step}
             value={setbacks[k]}
-            onChange={(e) => onSetbacks({ ...setbacks, [k]: Number(e.target.value) })}
+            onChange={(e) =>
+              onSetbacks({ ...setbacks, [k]: Number(e.target.value) })
+            }
           />
         </label>
       ))}
@@ -595,7 +613,9 @@ function StepPerimeter({
           max={4}
           step={0.1}
           value={perimeterHeight}
-          onChange={(e) => onChange({ perimeterHeight: Number(e.target.value) })}
+          onChange={(e) =>
+            onChange({ perimeterHeight: Number(e.target.value) })
+          }
         />
       </label>
       <div className="briefing-v2__field">
@@ -680,7 +700,9 @@ function StepCirculation({
 }: {
   carStalls: number;
   truckStalls: number;
-  onChange: (patch: Partial<{ carStalls: number; truckStalls: number }>) => void;
+  onChange: (
+    patch: Partial<{ carStalls: number; truckStalls: number }>,
+  ) => void;
 }) {
   return (
     <div style={{ display: "grid", gap: 14 }}>

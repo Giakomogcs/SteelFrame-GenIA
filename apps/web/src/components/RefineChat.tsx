@@ -66,7 +66,11 @@ export default function RefineChat({
         throw new Error(json.error ?? `HTTP ${res.status}`);
       }
       const proposedSite = json.proposedSitePlan;
-      const validations = json.validations ?? { ok: true, errors: [], warnings: [] };
+      const validations = json.validations ?? {
+        ok: true,
+        errors: [],
+        warnings: [],
+      };
       const turn: ChatTurn = {
         role: "assistant",
         text:
@@ -89,7 +93,15 @@ export default function RefineChat({
   }
 
   return (
-    <div className="refine-chat" style={{ display: "flex", flexDirection: "column", gap: 8, height: "100%" }}>
+    <div
+      className="refine-chat"
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: 8,
+        height: "100%",
+      }}
+    >
       <div
         className="refine-chat__log"
         style={{
@@ -103,7 +115,8 @@ export default function RefineChat({
       >
         {turns.length === 0 && (
           <div style={{ color: "#64748b", fontSize: 12 }}>
-            Descreva ajustes (ex.: "afaste o galpão 2 da rua", "aumente o vão livre").
+            Descreva ajustes (ex.: "afaste o galpão 2 da rua", "aumente o vão
+            livre").
           </div>
         )}
         {turns.map((t, i) => (
@@ -135,7 +148,13 @@ export default function RefineChat({
                   onClick={() =>
                     setTurns((arr) =>
                       arr.map((x, j) =>
-                        j === i ? { ...x, proposal: undefined, text: x.text + " (descartado)" } : x,
+                        j === i
+                          ? {
+                              ...x,
+                              proposal: undefined,
+                              text: x.text + " (descartado)",
+                            }
+                          : x,
                       ),
                     )
                   }

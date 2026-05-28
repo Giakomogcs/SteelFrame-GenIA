@@ -28,7 +28,11 @@ function rectLot(w: number, d: number) {
   ];
 }
 
-function siteFor(lot: { x: number; z: number }[], count: number, area: number): SitePlan {
+function siteFor(
+  lot: { x: number; z: number }[],
+  count: number,
+  area: number,
+): SitePlan {
   const buildable = buildBuildableRegion(lot, {
     setbacks: { front: 5, sides: 1.5, back: 3 },
     streetEdges: [0],
@@ -60,13 +64,48 @@ function siteFor(lot: { x: number; z: number }[], count: number, area: number): 
 }
 
 describe("clampToPolygon (AC4)", () => {
-  const fixtures: Array<{ name: string; lot: { x: number; z: number }[]; count: number; area: number }> = [
-    { name: "square 100m × 1 galpão 1200m²", lot: squareLot(100), count: 1, area: 1200 },
-    { name: "square 100m × 2 galpões 800m²", lot: squareLot(100), count: 2, area: 800 },
-    { name: "square 150m × 4 galpões 1500m²", lot: squareLot(150), count: 4, area: 1500 },
-    { name: "square 200m × 4 galpões 4000m²", lot: squareLot(200), count: 4, area: 4000 },
-    { name: "rect 120×80 × 1 galpão 1500m²", lot: rectLot(120, 80), count: 1, area: 1500 },
-    { name: "rect 200×100 × 2 galpões 3000m²", lot: rectLot(200, 100), count: 2, area: 3000 },
+  const fixtures: Array<{
+    name: string;
+    lot: { x: number; z: number }[];
+    count: number;
+    area: number;
+  }> = [
+    {
+      name: "square 100m × 1 galpão 1200m²",
+      lot: squareLot(100),
+      count: 1,
+      area: 1200,
+    },
+    {
+      name: "square 100m × 2 galpões 800m²",
+      lot: squareLot(100),
+      count: 2,
+      area: 800,
+    },
+    {
+      name: "square 150m × 4 galpões 1500m²",
+      lot: squareLot(150),
+      count: 4,
+      area: 1500,
+    },
+    {
+      name: "square 200m × 4 galpões 4000m²",
+      lot: squareLot(200),
+      count: 4,
+      area: 4000,
+    },
+    {
+      name: "rect 120×80 × 1 galpão 1500m²",
+      lot: rectLot(120, 80),
+      count: 1,
+      area: 1500,
+    },
+    {
+      name: "rect 200×100 × 2 galpões 3000m²",
+      lot: rectLot(200, 100),
+      count: 2,
+      area: 3000,
+    },
   ];
   for (const fx of fixtures) {
     it(fx.name, () => {

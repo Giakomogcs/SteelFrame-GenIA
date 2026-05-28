@@ -55,13 +55,18 @@ export default async function BuildingPage({
               <span className="pill pill-neutral mono">#R-{shortId}</span>
             </div>
             <p className="text-sm muted">
-              {shed.footprint.width.toFixed(1)} × {shed.footprint.depth.toFixed(1)} m ·{" "}
-              {shed.estimate.coveredAreaM2.toLocaleString("pt-BR")} m² cobertos ·{" "}
-              {shed.structure.bayCount} pórticos · pé-direito {shed.structure.clearHeight} m
+              {shed.footprint.width.toFixed(1)} ×{" "}
+              {shed.footprint.depth.toFixed(1)} m ·{" "}
+              {shed.estimate.coveredAreaM2.toLocaleString("pt-BR")} m² cobertos
+              · {shed.structure.bayCount} pórticos · pé-direito{" "}
+              {shed.structure.clearHeight} m
             </p>
           </div>
           <div className="row">
-            <Link href={`/terrenos/${building.terrainId}`} className="btn btn-ghost">
+            <Link
+              href={`/terrenos/${building.terrainId}`}
+              className="btn btn-ghost"
+            >
               ← Terreno
             </Link>
             <Link
@@ -101,7 +106,9 @@ export default async function BuildingPage({
               </div>
               <div className="param-row">
                 <span className="pr-label">Confiança IA</span>
-                <span className="pr-value">{(shed.confidence * 100).toFixed(0)}%</span>
+                <span className="pr-value">
+                  {(shed.confidence * 100).toFixed(0)}%
+                </span>
               </div>
             </div>
 
@@ -152,7 +159,8 @@ export default async function BuildingPage({
               <div className="param-row">
                 <span className="pr-label">Piso</span>
                 <span className="pr-value">
-                  {shed.floor.type.replace(/_/g, " ")} · {shed.floor.load_kN_m2} kN/m²
+                  {shed.floor.type.replace(/_/g, " ")} · {shed.floor.load_kN_m2}{" "}
+                  kN/m²
                 </span>
               </div>
             </div>
@@ -169,7 +177,9 @@ export default async function BuildingPage({
               </div>
               <div className="param-row">
                 <span className="pr-label">Mezanino</span>
-                <span className="pr-value">{shed.mezzanine ? "Sim" : "Não"}</span>
+                <span className="pr-value">
+                  {shed.mezzanine ? "Sim" : "Não"}
+                </span>
               </div>
               <div className="param-row">
                 <span className="pr-label">AVCB</span>
@@ -185,9 +195,12 @@ export default async function BuildingPage({
                 <span className="pr-label">Custo total</span>
                 <span className="pr-value">
                   R${" "}
-                  {(shed.estimate.totalCost / 1_000_000).toLocaleString("pt-BR", {
-                    maximumFractionDigits: 2,
-                  })}{" "}
+                  {(shed.estimate.totalCost / 1_000_000).toLocaleString(
+                    "pt-BR",
+                    {
+                      maximumFractionDigits: 2,
+                    },
+                  )}{" "}
                   M
                 </span>
               </div>
@@ -240,9 +253,9 @@ export default async function BuildingPage({
             <div className="toast-title">⚠️ Aviso técnico obrigatório</div>
             <div className="toast-desc">
               Estimativa preliminar baseada em SINAPI/CUB e NBR{" "}
-              {shed.compliance.norms.join(" · ")}. Não substitui projeto executivo,
-              ART/RRT, sondagem geotécnica, levantamento topográfico ou aprovação legal
-              junto à prefeitura/Corpo de Bombeiros.
+              {shed.compliance.norms.join(" · ")}. Não substitui projeto
+              executivo, ART/RRT, sondagem geotécnica, levantamento topográfico
+              ou aprovação legal junto à prefeitura/Corpo de Bombeiros.
             </div>
           </div>
         </div>
@@ -274,12 +287,17 @@ export default async function BuildingPage({
             </span>
           </div>
           <p className="text-sm muted">
-            {model.footprint.width.toFixed(1)} × {model.footprint.depth.toFixed(1)} m ·{" "}
-            {model.footprint.areaM2.toLocaleString("pt-BR")} m² · {model.bays} pórticos
+            {model.footprint.width.toFixed(1)} ×{" "}
+            {model.footprint.depth.toFixed(1)} m ·{" "}
+            {model.footprint.areaM2.toLocaleString("pt-BR")} m² · {model.bays}{" "}
+            pórticos
           </p>
         </div>
         <div className="row">
-          <Link href={`/terrenos/${building.terrainId}`} className="btn btn-ghost">
+          <Link
+            href={`/terrenos/${building.terrainId}`}
+            className="btn btn-ghost"
+          >
             ← Voltar
           </Link>
         </div>
@@ -289,7 +307,10 @@ export default async function BuildingPage({
         <div className="kpi accent">
           <div className="kpi-label">Custo estimado</div>
           <div className="kpi-value">
-            R$ {(model.estimatedCost / 1_000_000).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}
+            R${" "}
+            {(model.estimatedCost / 1_000_000).toLocaleString("pt-BR", {
+              maximumFractionDigits: 2,
+            })}
             <span className="unit">M</span>
           </div>
           <div className="kpi-delta">
@@ -309,7 +330,13 @@ export default async function BuildingPage({
   );
 }
 
-function Block({ title, children }: { title: string; children: React.ReactNode }) {
+function Block({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
   return (
     <div
       style={{
@@ -319,10 +346,15 @@ function Block({ title, children }: { title: string; children: React.ReactNode }
         borderRadius: "var(--radius-md)",
       }}
     >
-      <div className="text-xs muted mono" style={{ textTransform: "uppercase", letterSpacing: "0.06em" }}>
+      <div
+        className="text-xs muted mono"
+        style={{ textTransform: "uppercase", letterSpacing: "0.06em" }}
+      >
         {title}
       </div>
-      <div style={{ marginTop: 4, fontWeight: 600, fontSize: 13 }}>{children}</div>
+      <div style={{ marginTop: 4, fontWeight: 600, fontSize: 13 }}>
+        {children}
+      </div>
     </div>
   );
 }

@@ -38,7 +38,9 @@ function SourceCard({
       <div className="card-row">
         <div>
           <div className="card-title">{title}</div>
-          <div className="card-subtitle">Fontes oficiais consultadas pelo agente</div>
+          <div className="card-subtitle">
+            Fontes oficiais consultadas pelo agente
+          </div>
         </div>
       </div>
       <div className="stack-sm">
@@ -58,8 +60,16 @@ function SourceCard({
             }}
             className="kb-source"
           >
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
-              <span style={{ color: "var(--color-primary-500)", fontWeight: 600 }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                gap: 8,
+              }}
+            >
+              <span
+                style={{ color: "var(--color-primary-500)", fontWeight: 600 }}
+              >
                 {s.name}
               </span>
               <span className="text-xs muted">↗</span>
@@ -188,7 +198,10 @@ export default function KnowledgePage() {
             href="https://www.abntcatalogo.com.br/"
             target="_blank"
             rel="noopener noreferrer"
-            style={{ color: "var(--color-primary-500)", textDecoration: "underline" }}
+            style={{
+              color: "var(--color-primary-500)",
+              textDecoration: "underline",
+            }}
           >
             abntcatalogo.com.br
           </a>
@@ -198,7 +211,9 @@ export default function KnowledgePage() {
       <section className="card">
         <div className="card-row">
           <div>
-            <div className="card-title">Custo paramétrico R$/m² (seed SINAPI/CUB)</div>
+            <div className="card-title">
+              Custo paramétrico R$/m² (seed SINAPI/CUB)
+            </div>
             <div className="card-subtitle">
               Tabela de ancoragem por UF e padrão construtivo — atualizada
               periodicamente.
@@ -219,7 +234,9 @@ export default function KnowledgePage() {
               const row = COST_PER_M2_BY_STATE[uf];
               return (
                 <tr key={uf}>
-                  <td className="mono" style={{ fontWeight: 700 }}>{uf}</td>
+                  <td className="mono" style={{ fontWeight: 700 }}>
+                    {uf}
+                  </td>
                   <td>R$ {row.economico.toLocaleString("pt-BR")}</td>
                   <td>R$ {row.medio.toLocaleString("pt-BR")}</td>
                   <td>R$ {row.alto.toLocaleString("pt-BR")}</td>
@@ -248,7 +265,11 @@ export default function KnowledgePage() {
               </tr>
             </thead>
             <tbody>
-              {(Object.keys(STANDARD_FACTORS) as Array<keyof typeof STANDARD_FACTORS>).map((k) => {
+              {(
+                Object.keys(STANDARD_FACTORS) as Array<
+                  keyof typeof STANDARD_FACTORS
+                >
+              ).map((k) => {
                 const f = STANDARD_FACTORS[k];
                 return (
                   <tr key={k}>
@@ -280,7 +301,11 @@ export default function KnowledgePage() {
               </tr>
             </thead>
             <tbody>
-              {(Object.keys(TERRAIN_FACTOR) as Array<keyof typeof TERRAIN_FACTOR>).map((k) => {
+              {(
+                Object.keys(TERRAIN_FACTOR) as Array<
+                  keyof typeof TERRAIN_FACTOR
+                >
+              ).map((k) => {
                 const f = TERRAIN_FACTOR[k];
                 return (
                   <tr key={k}>
@@ -334,41 +359,46 @@ export default function KnowledgePage() {
           </div>
         </div>
         <div className="stack-md">
-          {(Object.keys(GROUP_LABELS) as Array<keyof typeof GROUP_LABELS>).map((g) => (
-            <div key={g}>
-              <div
-                className="text-xs"
-                style={{
-                  textTransform: "uppercase",
-                  letterSpacing: "0.05em",
-                  color: "var(--color-text-muted)",
-                  marginBottom: 6,
-                }}
-              >
-                {GROUP_LABELS[g]}
+          {(Object.keys(GROUP_LABELS) as Array<keyof typeof GROUP_LABELS>).map(
+            (g) => (
+              <div key={g}>
+                <div
+                  className="text-xs"
+                  style={{
+                    textTransform: "uppercase",
+                    letterSpacing: "0.05em",
+                    color: "var(--color-text-muted)",
+                    marginBottom: 6,
+                  }}
+                >
+                  {GROUP_LABELS[g]}
+                </div>
+                <ul style={{ margin: 0, paddingLeft: 16 }}>
+                  {questionsByGroup(g).map((q) => (
+                    <li key={q.id} style={{ marginBottom: 4 }}>
+                      <span>{q.label}</span>{" "}
+                      {q.options && (
+                        <span className="text-xs muted">
+                          — {q.options.join(" / ")}
+                        </span>
+                      )}
+                      {q.optional && (
+                        <span
+                          className="text-xs"
+                          style={{
+                            marginLeft: 6,
+                            color: "var(--color-text-muted)",
+                          }}
+                        >
+                          (opcional)
+                        </span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
               </div>
-              <ul style={{ margin: 0, paddingLeft: 16 }}>
-                {questionsByGroup(g).map((q) => (
-                  <li key={q.id} style={{ marginBottom: 4 }}>
-                    <span>{q.label}</span>{" "}
-                    {q.options && (
-                      <span className="text-xs muted">
-                        — {q.options.join(" / ")}
-                      </span>
-                    )}
-                    {q.optional && (
-                      <span
-                        className="text-xs"
-                        style={{ marginLeft: 6, color: "var(--color-text-muted)" }}
-                      >
-                        (opcional)
-                      </span>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
+            ),
+          )}
         </div>
       </section>
 
@@ -381,9 +411,9 @@ export default function KnowledgePage() {
         </div>
         <p className="text-sm muted">
           Toda hipótese adotada que não foi explicitamente informada no briefing
-          é registrada na seção <b>premissas</b> do relatório. Cada custo
-          remete a uma faixa SINAPI/CUB, cada norma citada pode ser conferida
-          no Catálogo ABNT, e cada camada topográfica indica sua fonte
+          é registrada na seção <b>premissas</b> do relatório. Cada custo remete
+          a uma faixa SINAPI/CUB, cada norma citada pode ser conferida no
+          Catálogo ABNT, e cada camada topográfica indica sua fonte
           (OpenTopography, OpenTopoMap ou Esri). O agente NUNCA cita norma ou
           fonte que não esteja neste catálogo.
         </p>

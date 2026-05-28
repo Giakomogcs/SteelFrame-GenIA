@@ -13,10 +13,7 @@ function square(side = 100) {
   ];
 }
 
-function siteWith(
-  placements: ReturnType<typeof fitBuildings>,
-  lotSide = 100,
-) {
+function siteWith(placements: ReturnType<typeof fitBuildings>, lotSide = 100) {
   if (placements.ok === false) throw new Error(placements.reason);
   return SitePlanSchema.parse({
     schemaVersion: "site-1",
@@ -70,7 +67,9 @@ describe("fitBuildings — two side-by-side", () => {
     expect(r.ok).toBe(true);
     const site = siteWith(r, 150);
     const v = validateSitePlan(site);
-    expect(v.errors.filter((e) => ["E001", "E002"].includes(e.code))).toHaveLength(0);
+    expect(
+      v.errors.filter((e) => ["E001", "E002"].includes(e.code)),
+    ).toHaveLength(0);
   });
 });
 
@@ -93,7 +92,9 @@ describe("fitBuildings — four in a grid", () => {
     expect(r.ok).toBe(true);
     if (r.ok) expect(r.placements).toHaveLength(4);
     const v = validateSitePlan(siteWith(r, 200));
-    expect(v.errors.filter((e) => ["E001", "E002"].includes(e.code))).toHaveLength(0);
+    expect(
+      v.errors.filter((e) => ["E001", "E002"].includes(e.code)),
+    ).toHaveLength(0);
   });
 });
 

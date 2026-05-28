@@ -86,37 +86,37 @@ Tudo em `apps/web/src/lib/siteGeometry.ts` (funções puras): `detectStreetEdges
 
 Arquivo `apps/web/src/lib/siteConstraints.ts`:
 
-| Restrição | Valor padrão | Origem |
-|---|---|---|
-| Recuo frontal | `zoneamento.front || 5 m` | Lei de uso e ocupação |
-| Recuo lateral | ≥ 1.5 m | NBR 14432 acesso bombeiros |
-| Recuo fundo | ≥ 3 m | idem |
-| Faixa de circulação carro | ≥ 6 m | — |
-| Faixa de circulação caminhão | ≥ 12 m | raio giro 13 m |
-| Vaga carro | 2.5 × 5 m + 6 m corredor | — |
-| Vaga caminhão | 3.5 × 16 m + 25 m raio | `YardSchema.truckCircle_m` |
-| Galpão width/depth | ≥ 6 m | `FootprintSchema` |
-| TO / CA | `Terrain.to` / `Terrain.ca` | zoneamento |
-| Pé-direito útil | 4–20 m | `StructureSchema` |
-| Distância entre galpões | ≥ 6 m | NBR 14432 |
-| Vão livre máx. (steel_frame_light) | 12 m | `StructureSchema.system` |
-| Vão livre máx. (porticos_aco) | 40 m | idem |
-| Vão livre máx. (trelicado) | 80 m | idem |
+| Restrição                          | Valor padrão                | Origem                     |
+| ---------------------------------- | --------------------------- | -------------------------- | ---- | --------------------- |
+| Recuo frontal                      | `zoneamento.front           |                            | 5 m` | Lei de uso e ocupação |
+| Recuo lateral                      | ≥ 1.5 m                     | NBR 14432 acesso bombeiros |
+| Recuo fundo                        | ≥ 3 m                       | idem                       |
+| Faixa de circulação carro          | ≥ 6 m                       | —                          |
+| Faixa de circulação caminhão       | ≥ 12 m                      | raio giro 13 m             |
+| Vaga carro                         | 2.5 × 5 m + 6 m corredor    | —                          |
+| Vaga caminhão                      | 3.5 × 16 m + 25 m raio      | `YardSchema.truckCircle_m` |
+| Galpão width/depth                 | ≥ 6 m                       | `FootprintSchema`          |
+| TO / CA                            | `Terrain.to` / `Terrain.ca` | zoneamento                 |
+| Pé-direito útil                    | 4–20 m                      | `StructureSchema`          |
+| Distância entre galpões            | ≥ 6 m                       | NBR 14432                  |
+| Vão livre máx. (steel_frame_light) | 12 m                        | `StructureSchema.system`   |
+| Vão livre máx. (porticos_aco)      | 40 m                        | idem                       |
+| Vão livre máx. (trelicado)         | 80 m                        | idem                       |
 
 A função `validateSitePlan(site): ValidationReport` retorna `{ ok, errors[], warnings[] }` com `{ code, message, where:{x,z} }`. **Salvar e gerar 3D ficam bloqueados se `errors.length > 0`.**
 
 ### 4.1 Códigos de erro/warning
 
-| Código | Significado |
-|---|---|
-| E001 | galpão fora do polígono do lote (após setbacks) |
-| E002 | distância mínima entre galpões violada |
-| E003 | TO/CA excedidos |
-| E004 | portão fora de aresta `street` |
-| E005 | raio de giro de caminhão inviável no pátio |
-| E006 | `freeSpan` > limite do `Structure.system` escolhido |
-| W101 | nº de vagas abaixo do mínimo legal (configurável por cidade) |
-| W102 | pé-direito incompatível com porta seccional declarada |
+| Código | Significado                                                  |
+| ------ | ------------------------------------------------------------ |
+| E001   | galpão fora do polígono do lote (após setbacks)              |
+| E002   | distância mínima entre galpões violada                       |
+| E003   | TO/CA excedidos                                              |
+| E004   | portão fora de aresta `street`                               |
+| E005   | raio de giro de caminhão inviável no pátio                   |
+| E006   | `freeSpan` > limite do `Structure.system` escolhido          |
+| W101   | nº de vagas abaixo do mínimo legal (configurável por cidade) |
+| W102   | pé-direito incompatível com porta seccional declarada        |
 
 ---
 
@@ -161,14 +161,14 @@ Cada item é uma função pura `build*(spec): THREE.Group`.
 
 Refatorar [BuildWizard.tsx](apps/web/src/components/BuildWizard.tsx) em 6 passos. A planta editável aparece desde o passo 1.
 
-| Passo | Conteúdo | Saída no `SitePlan` |
-|---|---|---|
-| 1. Programa | nº de galpões, uso, faixa de orçamento, padrão | `buildings[].targetArea/use` |
-| 2. Terreno e rua | confirma arestas de rua e setbacks sobre OSM | `streetEdges`, `setbacks` |
-| 3. Perímetro e acessos | desenha muros por aresta, posiciona portões (drag sobre aresta de rua) | `perimeter`, `gates` |
-| 4. Galpões | dimensões com sliders limitados pelos mín/máx do schema **e** pelo polígono inscrito; pé-direito; telhado; docas; mezanino; pontes rolantes. Layout sugerido por `fitBuildings`, editável (drag/rotate) | `buildings[]` |
-| 5. Circulação e vagas | vagas calculadas (ex. 1 vaga / 75 m² coberto); vias com raio 13 m garantido | `parking`, `circulation` |
-| 6. Revisão | `ValidationReport` consolidado + botão **Gerar 3D** | persiste `SitePlan` e abre viewer |
+| Passo                  | Conteúdo                                                                                                                                                                                                | Saída no `SitePlan`               |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------- |
+| 1. Programa            | nº de galpões, uso, faixa de orçamento, padrão                                                                                                                                                          | `buildings[].targetArea/use`      |
+| 2. Terreno e rua       | confirma arestas de rua e setbacks sobre OSM                                                                                                                                                            | `streetEdges`, `setbacks`         |
+| 3. Perímetro e acessos | desenha muros por aresta, posiciona portões (drag sobre aresta de rua)                                                                                                                                  | `perimeter`, `gates`              |
+| 4. Galpões             | dimensões com sliders limitados pelos mín/máx do schema **e** pelo polígono inscrito; pé-direito; telhado; docas; mezanino; pontes rolantes. Layout sugerido por `fitBuildings`, editável (drag/rotate) | `buildings[]`                     |
+| 5. Circulação e vagas  | vagas calculadas (ex. 1 vaga / 75 m² coberto); vias com raio 13 m garantido                                                                                                                             | `parking`, `circulation`          |
+| 6. Revisão             | `ValidationReport` consolidado + botão **Gerar 3D**                                                                                                                                                     | persiste `SitePlan` e abre viewer |
 
 Cada passo escreve no mesmo objeto `SitePlan` (controlled state). Sem payloads opacos.
 

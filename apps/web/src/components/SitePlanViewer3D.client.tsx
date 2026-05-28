@@ -28,7 +28,11 @@ function disposeRoot(root: THREE.Object3D) {
   });
 }
 
-export default function SitePlanViewer3D({ site, shedsById, lod = "structural" }: Props) {
+export default function SitePlanViewer3D({
+  site,
+  shedsById,
+  lod = "structural",
+}: Props) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
@@ -124,7 +128,12 @@ export default function SitePlanViewer3D({ site, shedsById, lod = "structural" }
   return (
     <div
       ref={hostRef}
-      style={{ width: "100%", height: "100%", minHeight: 400, position: "relative" }}
+      style={{
+        width: "100%",
+        height: "100%",
+        minHeight: 400,
+        position: "relative",
+      }}
     />
   );
 }

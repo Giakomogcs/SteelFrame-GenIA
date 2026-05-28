@@ -169,7 +169,8 @@ export function computeEarthworksOptions(
     fillM3: 0,
     unitCost: EARTHWORKS_RATES.cutHaul,
     totalCost: Math.round(cutVol * EARTHWORKS_RATES.cutHaul),
-    description: "Rebaixa o terreno até a cota mais baixa e descarta o material.",
+    description:
+      "Rebaixa o terreno até a cota mais baixa e descarta o material.",
   };
 
   // 2) Aterro total → plataforma na cota máxima (só importa material)
@@ -182,7 +183,8 @@ export function computeEarthworksOptions(
     fillM3: Math.round(fillVol),
     unitCost: EARTHWORKS_RATES.fillImport,
     totalCost: Math.round(fillVol * EARTHWORKS_RATES.fillImport),
-    description: "Importa material para chegar à cota mais alta — sem bota-fora.",
+    description:
+      "Importa material para chegar à cota mais alta — sem bota-fora.",
   };
 
   // 3) Compensado → plataforma na cota média; movimenta corte+aterro internos
@@ -197,7 +199,8 @@ export function computeEarthworksOptions(
     fillM3: Math.round(balFill),
     unitCost: EARTHWORKS_RATES.balanced,
     totalCost: Math.round(balVol * EARTHWORKS_RATES.balanced),
-    description: "Plataforma na cota média — quase sem transporte, mais barato.",
+    description:
+      "Plataforma na cota média — quase sem transporte, mais barato.",
   };
 
   const options = [balanced, cut, fill];
@@ -251,7 +254,10 @@ export function computeSlopeAnalysis(
   areaM2: number,
 ): SlopeAnalysis {
   if (samples.length < 2) {
-    const empty = computeEarthworksOptions(samples.length ? samples : [{ h: 0 }], areaM2);
+    const empty = computeEarthworksOptions(
+      samples.length ? samples : [{ h: 0 }],
+      areaM2,
+    );
     return {
       slopePct: 0,
       elevationDelta: 0,
@@ -281,8 +287,12 @@ export function computeSlopeAnalysis(
           : "acentuado";
   const needsLeveling = slopePct > 3 || elevationDelta > 1.5;
   const earth = computeEarthworksOptions(samples, areaM2);
-  const recommendedOpt = earth.options.find((o) => o.key === earth.recommended)!;
-  const earthworksM3 = needsLeveling ? recommendedOpt.cutM3 + recommendedOpt.fillM3 : 0;
+  const recommendedOpt = earth.options.find(
+    (o) => o.key === earth.recommended,
+  )!;
+  const earthworksM3 = needsLeveling
+    ? recommendedOpt.cutM3 + recommendedOpt.fillM3
+    : 0;
   return {
     slopePct: Number(slopePct.toFixed(2)),
     elevationDelta: Number(elevationDelta.toFixed(2)),

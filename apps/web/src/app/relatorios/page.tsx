@@ -69,7 +69,10 @@ export default async function RelatoriosPage() {
     .filter((g) => g.briefings.length > 0 || g.legacyReports.length > 0);
 
   const totalReports = groups.reduce(
-    (s, g) => s + g.legacyReports.length + g.briefings.reduce((ss, b) => ss + b.reports.length, 0),
+    (s, g) =>
+      s +
+      g.legacyReports.length +
+      g.briefings.reduce((ss, b) => ss + b.reports.length, 0),
     0,
   );
 
@@ -80,8 +83,8 @@ export default async function RelatoriosPage() {
           <Breadcrumb items={[{ label: "Relatórios" }]} />
           <div className="page-title-row">
             <h1>
-              {totalReports} relatório{totalReports === 1 ? "" : "s"} · {groups.length}{" "}
-              terreno{groups.length === 1 ? "" : "s"}
+              {totalReports} relatório{totalReports === 1 ? "" : "s"} ·{" "}
+              {groups.length} terreno{groups.length === 1 ? "" : "s"}
             </h1>
             <span className="pill pill-success">
               <span className="dot" />
@@ -99,7 +102,8 @@ export default async function RelatoriosPage() {
           <div className="empty-icon">📑</div>
           <div className="empty-title">Nenhum relatório ainda</div>
           <div className="empty-desc">
-            Conclua um briefing e aceite o estudo para gerar o primeiro relatório.
+            Conclua um briefing e aceite o estudo para gerar o primeiro
+            relatório.
           </div>
           <Link href="/" className="btn btn-primary">
             Ver carteira
@@ -126,7 +130,8 @@ export default async function RelatoriosPage() {
                   </Link>
                 </h2>
                 <span className="text-xs muted">
-                  {g.briefings.length} briefing(s) · {g.legacyReports.length} legado(s)
+                  {g.briefings.length} briefing(s) · {g.legacyReports.length}{" "}
+                  legado(s)
                 </span>
               </header>
 
@@ -140,7 +145,13 @@ export default async function RelatoriosPage() {
                     marginBottom: 10,
                   }}
                 >
-                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      marginBottom: 8,
+                    }}
+                  >
                     <div>
                       <div style={{ fontWeight: 600 }}>{b.title}</div>
                       <div className="text-xs muted">
@@ -176,8 +187,15 @@ export default async function RelatoriosPage() {
   );
 }
 
-function ReportTable({ rows, terrainId }: { rows: ReportLite[]; terrainId: string }) {
-  if (rows.length === 0) return <p className="text-xs muted">Sem relatórios.</p>;
+function ReportTable({
+  rows,
+  terrainId,
+}: {
+  rows: ReportLite[];
+  terrainId: string;
+}) {
+  if (rows.length === 0)
+    return <p className="text-xs muted">Sem relatórios.</p>;
   return (
     <table className="ds-table" style={{ width: "100%" }}>
       <thead>
@@ -223,7 +241,10 @@ function ReportTable({ rows, terrainId }: { rows: ReportLite[]; terrainId: strin
                 {new Date(r.createdAt).toLocaleDateString("pt-BR")}
               </td>
               <td>
-                <Link href={`/relatorios/${r.id}`} className="btn btn-ghost btn-sm">
+                <Link
+                  href={`/relatorios/${r.id}`}
+                  className="btn btn-ghost btn-sm"
+                >
                   Abrir
                 </Link>
                 {r.building?.id && (

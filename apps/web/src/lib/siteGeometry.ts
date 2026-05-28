@@ -8,10 +8,7 @@
 // ============================================================
 import { toLocalMeters, type LngLat } from "./geo";
 import { SITE_CONSTRAINTS } from "./siteConstraints";
-import type {
-  Gate,
-  PerimeterSegment,
-} from "./sitePlanSchema";
+import type { Gate, PerimeterSegment } from "./sitePlanSchema";
 
 export type V = { x: number; z: number };
 

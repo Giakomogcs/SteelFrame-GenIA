@@ -98,7 +98,9 @@ export function BriefingStepper({ steps, current, furthest, onChange }: Props) {
                 <span className="briefing-stepper__label">
                   <span className="briefing-stepper__title">{s.label}</span>
                   {s.description && (
-                    <span className="briefing-stepper__sub">{s.description}</span>
+                    <span className="briefing-stepper__sub">
+                      {s.description}
+                    </span>
                   )}
                 </span>
               </button>

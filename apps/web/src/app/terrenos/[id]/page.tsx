@@ -125,9 +125,7 @@ export default async function TerrainPage({
         <div className="kpi">
           <div className="kpi-label">Relevo</div>
           <div className="kpi-value">
-            {terrain.slopePct != null
-              ? terrain.slopePct.toFixed(1)
-              : "—"}
+            {terrain.slopePct != null ? terrain.slopePct.toFixed(1) : "—"}
             <span className="unit">%</span>
           </div>
           <div className="kpi-delta">
@@ -152,7 +150,10 @@ export default async function TerrainPage({
           <div className="row-between">
             <h2 style={{ fontSize: "var(--fs-md)", margin: 0 }}>
               Galpões estudados
-              <span className="muted mono" style={{ marginLeft: 8, fontSize: "var(--fs-xs)" }}>
+              <span
+                className="muted mono"
+                style={{ marginLeft: 8, fontSize: "var(--fs-xs)" }}
+              >
                 {terrain.buildings.length}
               </span>
             </h2>
@@ -196,7 +197,10 @@ export default async function TerrainPage({
                     >
                       <div className="card-row">
                         <div style={{ minWidth: 0 }}>
-                          <div className="card-title" style={{ fontSize: "var(--fs-sm)" }}>
+                          <div
+                            className="card-title"
+                            style={{ fontSize: "var(--fs-sm)" }}
+                          >
                             {b.name}
                           </div>
                           <div className="card-subtitle">
@@ -224,7 +228,9 @@ export default async function TerrainPage({
                           <div className="text-xs muted mono">Custo est.</div>
                           <div className="mono" style={{ fontWeight: 600 }}>
                             R${" "}
-                            {(m?.estimate?.totalCost ?? 0).toLocaleString("pt-BR")}
+                            {(m?.estimate?.totalCost ?? 0).toLocaleString(
+                              "pt-BR",
+                            )}
                           </div>
                         </div>
                       </div>
@@ -250,7 +256,8 @@ export default async function TerrainPage({
           elevationDelta: terrain.elevationDelta,
           elevationMean: terrain.elevationMean,
           profile:
-            (terrain.elevationProfile as { d: number; h: number }[] | null) ?? null,
+            (terrain.elevationProfile as { d: number; h: number }[] | null) ??
+            null,
         }}
       />
     </>

@@ -126,7 +126,9 @@ export default function StudyShell({
           >
             {report.ok ? "✓ válido" : `${report.errors.length} erro(s)`}
           </span>
-          {saving && <span style={{ fontSize: 11, color: "#94a3b8" }}>salvando…</span>}
+          {saving && (
+            <span style={{ fontSize: 11, color: "#94a3b8" }}>salvando…</span>
+          )}
           {!acceptedAt && (
             <button
               type="button"
@@ -147,7 +149,15 @@ export default function StudyShell({
             </button>
           )}
           {acceptedAt && (
-            <span className="pill" style={{ background: "#1e3a8a", color: "#fff", padding: "4px 10px", borderRadius: 12 }}>
+            <span
+              className="pill"
+              style={{
+                background: "#1e3a8a",
+                color: "#fff",
+                padding: "4px 10px",
+                borderRadius: 12,
+              }}
+            >
               Aceito · {new Date(acceptedAt).toLocaleDateString("pt-BR")}
             </span>
           )}
@@ -160,7 +170,11 @@ export default function StudyShell({
         </div>
       )}
       {err && (
-        <div className="study-shell__banner" style={{ background: "#7f1d1d" }} role="alert">
+        <div
+          className="study-shell__banner"
+          style={{ background: "#7f1d1d" }}
+          role="alert"
+        >
           {err}
         </div>
       )}
@@ -170,21 +184,48 @@ export default function StudyShell({
           <section className="card" style={{ padding: 12 }}>
             <h3 style={{ marginTop: 0 }}>Premissas</h3>
             <ul style={{ fontSize: 12, lineHeight: 1.6, paddingLeft: 18 }}>
-              <li>Galpões: <strong>{site.buildings.length}</strong></li>
               <li>
-                Recuos: frente {site.setbacks.front}m · lados {site.setbacks.sides}m · fundo {site.setbacks.back}m
+                Galpões: <strong>{site.buildings.length}</strong>
               </li>
-              <li>Portões: <strong>{site.gates.length}</strong></li>
+              <li>
+                Recuos: frente {site.setbacks.front}m · lados{" "}
+                {site.setbacks.sides}m · fundo {site.setbacks.back}m
+              </li>
+              <li>
+                Portões: <strong>{site.gates.length}</strong>
+              </li>
               <li>Arestas de rua: {site.streetEdges.join(", ") || "—"}</li>
               <li>
-                Vagas: carro <strong>{site.parking.filter((p) => p.kind === "car").reduce((s, p) => s + p.stallCount, 0)}</strong>{" · "}
-                caminhão <strong>{site.parking.filter((p) => p.kind === "truck").reduce((s, p) => s + p.stallCount, 0)}</strong>
+                Vagas: carro{" "}
+                <strong>
+                  {site.parking
+                    .filter((p) => p.kind === "car")
+                    .reduce((s, p) => s + p.stallCount, 0)}
+                </strong>
+                {" · "}
+                caminhão{" "}
+                <strong>
+                  {site.parking
+                    .filter((p) => p.kind === "truck")
+                    .reduce((s, p) => s + p.stallCount, 0)}
+                </strong>
               </li>
             </ul>
             {report.errors.length > 0 && (
               <div style={{ marginTop: 8 }}>
-                <div style={{ fontSize: 11, color: "#fca5a5", fontWeight: 600 }}>Erros:</div>
-                <ul style={{ fontSize: 11, color: "#fca5a5", paddingLeft: 18, margin: 0 }}>
+                <div
+                  style={{ fontSize: 11, color: "#fca5a5", fontWeight: 600 }}
+                >
+                  Erros:
+                </div>
+                <ul
+                  style={{
+                    fontSize: 11,
+                    color: "#fca5a5",
+                    paddingLeft: 18,
+                    margin: 0,
+                  }}
+                >
                   {report.errors.map((e, i) => (
                     <li key={i}>
                       [{e.code}] {e.message}
@@ -195,8 +236,19 @@ export default function StudyShell({
             )}
             {report.warnings.length > 0 && (
               <div style={{ marginTop: 8 }}>
-                <div style={{ fontSize: 11, color: "#fbbf24", fontWeight: 600 }}>Avisos:</div>
-                <ul style={{ fontSize: 11, color: "#fbbf24", paddingLeft: 18, margin: 0 }}>
+                <div
+                  style={{ fontSize: 11, color: "#fbbf24", fontWeight: 600 }}
+                >
+                  Avisos:
+                </div>
+                <ul
+                  style={{
+                    fontSize: 11,
+                    color: "#fbbf24",
+                    paddingLeft: 18,
+                    margin: 0,
+                  }}
+                >
                   {report.warnings.map((w, i) => (
                     <li key={i}>
                       [{w.code}] {w.message}
@@ -206,7 +258,16 @@ export default function StudyShell({
               </div>
             )}
           </section>
-          <section className="card" style={{ padding: 12, flex: 1, display: "flex", flexDirection: "column", minHeight: 240 }}>
+          <section
+            className="card"
+            style={{
+              padding: 12,
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+              minHeight: 240,
+            }}
+          >
             <h3 style={{ marginTop: 0 }}>Chat de refinamento</h3>
             <div style={{ flex: 1, minHeight: 0 }}>
               <RefineChat
@@ -242,10 +303,18 @@ export default function StudyShell({
           </div>
           <div className="study-shell__canvas">
             {tab === "2d" && (
-              <SitePlanEditor site={site} onChange={applyChange} debounceMs={300} />
+              <SitePlanEditor
+                site={site}
+                onChange={applyChange}
+                debounceMs={300}
+              />
             )}
             {tab === "3d" && (
-              <SitePlanViewer3D site={site} shedsById={shedsById} lod="structural" />
+              <SitePlanViewer3D
+                site={site}
+                shedsById={shedsById}
+                lod="structural"
+              />
             )}
             {tab === "premissas" && (
               <pre

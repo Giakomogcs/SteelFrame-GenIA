@@ -57,7 +57,9 @@ export default async function ReportDetailPage({
             ]}
           />
           <div className="page-title-row">
-            <h1>{report.code} · v{report.version}</h1>
+            <h1>
+              {report.code} · v{report.version}
+            </h1>
             <span
               className={`pill ${
                 report.status === "issued"
@@ -73,12 +75,16 @@ export default async function ReportDetailPage({
           </div>
           <p className="text-sm muted">
             Terreno:{" "}
-            <Link href={`/terrenos/${report.terrainId}`} style={{ color: "var(--color-primary-500)" }}>
+            <Link
+              href={`/terrenos/${report.terrainId}`}
+              style={{ color: "var(--color-primary-500)" }}
+            >
               {report.terrain.name}
             </Link>
             {report.briefing && (
               <>
-                {" "}· Briefing:{" "}
+                {" "}
+                · Briefing:{" "}
                 <Link
                   href={`/terrenos/${report.terrainId}/estudo/${report.briefing.id}`}
                   style={{ color: "var(--color-primary-500)" }}
@@ -104,7 +110,9 @@ export default async function ReportDetailPage({
           <div className="kpi-value">
             R${" "}
             {cost > 0
-              ? (cost / 1_000_000).toLocaleString("pt-BR", { maximumFractionDigits: 2 })
+              ? (cost / 1_000_000).toLocaleString("pt-BR", {
+                  maximumFractionDigits: 2,
+                })
               : "—"}
             <span className="unit">M</span>
           </div>
@@ -112,24 +120,33 @@ export default async function ReportDetailPage({
         <div className="kpi">
           <div className="kpi-label">Versão</div>
           <div className="kpi-value">v{report.version}</div>
-          <div className="kpi-delta">{new Date(report.createdAt).toLocaleDateString("pt-BR")}</div>
+          <div className="kpi-delta">
+            {new Date(report.createdAt).toLocaleDateString("pt-BR")}
+          </div>
         </div>
       </section>
 
-      <section className="card" style={{ padding: 0, overflow: "hidden", marginTop: 16, height: 480 }}>
+      <section
+        className="card"
+        style={{ padding: 0, overflow: "hidden", marginTop: 16, height: 480 }}
+      >
         {site ? (
           <SitePlanViewer3D site={site} lod="structural" />
         ) : (
           <div className="empty" style={{ padding: 32 }}>
             <div className="empty-icon">🚧</div>
             <div className="empty-title">SitePlan indisponível</div>
-            <div className="empty-desc">Este relatório foi gerado antes da introdução do SitePlan.</div>
+            <div className="empty-desc">
+              Este relatório foi gerado antes da introdução do SitePlan.
+            </div>
           </div>
         )}
       </section>
 
       <section className="card" style={{ padding: 16, marginTop: 16 }}>
-        <h2 style={{ marginTop: 0, fontSize: "var(--fs-md)" }}>Premissas & validações</h2>
+        <h2 style={{ marginTop: 0, fontSize: "var(--fs-md)" }}>
+          Premissas & validações
+        </h2>
         <pre
           style={{
             fontSize: 11,

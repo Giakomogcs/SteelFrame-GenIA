@@ -7,7 +7,17 @@ export const runtime = "nodejs";
 const PatchBriefingSchema = z.object({
   title: z.string().min(1).max(120).optional(),
   status: z
-    .enum(["draft", "active", "paused", "ready_to_generate", "generating", "preview", "refining", "accepted", "complete"])
+    .enum([
+      "draft",
+      "active",
+      "paused",
+      "ready_to_generate",
+      "generating",
+      "preview",
+      "refining",
+      "accepted",
+      "complete",
+    ])
     .optional(),
   progress: z.number().int().min(0).max(6).optional(),
   total: z.number().int().min(1).max(20).optional(),
@@ -26,7 +36,10 @@ export async function GET(
     },
   });
   if (!briefing) {
-    return NextResponse.json({ error: "Briefing não encontrado" }, { status: 404 });
+    return NextResponse.json(
+      { error: "Briefing não encontrado" },
+      { status: 404 },
+    );
   }
   return NextResponse.json({ briefing });
 }
@@ -49,17 +62,26 @@ export async function PATCH(
     );
   }
 
-  const existing = await prisma.briefing.findUnique({ where: { id: params.id } });
+  const existing = await prisma.briefing.findUnique({
+    where: { id: params.id },
+  });
   if (!existing) {
-    return NextResponse.json({ error: "Briefing não encontrado" }, { status: 404 });
+    return NextResponse.json(
+      { error: "Briefing não encontrado" },
+      { status: 404 },
+    );
   }
 
   const updated = await prisma.briefing.update({
     where: { id: params.id },
     data: {
       ...(parsed.data.title !== undefined ? { title: parsed.data.title } : {}),
-      ...(parsed.data.status !== undefined ? { status: parsed.data.status } : {}),
-      ...(parsed.data.progress !== undefined ? { progress: parsed.data.progress } : {}),
+      ...(parsed.data.status !== undefined
+        ? { status: parsed.data.status }
+        : {}),
+      ...(parsed.data.progress !== undefined
+        ? { progress: parsed.data.progress }
+        : {}),
       ...(parsed.data.total !== undefined ? { total: parsed.data.total } : {}),
       ...(parsed.data.assumptions !== undefined
         ? { assumptions: parsed.data.assumptions as object }
@@ -76,9 +98,14 @@ export async function DELETE(
   _req: NextRequest,
   { params }: { params: { id: string } },
 ) {
-  const existing = await prisma.briefing.findUnique({ where: { id: params.id } });
+  const existing = await prisma.briefing.findUnique({
+    where: { id: params.id },
+  });
   if (!existing) {
-    return NextResponse.json({ error: "Briefing não encontrado" }, { status: 404 });
+    return NextResponse.json(
+      { error: "Briefing não encontrado" },
+      { status: 404 },
+    );
   }
   await prisma.briefing.delete({ where: { id: params.id } });
   return NextResponse.json({ ok: true });

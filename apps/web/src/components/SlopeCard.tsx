@@ -52,10 +52,7 @@ function classifyFromPct(p: number): Analysis["classification"] {
 }
 
 /** Reconstrói as opções de terraplenagem a partir do perfil persistido. */
-function hydrateOptions(
-  profile: { d: number; h: number }[],
-  areaM2: number,
-) {
+function hydrateOptions(profile: { d: number; h: number }[], areaM2: number) {
   if (profile.length < 2) return null;
   return computeEarthworksOptions(profile, areaM2);
 }

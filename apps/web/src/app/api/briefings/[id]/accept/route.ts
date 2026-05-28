@@ -14,7 +14,10 @@ export async function POST(
     where: { id: params.id },
   });
   if (!briefing) {
-    return NextResponse.json({ error: "Briefing não encontrado" }, { status: 404 });
+    return NextResponse.json(
+      { error: "Briefing não encontrado" },
+      { status: 404 },
+    );
   }
 
   const sitePlan = await prisma.sitePlan.findFirst({
@@ -23,7 +26,10 @@ export async function POST(
   });
   if (!sitePlan) {
     return NextResponse.json(
-      { error: "Nenhum SitePlan persistido para este briefing — salve antes de aceitar." },
+      {
+        error:
+          "Nenhum SitePlan persistido para este briefing — salve antes de aceitar.",
+      },
       { status: 409 },
     );
   }
@@ -31,7 +37,9 @@ export async function POST(
   const validations = sitePlan.validations as { ok?: boolean } | null;
   if (validations && validations.ok === false) {
     return NextResponse.json(
-      { error: "SitePlan possui erros de validação — corrija antes de aceitar." },
+      {
+        error: "SitePlan possui erros de validação — corrija antes de aceitar.",
+      },
       { status: 422 },
     );
   }
@@ -52,7 +60,8 @@ export async function POST(
       orderBy: { version: "desc" },
     });
     const nextVersion = (previousReport?.version ?? 0) + 1;
-    const code = previousReport?.code ?? `RPT-${briefing.id.slice(-6).toUpperCase()}`;
+    const code =
+      previousReport?.code ?? `RPT-${briefing.id.slice(-6).toUpperCase()}`;
 
     const building = await tx.building.create({
       data: {

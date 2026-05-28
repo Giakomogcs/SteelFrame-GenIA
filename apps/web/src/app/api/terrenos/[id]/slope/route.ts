@@ -16,8 +16,11 @@ export async function POST(
     return NextResponse.json({ ok: true, analysis });
   } catch (err) {
     const msg = (err as Error).message;
-    const status =
-      msg.includes("não encontrado") ? 404 : msg.includes("inválido") ? 400 : 502;
+    const status = msg.includes("não encontrado")
+      ? 404
+      : msg.includes("inválido")
+        ? 400
+        : 502;
     return NextResponse.json(
       {
         error:

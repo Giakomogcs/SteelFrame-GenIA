@@ -14,8 +14,10 @@ export default async function BriefingsPage() {
       t.buildings.length === 0 &&
       t.briefings.some(
         (b) =>
-          b.status === "active" || b.status === "draft" || b.status === "paused"
-      )
+          b.status === "active" ||
+          b.status === "draft" ||
+          b.status === "paused",
+      ),
   );
 
   return (
@@ -25,7 +27,8 @@ export default async function BriefingsPage() {
           <Breadcrumb items={[{ label: "Briefings ativos" }]} />
           <div className="page-title-row">
             <h1>
-              {pending.length} briefing{pending.length === 1 ? "" : "s"} aguardando
+              {pending.length} briefing{pending.length === 1 ? "" : "s"}{" "}
+              aguardando
             </h1>
             <span className="pill pill-warning">
               <span className="dot" />
@@ -75,7 +78,10 @@ export default async function BriefingsPage() {
                 <span className="text-xs muted mono">
                   {Math.round(t.areaM2).toLocaleString("pt-BR")} m²
                 </span>
-                <span className="text-xs" style={{ color: "var(--color-primary-500)" }}>
+                <span
+                  className="text-xs"
+                  style={{ color: "var(--color-primary-500)" }}
+                >
                   Iniciar briefing →
                 </span>
               </div>

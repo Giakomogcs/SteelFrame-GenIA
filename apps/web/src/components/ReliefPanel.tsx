@@ -42,7 +42,8 @@ export default function ReliefPanel(props: Props) {
         <div>
           <h2 style={{ margin: 0, fontSize: "var(--fs-md)" }}>Relevo</h2>
           <p className="text-sm muted" style={{ margin: "4px 0 0" }}>
-            Análise topográfica do polígono — seção AA&apos; e estimativa de terraplenagem.
+            Análise topográfica do polígono — seção AA&apos; e estimativa de
+            terraplenagem.
           </p>
         </div>
       </header>

@@ -39,9 +39,14 @@ export async function POST(
     );
   }
 
-  const briefing = await prisma.briefing.findUnique({ where: { id: params.id } });
+  const briefing = await prisma.briefing.findUnique({
+    where: { id: params.id },
+  });
   if (!briefing) {
-    return NextResponse.json({ error: "Briefing não encontrado" }, { status: 404 });
+    return NextResponse.json(
+      { error: "Briefing não encontrado" },
+      { status: 404 },
+    );
   }
 
   const latest = await prisma.sitePlan.findFirst({

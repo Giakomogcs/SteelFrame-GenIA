@@ -31,7 +31,10 @@ export async function POST(req: NextRequest) {
     where: { id: parsed.data.terrainId },
   });
   if (!terrain) {
-    return NextResponse.json({ error: "Terreno não encontrado" }, { status: 404 });
+    return NextResponse.json(
+      { error: "Terreno não encontrado" },
+      { status: 404 },
+    );
   }
 
   const briefing = await prisma.briefing.create({

@@ -70,7 +70,10 @@ export async function POST(
 
   const terrain = await prisma.terrain.findUnique({ where: { id: params.id } });
   if (!terrain) {
-    return NextResponse.json({ error: "Terreno não encontrado" }, { status: 404 });
+    return NextResponse.json(
+      { error: "Terreno não encontrado" },
+      { status: 404 },
+    );
   }
   if (rec.briefingId) {
     const briefing = await prisma.briefing.findUnique({

@@ -56,12 +56,21 @@ function rotatePoly(
   });
 }
 
-export default function SitePlanEditor({ site, onChange, debounceMs = 300 }: Props) {
+export default function SitePlanEditor({
+  site,
+  onChange,
+  debounceMs = 300,
+}: Props) {
   const lot = site.lotPolygonLocal;
   const edges = useMemo(() => getEdges(lot), [lot]);
   const bb = useMemo(() => polygonBBox(lot), [lot]);
   const pad = Math.max(bb.width, bb.depth) * 0.1;
-  const vb = { x: bb.minX - pad, z: bb.minZ - pad, w: bb.width + pad * 2, h: bb.depth + pad * 2 };
+  const vb = {
+    x: bb.minX - pad,
+    z: bb.minZ - pad,
+    w: bb.width + pad * 2,
+    h: bb.depth + pad * 2,
+  };
 
   const [local, setLocal] = useState<SitePlan>(site);
   const [drag, setDrag] = useState<{
@@ -113,7 +122,10 @@ export default function SitePlanEditor({ site, onChange, debounceMs = 300 }: Pro
       origPoly: b.footprintPolygon,
       mode,
       pivot,
-      startAngle: mode === "rotate" ? Math.atan2(p.z - pivot.z, p.x - pivot.x) : undefined,
+      startAngle:
+        mode === "rotate"
+          ? Math.atan2(p.z - pivot.z, p.x - pivot.x)
+          : undefined,
       origRot: b.rotationRad,
     });
     (evt.target as Element).setPointerCapture?.(evt.pointerId);
@@ -131,7 +143,10 @@ export default function SitePlanEditor({ site, onChange, debounceMs = 300 }: Pro
           let dz = p.z - drag.startZ;
           dx = Math.round(dx / SNAP) * SNAP;
           dz = Math.round(dz / SNAP) * SNAP;
-          return { ...b, footprintPolygon: translatePoly(drag.origPoly, dx, dz) };
+          return {
+            ...b,
+            footprintPolygon: translatePoly(drag.origPoly, dx, dz),
+          };
         } else {
           const a = Math.atan2(p.z - drag.pivot.z, p.x - drag.pivot.x);
           const delta = a - (drag.startAngle ?? a);
@@ -196,7 +211,13 @@ export default function SitePlanEditor({ site, onChange, debounceMs = 300 }: Pro
         const cx = e.a.x + (e.b.x - e.a.x) * g.tAlongEdge;
         const cz = e.a.z + (e.b.z - e.a.z) * g.tAlongEdge;
         return (
-          <circle key={g.id} cx={cx} cy={cz} r={Math.max(0.5, g.width / 4)} fill="#0ea5e9" />
+          <circle
+            key={g.id}
+            cx={cx}
+            cy={cz}
+            r={Math.max(0.5, g.width / 4)}
+            fill="#0ea5e9"
+          />
         );
       })}
       {local.buildings.map((b) => {

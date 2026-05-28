@@ -190,7 +190,9 @@ export default function ShedInlineEditor({
         <div className="se-kpis">
           <div className="se-kpi accent">
             <span className="se-kpi-lbl">Área coberta</span>
-            <strong>{shed.estimate.coveredAreaM2.toLocaleString("pt-BR")} m²</strong>
+            <strong>
+              {shed.estimate.coveredAreaM2.toLocaleString("pt-BR")} m²
+            </strong>
           </div>
           <div className="se-kpi accent">
             <span className="se-kpi-lbl">Custo total</span>
@@ -202,7 +204,9 @@ export default function ShedInlineEditor({
           </div>
           <div className="se-kpi">
             <span className="se-kpi-lbl">R$/m²</span>
-            <strong>R$ {shed.estimate.costPerM2.toLocaleString("pt-BR")}</strong>
+            <strong>
+              R$ {shed.estimate.costPerM2.toLocaleString("pt-BR")}
+            </strong>
           </div>
         </div>
 
@@ -300,8 +304,8 @@ export default function ShedInlineEditor({
         </Section>
 
         <p className="se-help">
-          As mudanças refletem no 3D em tempo real e recalculam aço/custo.
-          Toque <strong>Salvar</strong> para persistir.
+          As mudanças refletem no 3D em tempo real e recalculam aço/custo. Toque{" "}
+          <strong>Salvar</strong> para persistir.
         </p>
       </aside>
     </div>

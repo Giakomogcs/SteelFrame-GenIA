@@ -554,8 +554,8 @@ function buildLotShape(polygon?: LngLat[]): {
   const cosLat = Math.cos((cy * Math.PI) / 180);
   const R = 6371000;
   const pts = polygon.map<[number, number]>(([lng, lat]) => [
-    ((lng - cx) * Math.PI) / 180 * R * cosLat,
-    ((lat - cy) * Math.PI) / 180 * R,
+    (((lng - cx) * Math.PI) / 180) * R * cosLat,
+    (((lat - cy) * Math.PI) / 180) * R,
   ]);
   // 2) ângulo do lado mais longo
   let bestLen = 0;
@@ -573,9 +573,14 @@ function buildLotShape(polygon?: LngLat[]): {
   }
   const cos = Math.cos(-bestAngle);
   const sin = Math.sin(-bestAngle);
-  const rotated = pts.map(([x, y]) => [x * cos - y * sin, x * sin + y * cos] as [number, number]);
+  const rotated = pts.map(
+    ([x, y]) => [x * cos - y * sin, x * sin + y * cos] as [number, number],
+  );
   // 3) recentralizar no bbox
-  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  let minX = Infinity,
+    maxX = -Infinity,
+    minY = Infinity,
+    maxY = -Infinity;
   for (const [x, y] of rotated) {
     if (x < minX) minX = x;
     if (x > maxX) maxX = x;
@@ -584,7 +589,9 @@ function buildLotShape(polygon?: LngLat[]): {
   }
   const ox = (minX + maxX) / 2;
   const oy = (minY + maxY) / 2;
-  const centered = rotated.map(([x, y]) => [x - ox, y - oy] as [number, number]);
+  const centered = rotated.map(
+    ([x, y]) => [x - ox, y - oy] as [number, number],
+  );
   // 4) THREE.Shape (em plano XY local, será rotacionado pelo grupo pai para deitar no chão)
   const shape = new THREE.Shape();
   centered.forEach(([x, y], i) => {
@@ -1040,7 +1047,12 @@ export default function ShedViewerClient({
           infiniteGrid
         />
 
-        <GroundEnv envMode={envMode} envOpacity={envOpacity} shed={shed} polygon={polygon} />
+        <GroundEnv
+          envMode={envMode}
+          envOpacity={envOpacity}
+          shed={shed}
+          polygon={polygon}
+        />
 
         <LayerGroup
           layer="foundation"

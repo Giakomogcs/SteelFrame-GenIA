@@ -41,7 +41,8 @@ export async function POST(req: NextRequest) {
   // earlier calls with 422. The legacy non-briefing flow (e.g. /briefings
   // landing page demo) is still allowed for backwards compatibility only
   // when neither `briefingId` nor `step` is supplied.
-  const briefingId = typeof body.briefingId === "string" ? body.briefingId : null;
+  const briefingId =
+    typeof body.briefingId === "string" ? body.briefingId : null;
   const step = typeof body.step === "number" ? body.step : null;
   if (briefingId !== null || step !== null) {
     if (!briefingId) {
@@ -53,8 +54,7 @@ export async function POST(req: NextRequest) {
     if (step !== 6) {
       return NextResponse.json(
         {
-          error:
-            "Geração 3D só é permitida no passo 6 do wizard (FR-G1).",
+          error: "Geração 3D só é permitida no passo 6 do wizard (FR-G1).",
           step,
         },
         { status: 422 },

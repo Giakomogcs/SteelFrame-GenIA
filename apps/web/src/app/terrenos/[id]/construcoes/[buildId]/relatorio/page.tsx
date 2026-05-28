@@ -46,15 +46,27 @@ export default async function RelatorioPage({
   const slopePct = building.terrain.slopePct ?? 0;
   const slopeDelta = building.terrain.elevationDelta ?? 0;
   const slopeClass =
-    slopePct < 2 ? "plano" : slopePct < 5 ? "suave" : slopePct < 10 ? "moderado" : "acentuado";
+    slopePct < 2
+      ? "plano"
+      : slopePct < 5
+        ? "suave"
+        : slopePct < 10
+          ? "moderado"
+          : "acentuado";
   const earthworks =
     slopePct > 3 || slopeDelta > 1.5
       ? Math.round((slopeDelta / 2) * lotAreaM2)
       : 0;
   const slopeRisk = slopePct > 5;
   const verdict = areaM2 > 0 ? "VIÁVEL" : "INSUFICIENTE";
-  const months = Math.max(3, Math.round(4 + (steelT / 60))); // heurística simples
-  const breakdown: { label: string; sub: string; pct: number; min: number; max: number }[] = [
+  const months = Math.max(3, Math.round(4 + steelT / 60)); // heurística simples
+  const breakdown: {
+    label: string;
+    sub: string;
+    pct: number;
+    min: number;
+    max: number;
+  }[] = [
     { label: "Projetos", sub: "3–8% · faixa", pct: 5, min: 3, max: 8 },
     { label: "Fundação", sub: "8–15% · faixa", pct: 11, min: 8, max: 15 },
     {
@@ -64,8 +76,20 @@ export default async function RelatorioPage({
       min: 18,
       max: 28,
     },
-    { label: "Fechamentos", sub: "15–25% · sandwich PIR", pct: 19, min: 15, max: 25 },
-    { label: "Cobertura", sub: "8–15% · telha trapez.", pct: 11, min: 8, max: 15 },
+    {
+      label: "Fechamentos",
+      sub: "15–25% · sandwich PIR",
+      pct: 19,
+      min: 15,
+      max: 25,
+    },
+    {
+      label: "Cobertura",
+      sub: "8–15% · telha trapez.",
+      pct: 11,
+      min: 8,
+      max: 15,
+    },
     {
       label: "Instalações",
       sub: "10–18% · elétrica + hidráulica",
@@ -73,8 +97,20 @@ export default async function RelatorioPage({
       min: 10,
       max: 18,
     },
-    { label: "Acabamentos", sub: "8–15% · piso industrial + docas", pct: 10, min: 8, max: 15 },
-    { label: "Contingência", sub: "8–15% · reserva técnica", pct: 8, min: 8, max: 15 },
+    {
+      label: "Acabamentos",
+      sub: "8–15% · piso industrial + docas",
+      pct: 10,
+      min: 8,
+      max: 15,
+    },
+    {
+      label: "Contingência",
+      sub: "8–15% · reserva técnica",
+      pct: 8,
+      min: 8,
+      max: 15,
+    },
   ];
   const competitors = [
     { name: "SteelFrame (este projeto)", value: cpm2, highlight: true },
@@ -108,7 +144,12 @@ export default async function RelatorioPage({
             ]}
           />
           <div className="page-title-row">
-            <h1>Relatório de Viabilidade · {shed.use === "industrial" ? "Galpão industrial" : "Galpão logístico"}</h1>
+            <h1>
+              Relatório de Viabilidade ·{" "}
+              {shed.use === "industrial"
+                ? "Galpão industrial"
+                : "Galpão logístico"}
+            </h1>
             <span className="pill pill-success">
               <span className="dot" />
               Gerado
@@ -118,8 +159,10 @@ export default async function RelatorioPage({
             </span>
           </div>
           <p className="text-sm muted" style={{ marginTop: 8 }}>
-            {areaM2.toLocaleString("pt-BR")} m² · vão livre {shed.structure.freeSpan} m · pé-direito{" "}
-            {shed.structure.clearHeight} m · cobertura {shed.roof.cover.replace(/_/g, " ")} · fechamento{" "}
+            {areaM2.toLocaleString("pt-BR")} m² · vão livre{" "}
+            {shed.structure.freeSpan} m · pé-direito{" "}
+            {shed.structure.clearHeight} m · cobertura{" "}
+            {shed.roof.cover.replace(/_/g, " ")} · fechamento{" "}
             {shed.envelope.walls.replace(/_/g, " ")}
           </p>
         </div>
@@ -150,22 +193,23 @@ export default async function RelatorioPage({
               {verdict}
             </span>
             <h2>
-              Galpão de <em>{areaM2.toLocaleString("pt-BR")} m²</em> com vão livre de{" "}
-              <em>{shed.structure.freeSpan} m</em>, executável em <em>{months}</em> meses.
+              Galpão de <em>{areaM2.toLocaleString("pt-BR")} m²</em> com vão
+              livre de <em>{shed.structure.freeSpan} m</em>, executável em{" "}
+              <em>{months}</em> meses.
             </h2>
             <p className="v-sub">
-              Lote de {lotAreaM2.toLocaleString("pt-BR")} m² em {building.terrain.address ?? building.terrain.name},{" "}
-              {slopeClass} ({PCT(slopePct)} de inclinação). Estimativa preliminar baseada em SINAPI/CUB Sinduscon-SP
-              + cotação CSN/Gerdau aço galvanizado · BDI 26%.
+              Lote de {lotAreaM2.toLocaleString("pt-BR")} m² em{" "}
+              {building.terrain.address ?? building.terrain.name}, {slopeClass}{" "}
+              ({PCT(slopePct)} de inclinação). Estimativa preliminar baseada em
+              SINAPI/CUB Sinduscon-SP + cotação CSN/Gerdau aço galvanizado · BDI
+              26%.
             </p>
           </div>
           <div className="v-sep" />
           <div className="v-metrics">
             <div className="v-metric">
               <span className="m-lbl">Custo total</span>
-              <div className="m-val accent">
-                {BRL(total)}
-              </div>
+              <div className="m-val accent">{BRL(total)}</div>
               <span className="m-foot">
                 faixa P10–P90 · {BRL(total * 0.9)} — {BRL(total * 1.1)}
               </span>
@@ -194,7 +238,9 @@ export default async function RelatorioPage({
               {steelT.toFixed(0)}
               <span className="unit">t</span>
             </div>
-            <span className="k-sub">{(shed.estimate.steelKg / areaM2).toFixed(1)} kg/m²</span>
+            <span className="k-sub">
+              {(shed.estimate.steelKg / areaM2).toFixed(1)} kg/m²
+            </span>
           </div>
           <div className="kpi-r alt">
             <span className="k-lbl">Vão livre · pé-direito</span>
@@ -202,7 +248,9 @@ export default async function RelatorioPage({
               {shed.structure.freeSpan}
               <span className="unit">× {shed.structure.clearHeight} m</span>
             </div>
-            <span className="k-sub">{shed.structure.bayCount} pórticos · {shed.structure.baySpacing} m</span>
+            <span className="k-sub">
+              {shed.structure.bayCount} pórticos · {shed.structure.baySpacing} m
+            </span>
           </div>
           <div className="kpi-r good">
             <span className="k-lbl">Documentos prontos</span>
@@ -217,7 +265,9 @@ export default async function RelatorioPage({
               {slopeRisk ? 3 : 2}
               <span className="unit">· {slopeRisk ? "1 alto" : "0 altos"}</span>
             </div>
-            <span className="k-sub">{slopeRisk ? "terraplenagem" : "sondagem pendente"}</span>
+            <span className="k-sub">
+              {slopeRisk ? "terraplenagem" : "sondagem pendente"}
+            </span>
           </div>
         </div>
 
@@ -231,7 +281,12 @@ export default async function RelatorioPage({
             {proj && (
               <svg viewBox={`0 0 ${PLANTA_VIEW_W} ${PLANTA_VIEW_H}`}>
                 <defs>
-                  <pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse">
+                  <pattern
+                    id="hatch"
+                    width="6"
+                    height="6"
+                    patternUnits="userSpaceOnUse"
+                  >
                     <path
                       d="M-1,1 l2,-2 M0,6 l6,-6 M5,7 l2,-2"
                       stroke="rgba(255,255,255,0.05)"
@@ -239,7 +294,11 @@ export default async function RelatorioPage({
                     />
                   </pattern>
                 </defs>
-                <rect width={PLANTA_VIEW_W} height={PLANTA_VIEW_H} fill="url(#hatch)" />
+                <rect
+                  width={PLANTA_VIEW_W}
+                  height={PLANTA_VIEW_H}
+                  fill="url(#hatch)"
+                />
                 <path
                   d={proj.polygonPath}
                   fill="rgba(215,32,66,0.18)"
@@ -252,11 +311,15 @@ export default async function RelatorioPage({
           <div className="grid-2-r">
             <div>
               <span className="text-xs muted mono">ENDEREÇO</span>
-              <div className="rcell">{building.terrain.address ?? building.terrain.name}</div>
+              <div className="rcell">
+                {building.terrain.address ?? building.terrain.name}
+              </div>
             </div>
             <div>
               <span className="text-xs muted mono">ÁREA DO LOTE</span>
-              <div className="rcell">{lotAreaM2.toLocaleString("pt-BR")} m²</div>
+              <div className="rcell">
+                {lotAreaM2.toLocaleString("pt-BR")} m²
+              </div>
             </div>
             <div>
               <span className="text-xs muted mono">ZONEAMENTO</span>
@@ -287,7 +350,10 @@ export default async function RelatorioPage({
                 ? "Galpão industrial leve, ponte rolante prevista e pé-direito para porta-paletes."
                 : "Galpão multi-uso com mezanino administrativo."}
           </p>
-          <div className="row" style={{ flexWrap: "wrap", gap: 6, marginTop: 12 }}>
+          <div
+            className="row"
+            style={{ flexWrap: "wrap", gap: 6, marginTop: 12 }}
+          >
             <span className="pill pill-primary">
               <span className="dot" />
               {areaM2.toLocaleString("pt-BR")} m²
@@ -325,11 +391,15 @@ export default async function RelatorioPage({
               </tr>
               <tr>
                 <td>Pé-direito</td>
-                <td className="num-col">{shed.structure.clearHeight.toFixed(1)} m</td>
+                <td className="num-col">
+                  {shed.structure.clearHeight.toFixed(1)} m
+                </td>
               </tr>
               <tr>
                 <td>Vão livre</td>
-                <td className="num-col">{shed.structure.freeSpan.toFixed(1)} m</td>
+                <td className="num-col">
+                  {shed.structure.freeSpan.toFixed(1)} m
+                </td>
               </tr>
               <tr>
                 <td>Peso aço</td>
@@ -337,11 +407,15 @@ export default async function RelatorioPage({
               </tr>
               <tr>
                 <td>Cobertura</td>
-                <td className="num-col">{shed.roof.cover.replace(/_/g, " ")}</td>
+                <td className="num-col">
+                  {shed.roof.cover.replace(/_/g, " ")}
+                </td>
               </tr>
               <tr>
                 <td>Fechamento</td>
-                <td className="num-col">{shed.envelope.walls.replace(/_/g, " ")}</td>
+                <td className="num-col">
+                  {shed.envelope.walls.replace(/_/g, " ")}
+                </td>
               </tr>
               <tr>
                 <td>Docas</td>
@@ -359,9 +433,14 @@ export default async function RelatorioPage({
         <article className="rcard span-12">
           <div className="rcard-head">
             <span className="rcard-title">
-              05–06 · Cenário {earthworks > 0 ? "com vs. sem terraplenagem" : "preparo do terreno"}
+              05–06 · Cenário{" "}
+              {earthworks > 0
+                ? "com vs. sem terraplenagem"
+                : "preparo do terreno"}
             </span>
-            <span className="rcard-block">{earthworks > 0 ? "2 hipóteses" : "terreno plano"}</span>
+            <span className="rcard-block">
+              {earthworks > 0 ? "2 hipóteses" : "terreno plano"}
+            </span>
           </div>
           {earthworks > 0 ? (
             <div className="scenario-compare">
@@ -374,11 +453,15 @@ export default async function RelatorioPage({
                 </div>
                 <div className="s-cost">{BRL(total)}</div>
                 <span className="s-range">
-                  Aceita o lote como está · piso industrial com declividade de {PCT(slopePct)}.
+                  Aceita o lote como está · piso industrial com declividade de{" "}
+                  {PCT(slopePct)}.
                 </span>
                 <ul className="s-bullets">
                   <li>Não há custo de terraplenagem</li>
-                  <li>Empilhadeiras enfrentam {PCT(slopePct)} de declividade no piso</li>
+                  <li>
+                    Empilhadeiras enfrentam {PCT(slopePct)} de declividade no
+                    piso
+                  </li>
                   <li>Drenagem pluvial precisa de mais bocas-de-lobo</li>
                   <li>Sapatas variáveis (cotas de fundação diferentes)</li>
                 </ul>
@@ -393,21 +476,26 @@ export default async function RelatorioPage({
                 </div>
                 <div className="s-cost">{BRL(total + earthworks * 65)}</div>
                 <span className="s-range">
-                  ~{earthworks.toLocaleString("pt-BR")} m³ de corte/aterro · R$ 65/m³ médio (SINAPI).
+                  ~{earthworks.toLocaleString("pt-BR")} m³ de corte/aterro · R$
+                  65/m³ médio (SINAPI).
                 </span>
                 <ul className="s-bullets">
                   <li>Lote nivelado: piso 100% horizontal</li>
                   <li>Operação de empilhadeira otimizada</li>
                   <li>Drenagem simplificada com caimento controlado</li>
-                  <li>+{((earthworks * 65 / total) * 100).toFixed(1)}% no custo compra previsibilidade operacional</li>
+                  <li>
+                    +{(((earthworks * 65) / total) * 100).toFixed(1)}% no custo
+                    compra previsibilidade operacional
+                  </li>
                 </ul>
               </div>
             </div>
           ) : (
             <p className="muted text-sm" style={{ margin: 0 }}>
-              Terreno plano ({PCT(slopePct)} · desnível {slopeDelta.toFixed(2)} m). Não há necessidade de
-              terraplenagem prévia — a fundação pode ser executada com sapatas isoladas niveladas a partir do
-              gabarito original do lote.
+              Terreno plano ({PCT(slopePct)} · desnível {slopeDelta.toFixed(2)}{" "}
+              m). Não há necessidade de terraplenagem prévia — a fundação pode
+              ser executada com sapatas isoladas niveladas a partir do gabarito
+              original do lote.
             </p>
           )}
         </article>
@@ -415,7 +503,9 @@ export default async function RelatorioPage({
         {/* 07 · CUSTO POR M² */}
         <article className="rcard span-5">
           <div className="rcard-head">
-            <span className="rcard-title">07 · Custo por m² · SF vs. concorrentes</span>
+            <span className="rcard-title">
+              07 · Custo por m² · SF vs. concorrentes
+            </span>
             <span className="rcard-block">CUB-SP R8-N</span>
           </div>
           <div className="cost-compare">
@@ -424,13 +514,20 @@ export default async function RelatorioPage({
               return (
                 <div key={c.name}>
                   <div className="cc-head">
-                    <span className={c.highlight ? "cc-name highlight" : "cc-name"}>{c.name}</span>
+                    <span
+                      className={c.highlight ? "cc-name highlight" : "cc-name"}
+                    >
+                      {c.name}
+                    </span>
                     <span className={c.highlight ? "mono highlight" : "mono"}>
                       R$ {c.value.toLocaleString("pt-BR")} / m²
                     </span>
                   </div>
                   <div className="cc-track">
-                    <div className={`cc-fill ${c.highlight ? "primary" : "neutral"}`} style={{ width: `${w}%` }} />
+                    <div
+                      className={`cc-fill ${c.highlight ? "primary" : "neutral"}`}
+                      style={{ width: `${w}%` }}
+                    />
                   </div>
                 </div>
               );
@@ -486,11 +583,14 @@ export default async function RelatorioPage({
               <div className="risk-row high">
                 <div className="risk-icon">⚠</div>
                 <div>
-                  <div className="risk-title">Terreno com inclinação {PCT(slopePct)}</div>
+                  <div className="risk-title">
+                    Terreno com inclinação {PCT(slopePct)}
+                  </div>
                   <div className="risk-desc">
-                    Desnível de {slopeDelta.toFixed(2)} m em ~{Math.round(Math.sqrt(lotAreaM2))} m exige terraplenagem
-                    prévia ou fundação com cotas variáveis. Estimativa: {earthworks.toLocaleString("pt-BR")} m³ de
-                    corte/aterro.
+                    Desnível de {slopeDelta.toFixed(2)} m em ~
+                    {Math.round(Math.sqrt(lotAreaM2))} m exige terraplenagem
+                    prévia ou fundação com cotas variáveis. Estimativa:{" "}
+                    {earthworks.toLocaleString("pt-BR")} m³ de corte/aterro.
                   </div>
                 </div>
                 <span className="pill pill-danger">
@@ -502,10 +602,13 @@ export default async function RelatorioPage({
             <div className="risk-row med">
               <div className="risk-icon">!</div>
               <div>
-                <div className="risk-title">Sondagem SPT obrigatória antes da fundação</div>
+                <div className="risk-title">
+                  Sondagem SPT obrigatória antes da fundação
+                </div>
                 <div className="risk-desc">
-                  Sem sondagem prévia, fundação assumida como sapatas isoladas. Solo argiloso pode exigir
-                  radier estaqueado (NBR 6122 + NBR 16970).
+                  Sem sondagem prévia, fundação assumida como sapatas isoladas.
+                  Solo argiloso pode exigir radier estaqueado (NBR 6122 + NBR
+                  16970).
                 </div>
               </div>
               <span className="pill pill-warning">
@@ -516,11 +619,14 @@ export default async function RelatorioPage({
             <div className="risk-row low">
               <div className="risk-icon">i</div>
               <div>
-                <div className="risk-title">Variação de preço do aço galvanizado</div>
+                <div className="risk-title">
+                  Variação de preço do aço galvanizado
+                </div>
                 <div className="risk-desc">
-                  CSN/Gerdau cotação varia ±7% por semestre. Em {steelT.toFixed(0)} t isso equivale a ±{BRL(
-                    steelT * 1000 * 7,
-                  )}. Travar contrato com fornecedor reduz o risco.
+                  CSN/Gerdau cotação varia ±7% por semestre. Em{" "}
+                  {steelT.toFixed(0)} t isso equivale a ±
+                  {BRL(steelT * 1000 * 7)}. Travar contrato com fornecedor reduz
+                  o risco.
                 </div>
               </div>
               <span className="pill pill-info">
@@ -539,14 +645,34 @@ export default async function RelatorioPage({
           </div>
           <div className="doc-list">
             {[
-              { d: true, n: "Matrícula atualizada do imóvel", m: "Cartório · ok" },
+              {
+                d: true,
+                n: "Matrícula atualizada do imóvel",
+                m: "Cartório · ok",
+              },
               { d: true, n: "IPTU 2026", m: "Prefeitura · ok" },
               { d: true, n: "Certidão de zoneamento", m: "GeoSampa · ok" },
               { d: true, n: "Consulta de uso e ocupação", m: "aprovado" },
-              { d: false, n: "Sondagem SPT · 6 furos × 12 m", m: "pendente · ~R$ 9,8k" },
-              { d: false, n: "Levantamento planialtimétrico", m: "pendente · ~R$ 4,2k" },
-              { d: false, n: "Projeto arquitetônico aprovado", m: "depende de arquiteto" },
-              { d: false, n: "ART estrutural + RRT arquitetônico", m: "CREA-SP / CAU-BR" },
+              {
+                d: false,
+                n: "Sondagem SPT · 6 furos × 12 m",
+                m: "pendente · ~R$ 9,8k",
+              },
+              {
+                d: false,
+                n: "Levantamento planialtimétrico",
+                m: "pendente · ~R$ 4,2k",
+              },
+              {
+                d: false,
+                n: "Projeto arquitetônico aprovado",
+                m: "depende de arquiteto",
+              },
+              {
+                d: false,
+                n: "ART estrutural + RRT arquitetônico",
+                m: "CREA-SP / CAU-BR",
+              },
             ].map((d) => (
               <div key={d.n} className={`doc-row ${d.d ? "done" : ""}`}>
                 <div className="doc-mark">{d.d ? "✓" : ""}</div>
@@ -602,9 +728,10 @@ export default async function RelatorioPage({
           <div>
             <h4>12 · Aviso técnico obrigatório</h4>
             <p>
-              Esta estimativa é preliminar e serve para estudo de viabilidade. Não substitui projeto
-              arquitetônico, projeto estrutural, ART/RRT, orçamento executivo, sondagem, levantamento
-              topográfico, aprovação legal ou consulta formal a fornecedores. Normas referenciadas:{" "}
+              Esta estimativa é preliminar e serve para estudo de viabilidade.
+              Não substitui projeto arquitetônico, projeto estrutural, ART/RRT,
+              orçamento executivo, sondagem, levantamento topográfico, aprovação
+              legal ou consulta formal a fornecedores. Normas referenciadas:{" "}
               {shed.compliance.norms.join(" · ")}.
             </p>
           </div>
