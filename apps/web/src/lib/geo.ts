@@ -89,6 +89,25 @@ export interface ElevationSample {
   lng: number;
 }
 
+export type EarthworksKey = "cut" | "fill" | "balanced";
+
+export interface EarthworksOption {
+  key: EarthworksKey;
+  label: string;
+  /** altitude da plataforma final (m) */
+  platformH: number;
+  /** volume de corte (m³) */
+  cutM3: number;
+  /** volume de aterro/empréstimo (m³) */
+  fillM3: number;
+  /** custo unitário ponderado (R$/m³) */
+  unitCost: number;
+  /** custo total estimado (R$) */
+  totalCost: number;
+  /** texto curto da estratégia */
+  description: string;
+}
+
 export interface SlopeAnalysis {
   /** inclinacao media (%) = desnivel / extensao do perfil */
   slopePct: number;
@@ -102,8 +121,89 @@ export interface SlopeAnalysis {
   classification: "plano" | "suave" | "moderado" | "acentuado";
   /** se vale a pena terraplenar antes do galpao */
   needsLeveling: boolean;
-  /** estimativa de volume de corte/aterro (m3) */
+  /** estimativa de volume de corte/aterro (m3) — opção recomendada */
   earthworksM3: number;
+  /** as três opções de plataforma comparadas */
+  earthworksOptions: EarthworksOption[];
+  /** chave da opção mais barata */
+  earthworksRecommended: EarthworksKey;
+}
+
+/**
+ * Tabela de referência (R$/m³) — SINAPI/CUB médio Brasil 2025/26.
+ * Reajuste em um único lugar caso a base mude.
+ */
+export const EARTHWORKS_RATES = {
+  /** escavação mecanizada + carga + transporte + bota-fora */
+  cutHaul: 45,
+  /** material de empréstimo + lançamento + compactação */
+  fillImport: 65,
+  /** movimentação interna (corte + aterro no próprio lote) */
+  balanced: 25,
+} as const;
+
+/** Computa as três estratégias de plataforma e devolve já ordenadas por custo. */
+export function computeEarthworksOptions(
+  samples: { h: number }[],
+  areaM2: number,
+): { options: EarthworksOption[]; recommended: EarthworksKey } {
+  const hs = samples.map((s) => s.h);
+  const n = hs.length || 1;
+  const hMin = Math.min(...hs);
+  const hMax = Math.max(...hs);
+  const hMean = hs.reduce((s, h) => s + h, 0) / n;
+  const Ai = areaM2 / n; // fração da área representada por cada amostra
+
+  const sumCut = (H: number) =>
+    hs.reduce((s, h) => s + Math.max(0, h - H) * Ai, 0);
+  const sumFill = (H: number) =>
+    hs.reduce((s, h) => s + Math.max(0, H - h) * Ai, 0);
+
+  // 1) Corte total → plataforma na cota mínima (só remove terra)
+  const cutVol = sumCut(hMin);
+  const cut: EarthworksOption = {
+    key: "cut",
+    label: "Só corte (rebaixar)",
+    platformH: hMin,
+    cutM3: Math.round(cutVol),
+    fillM3: 0,
+    unitCost: EARTHWORKS_RATES.cutHaul,
+    totalCost: Math.round(cutVol * EARTHWORKS_RATES.cutHaul),
+    description: "Rebaixa o terreno até a cota mais baixa e descarta o material.",
+  };
+
+  // 2) Aterro total → plataforma na cota máxima (só importa material)
+  const fillVol = sumFill(hMax);
+  const fill: EarthworksOption = {
+    key: "fill",
+    label: "Só aterro (elevar)",
+    platformH: hMax,
+    cutM3: 0,
+    fillM3: Math.round(fillVol),
+    unitCost: EARTHWORKS_RATES.fillImport,
+    totalCost: Math.round(fillVol * EARTHWORKS_RATES.fillImport),
+    description: "Importa material para chegar à cota mais alta — sem bota-fora.",
+  };
+
+  // 3) Compensado → plataforma na cota média; movimenta corte+aterro internos
+  const balCut = sumCut(hMean);
+  const balFill = sumFill(hMean);
+  const balVol = balCut + balFill;
+  const balanced: EarthworksOption = {
+    key: "balanced",
+    label: "Corte + aterro compensado",
+    platformH: hMean,
+    cutM3: Math.round(balCut),
+    fillM3: Math.round(balFill),
+    unitCost: EARTHWORKS_RATES.balanced,
+    totalCost: Math.round(balVol * EARTHWORKS_RATES.balanced),
+    description: "Plataforma na cota média — quase sem transporte, mais barato.",
+  };
+
+  const options = [balanced, cut, fill];
+  const recommended = [...options].sort((a, b) => a.totalCost - b.totalCost)[0]
+    .key;
+  return { options, recommended };
 }
 
 /**
@@ -151,6 +251,7 @@ export function computeSlopeAnalysis(
   areaM2: number,
 ): SlopeAnalysis {
   if (samples.length < 2) {
+    const empty = computeEarthworksOptions(samples.length ? samples : [{ h: 0 }], areaM2);
     return {
       slopePct: 0,
       elevationDelta: 0,
@@ -159,6 +260,8 @@ export function computeSlopeAnalysis(
       classification: "plano",
       needsLeveling: false,
       earthworksM3: 0,
+      earthworksOptions: empty.options,
+      earthworksRecommended: empty.recommended,
     };
   }
   const hs = samples.map((s) => s.h);
@@ -177,9 +280,9 @@ export function computeSlopeAnalysis(
           ? "moderado"
           : "acentuado";
   const needsLeveling = slopePct > 3 || elevationDelta > 1.5;
-  const earthworksM3 = needsLeveling
-    ? Math.round((elevationDelta / 2) * areaM2)
-    : 0;
+  const earth = computeEarthworksOptions(samples, areaM2);
+  const recommendedOpt = earth.options.find((o) => o.key === earth.recommended)!;
+  const earthworksM3 = needsLeveling ? recommendedOpt.cutM3 + recommendedOpt.fillM3 : 0;
   return {
     slopePct: Number(slopePct.toFixed(2)),
     elevationDelta: Number(elevationDelta.toFixed(2)),
@@ -191,5 +294,7 @@ export function computeSlopeAnalysis(
     classification,
     needsLeveling,
     earthworksM3,
+    earthworksOptions: earth.options,
+    earthworksRecommended: earth.recommended,
   };
 }

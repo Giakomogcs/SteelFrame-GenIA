@@ -13,6 +13,15 @@ export default async function BriefingPage({
   const terrain = await prisma.terrain.findUnique({ where: { id: params.id } });
   if (!terrain) notFound();
 
+  const activeBriefing = await prisma.briefing.findFirst({
+    where: {
+      terrainId: terrain.id,
+      status: { in: ["active", "draft", "paused"] },
+    },
+    orderBy: { updatedAt: "desc" },
+    select: { id: true },
+  });
+
   const polygon = terrain.polygon as unknown as LngLat[];
 
   return (
@@ -22,6 +31,7 @@ export default async function BriefingPage({
       terrainAddress={terrain.address}
       areaM2={terrain.areaM2}
       polygon={polygon}
+      initialBriefingId={activeBriefing?.id ?? null}
     />
   );
 }

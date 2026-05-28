@@ -52,6 +52,7 @@ model Terrain {
   buildings   Building[]
   briefings   Briefing[]
   reports     Report[]
+  sitePlans   SitePlan[]
 }
 
 // ============================================================
@@ -71,16 +72,22 @@ model Building {
   // Configuração do contexto (satélite/relevo/ruas/off + opacidade).
   environment Json?
 
-  // draft | preview | viable | blocked.
+  // draft | preview | viable | blocked | superseded.
   status      String   @default("preview")
 
-  briefingId  String?  @unique
-  briefing    Briefing? @relation(fields: [briefingId], references: [id])
+  briefingId   String?
+  briefing     Briefing? @relation(fields: [briefingId], references: [id], onDelete: SetNull)
+  sitePlanId   String?
+  sitePlan     SitePlan? @relation(fields: [sitePlanId], references: [id], onDelete: SetNull)
+  sitePlanHash String?
 
   reports     Report[]
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  @@index([briefingId])
+  @@index([sitePlanId])
 }
 
 // ============================================================
@@ -102,7 +109,11 @@ model Briefing {
   // Premissas auto-extraídas / confirmadas.
   assumptions Json     @default("[]")
 
-  building    Building?
+  acceptedAt  DateTime?
+
+  buildings   Building[]
+  sitePlans   SitePlan[]
+  reports     Report[]
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -117,6 +128,8 @@ model Report {
   terrain     Terrain  @relation(fields: [terrainId], references: [id], onDelete: Cascade)
   buildingId  String?
   building    Building? @relation(fields: [buildingId], references: [id], onDelete: SetNull)
+  briefingId  String?
+  briefing    Briefing? @relation(fields: [briefingId], references: [id], onDelete: SetNull)
 
   code        String
   version     Int      @default(1)
@@ -128,4 +141,35 @@ model Report {
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  @@index([briefingId])
+}
+
+// ============================================================
+// SITEPLAN — planta baixa 2D canonical (single source of truth
+// para a geração 3D paramétrica). Versionado por briefing.
+// ============================================================
+model SitePlan {
+  id          String   @id @default(cuid())
+  terrainId   String
+  terrain     Terrain  @relation(fields: [terrainId], references: [id], onDelete: Cascade)
+  briefingId  String?
+  briefing    Briefing? @relation(fields: [briefingId], references: [id], onDelete: SetNull)
+
+  version     Int      @default(1)
+  // SitePlan completo (schemaVersion="site-1").
+  data        Json
+  // Último ValidationReport { ok, errors[], warnings[] }.
+  validations Json
+  // Hash determinístico do `data` para lock otimista.
+  hash        String
+
+  buildings   Building[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([terrainId])
+  @@index([briefingId])
+  @@index([hash])
 }

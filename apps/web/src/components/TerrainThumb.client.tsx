@@ -5,10 +5,33 @@
  * (e silhueta opcional do galpão) usada em cards e seções de listagem.
  * Não-interativo (drag/zoom desligados) para servir como "imagem".
  */
-import { MapContainer, TileLayer, Polygon } from "react-leaflet";
+import { useEffect } from "react";
+import { MapContainer, TileLayer, Polygon, useMap } from "react-leaflet";
 import L from "leaflet";
 import type { LngLat } from "@/lib/geo";
 import { MAX_MAP_ZOOM } from "@/lib/geo";
+
+/**
+ * Reenquadra o mapa nos bounds passados sempre que o container muda de
+ * tamanho (flex/grid layouts comuns) ou os bounds mudam. Sem isso o
+ * Leaflet mantém o zoom inicial e o terreno aparece minúsculo ou
+ * recortado depois que a área final do painel é definida.
+ */
+function FitBounds({ bounds }: { bounds: L.LatLngBounds }) {
+  const map = useMap();
+  useEffect(() => {
+    const fit = () => {
+      map.invalidateSize();
+      map.fitBounds(bounds, { padding: [16, 16], maxZoom: MAX_MAP_ZOOM });
+    };
+    fit();
+    const container = map.getContainer();
+    const ro = new ResizeObserver(fit);
+    ro.observe(container);
+    return () => ro.disconnect();
+  }, [map, bounds]);
+  return null;
+}
 
 export interface BuildingFootprint {
   width: number; // m, eixo leste-oeste
@@ -40,9 +63,9 @@ export default function TerrainThumbClient({
     return <div className="map-placeholder" />;
   }
   const positions = polygon.map(([lng, lat]) => [lat, lng] as [number, number]);
-  const bounds = L.latLngBounds(positions);
-  const cLat = (bounds.getNorth() + bounds.getSouth()) / 2;
-  const cLng = (bounds.getEast() + bounds.getWest()) / 2;
+  const polyBounds = L.latLngBounds(positions);
+  const cLat = (polyBounds.getNorth() + polyBounds.getSouth()) / 2;
+  const cLng = (polyBounds.getEast() + polyBounds.getWest()) / 2;
 
   let buildingPositions: [number, number][] | null = null;
   if (building && building.width > 0 && building.depth > 0) {
@@ -56,10 +79,16 @@ export default function TerrainThumbClient({
     ];
   }
 
+  // Garante que o footprint do galpão (quando maior que o lote em algum
+  // eixo) também caiba dentro do enquadramento.
+  const bounds = buildingPositions
+    ? L.latLngBounds(positions).extend(L.latLngBounds(buildingPositions))
+    : polyBounds;
+
   return (
     <MapContainer
       bounds={bounds}
-      boundsOptions={{ padding: [12, 12] }}
+      boundsOptions={{ padding: [16, 16] }}
       style={{ width: "100%", height: "100%" }}
       dragging={interactive}
       scrollWheelZoom={interactive}
@@ -74,6 +103,7 @@ export default function TerrainThumbClient({
         url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
         maxZoom={MAX_MAP_ZOOM}
       />
+      <FitBounds bounds={bounds} />
       <Polygon
         positions={positions}
         pathOptions={{

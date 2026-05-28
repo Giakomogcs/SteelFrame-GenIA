@@ -36,12 +36,51 @@ export async function POST(req: NextRequest) {
   const use = body.use as IndustrialShed["use"] | undefined;
   const standard = body.standard as IndustrialShed["standard"] | undefined;
 
+  // FR-G1 (PRD §10.2): 3D generation only at the final wizard step. We
+  // require both `briefingId` and `step === 6` in the request, and refuse
+  // earlier calls with 422. The legacy non-briefing flow (e.g. /briefings
+  // landing page demo) is still allowed for backwards compatibility only
+  // when neither `briefingId` nor `step` is supplied.
+  const briefingId = typeof body.briefingId === "string" ? body.briefingId : null;
+  const step = typeof body.step === "number" ? body.step : null;
+  if (briefingId !== null || step !== null) {
+    if (!briefingId) {
+      return NextResponse.json(
+        { error: "Briefing obrigatório quando 'step' for informado." },
+        { status: 422 },
+      );
+    }
+    if (step !== 6) {
+      return NextResponse.json(
+        {
+          error:
+            "Geração 3D só é permitida no passo 6 do wizard (FR-G1).",
+          step,
+        },
+        { status: 422 },
+      );
+    }
+    const briefing = await prisma.briefing.findUnique({
+      where: { id: briefingId },
+    });
+    if (!briefing) {
+      return NextResponse.json(
+        { error: "Briefing não encontrado." },
+        { status: 404 },
+      );
+    }
+  }
+
   let terrainContext:
     | {
         areaM2: number;
         address?: string;
         centerLat?: number;
         centerLng?: number;
+        slopePct?: number;
+        uf?: string;
+        city?: string;
+        zoneamento?: string;
       }
     | undefined;
 
@@ -55,6 +94,10 @@ export async function POST(req: NextRequest) {
         address: terrain.address ?? undefined,
         centerLat: terrain.centerLat,
         centerLng: terrain.centerLng,
+        slopePct: terrain.slopePct ?? undefined,
+        uf: terrain.state ?? undefined,
+        city: terrain.city ?? undefined,
+        zoneamento: terrain.zoneamento ?? undefined,
       };
     }
   }

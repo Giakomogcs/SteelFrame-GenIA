@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
   const terrains = await prisma.terrain.findMany({
-    include: { buildings: true },
+    include: { buildings: true, briefings: true },
     orderBy: { createdAt: "desc" },
   });
 
@@ -19,7 +19,7 @@ export default async function HomePage() {
         const m = b.model as { estimate?: { totalCost?: number } } | null;
         return bs + (m?.estimate?.totalCost ?? 0);
       }, 0),
-    0,
+    0
   );
   const totalBuildings = terrains.reduce((s, t) => s + t.buildings.length, 0);
   const totalCovered = terrains.reduce(
@@ -29,12 +29,20 @@ export default async function HomePage() {
         const m = b.model as { estimate?: { coveredAreaM2?: number } } | null;
         return bs + (m?.estimate?.coveredAreaM2 ?? 0);
       }, 0),
-    0,
+    0
   );
-  const avgPerM2 = totalCovered > 0 ? Math.round(totalCost / totalCovered) : 0;
+  const avgPerM2 =
+    totalCovered > 0 ? Math.round(totalCost / totalCovered) : 0;
 
   const viaveis = terrains.filter((t) => t.buildings.length > 0).length;
-  const briefings = terrains.length - viaveis;
+  const emBriefing = terrains.filter(
+    (t) =>
+      t.buildings.length === 0 &&
+      t.briefings.some(
+        (b) => b.status === "active" || b.status === "draft" || b.status === "paused"
+      )
+  ).length;
+  const semBriefing = terrains.length - viaveis - emBriefing;
 
   return (
     <>
@@ -43,8 +51,7 @@ export default async function HomePage() {
           <Breadcrumb items={[{ label: "Meus terrenos" }]} />
           <div className="page-title-row">
             <h1>
-              {terrains.length} terreno{terrains.length === 1 ? "" : "s"} em
-              estudo
+              {terrains.length} terreno{terrains.length === 1 ? "" : "s"} em estudo
             </h1>
             {viaveis > 0 && (
               <span className="pill pill-success">
@@ -52,10 +59,16 @@ export default async function HomePage() {
                 {viaveis} viável{viaveis === 1 ? "" : "is"}
               </span>
             )}
-            {briefings > 0 && (
+            {emBriefing > 0 && (
               <span className="pill pill-warning">
                 <span className="dot" />
-                {briefings} em briefing
+                {emBriefing} em briefing
+              </span>
+            )}
+            {semBriefing > 0 && (
+              <span className="pill pill-neutral">
+                <span className="dot" />
+                {semBriefing} sem briefing
               </span>
             )}
           </div>
@@ -158,7 +171,8 @@ export default async function HomePage() {
           <span className="filter-label">Status</span>
           <button className="chip active">Todos</button>
           <button className="chip">Viável ({viaveis})</button>
-          <button className="chip">Em briefing ({briefings})</button>
+          <button className="chip">Em briefing ({emBriefing})</button>
+          <button className="chip">Sem briefing ({semBriefing})</button>
         </div>
       </section>
 

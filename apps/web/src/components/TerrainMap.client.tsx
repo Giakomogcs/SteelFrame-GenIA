@@ -69,6 +69,31 @@ function FlyTo({ target }: { target: LngLat | null }) {
   return null;
 }
 
+/**
+ * Mantém o mapa enquadrado no polígono atual e revalida o tamanho do
+ * container quando ele é redimensionado (sidebar abre/fecha, painel
+ * preview muda de aba, etc.). Sem isso o Leaflet preserva o zoom inicial
+ * e o lote acaba aparecendo recortado ou minúsculo.
+ */
+function FitPolygon({ polygon }: { polygon: LngLat[] }) {
+  const map = useMap();
+  useEffect(() => {
+    const container = map.getContainer();
+    const ro = new ResizeObserver(() => map.invalidateSize());
+    ro.observe(container);
+    return () => ro.disconnect();
+  }, [map]);
+  useEffect(() => {
+    if (polygon.length < 2) return;
+    const bounds = L.latLngBounds(
+      polygon.map(([lng, lat]) => [lat, lng] as [number, number]),
+    );
+    map.invalidateSize();
+    map.fitBounds(bounds, { padding: [24, 24], maxZoom: MAX_MAP_ZOOM });
+  }, [map, polygon]);
+  return null;
+}
+
 export default function TerrainMapClient({
   initialPolygon = [],
   initialCenter,
@@ -96,14 +121,14 @@ export default function TerrainMapClient({
     if (polygon.length >= 3) {
       if (area < MIN_TERRAIN_AREA_M2) {
         errs.push(
-          `Área muito pequena (${Math.round(area)} m²). Mínimo ${MIN_TERRAIN_AREA_M2} m².`,
+          `Área muito pequena (${Math.round(area)} m²). Mínimo ${MIN_TERRAIN_AREA_M2} m².`
         );
       }
       if (area > MAX_TERRAIN_AREA_M2) {
         errs.push(
           `Área muito grande (${(area / 10_000).toFixed(1)} ha). Máximo ${(
             MAX_TERRAIN_AREA_M2 / 10_000
-          ).toFixed(0)} ha — selecione um lote, não uma região.`,
+          ).toFixed(0)} ha — selecione um lote, não uma região.`
         );
       }
     }
@@ -121,7 +146,7 @@ export default function TerrainMapClient({
     const ctrl = new AbortController();
     fetch(
       `https://nominatim.openstreetmap.org/reverse?format=json&zoom=18&addressdetails=1&lat=${lat}&lon=${lng}`,
-      { headers: { Accept: "application/json" }, signal: ctrl.signal },
+      { headers: { Accept: "application/json" }, signal: ctrl.signal }
     )
       .then((r) => r.json())
       .then((data: { display_name?: string } | null) => {
@@ -297,6 +322,7 @@ export default function TerrainMapClient({
           )}
 
           <FlyTo target={searchTarget} />
+          <FitPolygon polygon={polygon} />
 
           <MapClickHandler
             drawing={drawing}

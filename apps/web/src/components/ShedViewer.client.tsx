@@ -458,12 +458,15 @@ function GroundEnv({
   envMode,
   envOpacity,
   shed,
+  polygon,
 }: {
   envMode: EnvMode;
   envOpacity: number;
   shed: IndustrialShed;
+  polygon?: LngLat[];
 }) {
   const size = Math.max(shed.lot.width, shed.lot.depth, 80) * 1.5;
+  const lotShape = useMemo(() => buildLotShape(polygon), [polygon]);
   if (envMode === "off") return null;
 
   const color =
@@ -472,6 +475,13 @@ function GroundEnv({
       : envMode === "relief"
         ? "#5a5142"
         : "#2a2d33";
+
+  const lotColor =
+    envMode === "satellite"
+      ? "#4d5a3b"
+      : envMode === "relief"
+        ? "#7a6d52"
+        : "#3a3f48";
 
   return (
     <group>
@@ -488,10 +498,114 @@ function GroundEnv({
           roughness={1}
         />
       </mesh>
+      {/* lote real desenhado a partir do polígono */}
+      {lotShape && (
+        <group rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.69, 0]}>
+          <mesh receiveShadow>
+            <shapeGeometry args={[lotShape.shape]} />
+            <meshStandardMaterial
+              color={lotColor}
+              transparent
+              opacity={Math.min(1, envOpacity + 0.15)}
+              roughness={0.95}
+            />
+          </mesh>
+          {/* contorno do lote */}
+          <lineSegments position={[0, 0, 0.01]}>
+            <edgesGeometry args={[new THREE.ShapeGeometry(lotShape.shape)]} />
+            <lineBasicMaterial color="#D72042" />
+          </lineSegments>
+          {/* recuo (setback) tracejado */}
+          {lotShape.inner && (
+            <lineSegments position={[0, 0, 0.02]}>
+              <bufferGeometry
+                attach="geometry"
+                onUpdate={(g) => {
+                  const segPts: THREE.Vector3[] = [];
+                  for (let i = 0; i < lotShape.inner!.length - 1; i++) {
+                    segPts.push(lotShape.inner![i]);
+                    segPts.push(lotShape.inner![i + 1]);
+                  }
+                  g.setFromPoints(segPts);
+                }}
+              />
+              <lineBasicMaterial color="#ffffff" transparent opacity={0.45} />
+            </lineSegments>
+          )}
+        </group>
+      )}
       {/* vizinhos */}
       <NeighborBoxes shed={shed} opacity={envOpacity} />
     </group>
   );
+}
+
+/** Constrói uma THREE.Shape do polígono, projetado em metros, rotacionado para alinhar o lado mais longo ao eixo X. */
+function buildLotShape(polygon?: LngLat[]): {
+  shape: THREE.Shape;
+  inner: THREE.Vector3[] | null;
+} | null {
+  if (!polygon || polygon.length < 3) return null;
+  // 1) projeção equiretangular em metros usando o centroide como ref
+  const [cx, cy] = polygon.reduce(
+    ([ax, ay], [x, y]) => [ax + x / polygon.length, ay + y / polygon.length],
+    [0, 0],
+  );
+  const cosLat = Math.cos((cy * Math.PI) / 180);
+  const R = 6371000;
+  const pts = polygon.map<[number, number]>(([lng, lat]) => [
+    ((lng - cx) * Math.PI) / 180 * R * cosLat,
+    ((lat - cy) * Math.PI) / 180 * R,
+  ]);
+  // 2) ângulo do lado mais longo
+  let bestLen = 0;
+  let bestAngle = 0;
+  for (let i = 0; i < pts.length; i++) {
+    const a = pts[i];
+    const b = pts[(i + 1) % pts.length];
+    const dx = b[0] - a[0];
+    const dy = b[1] - a[1];
+    const l = Math.hypot(dx, dy);
+    if (l > bestLen) {
+      bestLen = l;
+      bestAngle = Math.atan2(dy, dx);
+    }
+  }
+  const cos = Math.cos(-bestAngle);
+  const sin = Math.sin(-bestAngle);
+  const rotated = pts.map(([x, y]) => [x * cos - y * sin, x * sin + y * cos] as [number, number]);
+  // 3) recentralizar no bbox
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (const [x, y] of rotated) {
+    if (x < minX) minX = x;
+    if (x > maxX) maxX = x;
+    if (y < minY) minY = y;
+    if (y > maxY) maxY = y;
+  }
+  const ox = (minX + maxX) / 2;
+  const oy = (minY + maxY) / 2;
+  const centered = rotated.map(([x, y]) => [x - ox, y - oy] as [number, number]);
+  // 4) THREE.Shape (em plano XY local, será rotacionado pelo grupo pai para deitar no chão)
+  const shape = new THREE.Shape();
+  centered.forEach(([x, y], i) => {
+    if (i === 0) shape.moveTo(x, y);
+    else shape.lineTo(x, y);
+  });
+  shape.closePath();
+  // 5) recuo tracejado (offset interno ~5 m, aproximado por shrink em torno do centro)
+  const setback = 5;
+  const inner: THREE.Vector3[] = [];
+  const cxLocal = 0;
+  const cyLocal = 0;
+  for (let i = 0; i <= centered.length; i++) {
+    const [x, y] = centered[i % centered.length];
+    const dx = x - cxLocal;
+    const dy = y - cyLocal;
+    const d = Math.hypot(dx, dy);
+    const k = Math.max(0, (d - setback) / d);
+    inner.push(new THREE.Vector3(dx * k + cxLocal, dy * k + cyLocal, 0));
+  }
+  return { shape, inner };
 }
 
 function NeighborBoxes({
@@ -556,22 +670,57 @@ function DimensionAnnotations({ shed }: { shed: IndustrialShed }) {
   );
 }
 
-function CameraRig({ preset }: { preset: ViewPreset }) {
-  const { camera } = useThree();
+function CameraRig({
+  preset,
+  shed,
+}: {
+  preset: ViewPreset;
+  shed: IndustrialShed;
+}) {
+  const { camera, size, controls } = useThree() as unknown as {
+    camera: THREE.PerspectiveCamera;
+    size: { width: number; height: number };
+    controls: { target: THREE.Vector3; update: () => void } | null;
+  };
+
+  // Caixa envolvente do galpão (largura·profundidade·altura total c/ telhado).
+  const w = shed.footprint.width;
+  const d = shed.footprint.depth;
+  const ch = shed.structure.clearHeight;
+  const rise =
+    shed.roof.type === "gable" ? (w / 2) * (shed.roof.slopePct / 100) : 0.3;
+  const totalH = ch + rise;
+
   useEffect(() => {
-    const cam = camera as THREE.PerspectiveCamera;
-    // Posições enquadram um galpão de até ~60×150×12 m com folga.
-    const targets: Record<ViewPreset, [number, number, number]> = {
-      iso: [70, 50, 90],
-      plan: [0, 180, 0.001], // topo, quase ortográfico
-      front: [0, 25, 140],
-      side: [140, 25, 0],
+    const cam = camera;
+    // Raio da bounding sphere a partir das dimensões reais do galpão.
+    const radius = 0.5 * Math.sqrt(w * w + d * d + totalH * totalH);
+    const aspect = Math.max(0.0001, size.width / Math.max(1, size.height));
+    const fovV = (cam.fov * Math.PI) / 180;
+    const fovH = 2 * Math.atan(Math.tan(fovV / 2) * aspect);
+    const fitFov = Math.min(fovV, fovH);
+    // 1.35 = folga para não encostar nas bordas (deixa HUD/cotagens visíveis).
+    const distance = (radius / Math.sin(fitFov / 2)) * 1.35;
+
+    const target = new THREE.Vector3(0, totalH * 0.45, 0);
+    const dirs: Record<ViewPreset, [number, number, number]> = {
+      iso: [0.7, 0.55, 0.95],
+      plan: [0, 1, 0.001],
+      front: [0, 0.18, 1],
+      side: [1, 0.18, 0],
     };
-    const t = targets[preset];
-    cam.position.set(t[0], t[1], t[2]);
-    cam.lookAt(0, 6, 0);
+    const dir = new THREE.Vector3(...dirs[preset]).normalize();
+    cam.position.copy(target.clone().add(dir.multiplyScalar(distance)));
+    cam.near = Math.max(0.1, distance / 200);
+    cam.far = distance * 12;
+    cam.lookAt(target);
     cam.updateProjectionMatrix();
-  }, [preset, camera]);
+
+    if (controls) {
+      controls.target.copy(target);
+      controls.update();
+    }
+  }, [preset, camera, controls, w, d, totalH, size.width, size.height]);
   return null;
 }
 
@@ -816,6 +965,7 @@ export default function ShedViewerClient({
   shed,
   height = "70vh",
   compact = false,
+  polygon,
 }: Props) {
   const layers = useMemo(() => deriveLayers(shed), [shed]);
   const layerMap = useMemo(
@@ -890,7 +1040,7 @@ export default function ShedViewerClient({
           infiniteGrid
         />
 
-        <GroundEnv envMode={envMode} envOpacity={envOpacity} shed={shed} />
+        <GroundEnv envMode={envMode} envOpacity={envOpacity} shed={shed} polygon={polygon} />
 
         <LayerGroup
           layer="foundation"
@@ -945,11 +1095,11 @@ export default function ShedViewerClient({
 
         <DimensionAnnotations shed={shed} />
 
-        <CameraRig preset={preset} />
+        <CameraRig preset={preset} shed={shed} />
         <OrbitControls
+          makeDefault
           enableDamping
           dampingFactor={0.08}
-          target={[0, 6, 0]}
           // Permite rotacionar livremente — inclusive olhar de baixo para
           // contar treliças/colunas a partir da planta invertida.
           minPolarAngle={0}
@@ -957,7 +1107,7 @@ export default function ShedViewerClient({
           // Zoom amplo: chega bem perto para inspecionar conexões e bem longe
           // para enquadrar o lote inteiro.
           minDistance={3}
-          maxDistance={600}
+          maxDistance={2000}
           // Pan livre (atalho Shift+drag ou botão direito).
           enablePan
           zoomSpeed={1.1}

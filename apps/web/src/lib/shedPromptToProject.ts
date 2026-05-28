@@ -7,6 +7,7 @@ import {
   recomputeEstimate,
   type FallbackContext,
 } from "./shedDefaults";
+import { buildKnowledgeBlock } from "./knowledge";
 
 const MAX_RETRIES = 3;
 
@@ -198,6 +199,9 @@ export interface ShedPromptOptions extends FallbackContext {
     centerLat?: number;
     centerLng?: number;
     slopePct?: number;
+    uf?: string;
+    city?: string;
+    zoneamento?: string;
   };
 }
 
@@ -205,8 +209,11 @@ function buildUserMessage(opts: ShedPromptOptions): string {
   const ctx = opts.terrainContext;
   const parts: string[] = [];
   if (ctx) {
+    const ufStr = ctx.uf ? ` | UF: ${ctx.uf}` : "";
+    const cityStr = ctx.city ? ` | cidade: ${ctx.city}` : "";
+    const zonaStr = ctx.zoneamento ? ` | zoneamento: ${ctx.zoneamento}` : "";
     parts.push(
-      `CONTEXTO DO TERRENO: área ≈ ${ctx.areaM2.toFixed(0)} m² | endereço: ${ctx.address ?? "não informado"} | inclinação: ${ctx.slopePct ?? 0}%`,
+      `CONTEXTO DO TERRENO: área ≈ ${ctx.areaM2.toFixed(0)} m² | endereço: ${ctx.address ?? "não informado"} | inclinação: ${ctx.slopePct ?? 0}%${ufStr}${cityStr}${zonaStr}`,
     );
     if (
       typeof ctx.centerLat === "number" &&
@@ -219,9 +226,18 @@ function buildUserMessage(opts: ShedPromptOptions): string {
   }
   parts.push("BRIEFING DO USUÁRIO:\n" + opts.prompt);
   parts.push(
-    "Gere o JSON conforme o schema. Lembre: docas + AVCB + pé-direito coerente com o uso.",
+    "Gere o JSON conforme o schema. Lembre: docas + AVCB + pé-direito coerente com o uso. Use a Base de Conhecimento (normas + custos SINAPI/CUB) acima como ancoragem.",
   );
   return parts.join("\n\n");
+}
+
+/** Compõe o system prompt enriquecido com a Base de Conhecimento dinâmica. */
+function buildSystemMessage(opts: ShedPromptOptions): string {
+  return (
+    SHED_SYSTEM_PROMPT +
+    "\n\n" +
+    buildKnowledgeBlock({ uf: opts.terrainContext?.uf })
+  );
 }
 
 async function tryParse(
@@ -292,7 +308,7 @@ export async function* promptToShedStream(
   }
 
   const messages: Array<{ role: string; content: string }> = [
-    { role: "system", content: SHED_SYSTEM_PROMPT },
+    { role: "system", content: buildSystemMessage(opts) },
     { role: "user", content: buildUserMessage(opts) },
   ];
 

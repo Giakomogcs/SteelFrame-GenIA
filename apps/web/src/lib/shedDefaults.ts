@@ -1,5 +1,6 @@
 // Fallback determinístico + heurísticas para o IndustrialShed.
 import type { IndustrialShed } from "./shedSchema";
+import { COST_PER_M2_BY_STATE } from "./knowledge";
 
 export interface FallbackContext {
   /** Área disponível no lote (m²) — usada para escalar o galpão. */
@@ -10,12 +11,9 @@ export interface FallbackContext {
   use?: IndustrialShed["use"];
 }
 
-// Custo paramétrico R$/m² por padrão (referência preliminar — SINAPI/CUB Sinduscon-SP)
-export const COST_PER_M2: Record<"economico" | "medio" | "alto", number> = {
-  economico: 1800,
-  medio: 2400,
-  alto: 3400,
-};
+// Custo paramétrico R$/m² por padrão — fonte única em knowledge/costs (UF=BR).
+export const COST_PER_M2: Record<"economico" | "medio" | "alto", number> =
+  COST_PER_M2_BY_STATE.BR;
 
 // Peso de aço (kg/m² coberto) por sistema estrutural
 export const STEEL_KG_PER_M2: Record<string, number> = {

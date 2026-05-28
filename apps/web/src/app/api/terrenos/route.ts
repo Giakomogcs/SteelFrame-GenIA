@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@sfg/db";
 import { MAX_TERRAIN_AREA_M2, MIN_TERRAIN_AREA_M2 } from "@/lib/geo";
+import { measureAndPersistSlope } from "@/lib/slopeService";
 
 const CreateTerrainSchema = z.object({
   name: z.string().min(1).max(120),
@@ -45,5 +46,16 @@ export async function POST(req: Request) {
       areaM2: parsed.data.areaM2,
     },
   });
+
+  // Medição automática de relevo (best-effort — não bloqueia se a API externa falhar).
+  try {
+    await measureAndPersistSlope(created.id);
+  } catch (err) {
+    console.warn(
+      `[terrenos] medição automática de relevo falhou para ${created.id}:`,
+      (err as Error).message,
+    );
+  }
+
   return NextResponse.json(created, { status: 201 });
 }
