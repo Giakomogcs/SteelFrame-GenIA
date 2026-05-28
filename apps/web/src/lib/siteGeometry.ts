@@ -60,6 +60,11 @@ function polygonSignedArea(poly: readonly V[]): number {
   return s * 0.5;
 }
 
+/** Absolute area (m²) of a polygon in local coords. */
+export function polygonAreaLocal(poly: readonly V[]): number {
+  return Math.abs(polygonSignedArea(poly));
+}
+
 /** Ensures polygon is CCW (positive signed area in x/z plane). */
 export function ensureCCW(poly: readonly V[]): V[] {
   return polygonSignedArea(poly) >= 0 ? poly.slice() : poly.slice().reverse();

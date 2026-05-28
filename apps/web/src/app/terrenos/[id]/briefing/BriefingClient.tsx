@@ -12,6 +12,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { LngLat } from "@/lib/geo";
+import { Breadcrumb } from "@/components/Breadcrumb";
 import { BriefingStepper, type StepDef } from "@/components/BriefingStepper";
 import {
   SITE_CONSTRAINTS,
@@ -23,15 +24,18 @@ import {
   detectStreetEdges,
   getEdges,
   placeGates,
+  polygonAreaLocal,
   polygonBBox,
   projectLotToLocal,
 } from "@/lib/siteGeometry";
 import { fitBuildings } from "@/lib/siteLayout";
 import {
   SitePlanSchema,
+  type BuildingUse,
   type SitePlan,
   type ValidationReport,
 } from "@/lib/sitePlanSchema";
+import TerrainThumb from "@/components/TerrainThumb";
 
 const STEPS: StepDef[] = [
   { id: "programa", label: "Programa", description: "Nº de galpões, uso" },
@@ -165,15 +169,52 @@ export default function BriefingClient({
     return () => window.clearTimeout(handle);
   }, [state, step, briefingId]);
 
+  // ---- Buildable area (m²) and per-building max --------------------------
+
+  const buildableRegion = useMemo(
+    () =>
+      buildBuildableRegion(lot.local, {
+        setbacks: state.setbacks,
+        streetEdges: state.streetEdges,
+        laneBufferM: state.truckAccess
+          ? SITE_CONSTRAINTS.circulation.truckLaneMin
+          : SITE_CONSTRAINTS.circulation.carLaneMin,
+      }),
+    [lot.local, state.setbacks, state.streetEdges, state.truckAccess],
+  );
+
+  const buildableAreaM2 = useMemo(
+    () => (buildableRegion.length >= 3 ? polygonAreaLocal(buildableRegion) : 0),
+    [buildableRegion],
+  );
+
+  /** Max target area per building = buildable area ÷ qty (rounded down to step). */
+  const maxTargetArea = useMemo(() => {
+    const raw = buildableAreaM2 / Math.max(1, state.programa.qty);
+    return Math.max(300, Math.floor(raw / 100) * 100);
+  }, [buildableAreaM2, state.programa.qty]);
+
+  // Clamp targetAreaM2 when max shrinks below current value.
+  useEffect(() => {
+    if (state.programa.targetAreaM2 > maxTargetArea) {
+      setState((s) => ({
+        ...s,
+        programa: { ...s.programa, targetAreaM2: maxTargetArea },
+      }));
+    }
+  }, [maxTargetArea, state.programa.targetAreaM2]);
+
   // ---- Derive SitePlan from current state (deterministic) ---------------
 
   const candidate = useMemo<{
     site: SitePlan | null;
     report: ValidationReport;
+    buildable: { x: number; z: number }[] | null;
     error?: string;
   }>(() => {
+    let buildable: { x: number; z: number }[] | null = null;
     try {
-      const buildable = buildBuildableRegion(lot.local, {
+      buildable = buildBuildableRegion(lot.local, {
         setbacks: state.setbacks,
         streetEdges: state.streetEdges,
         laneBufferM: state.truckAccess
@@ -192,6 +233,7 @@ export default function BriefingClient({
       if (!fit.ok) {
         return {
           site: null,
+          buildable,
           report: { ok: false, errors: [], warnings: [] },
           error: fit.reason,
         };
@@ -248,10 +290,11 @@ export default function BriefingClient({
         greenAreas: [],
       });
       const report = validateSitePlan(draft);
-      return { site: draft, report };
+      return { site: draft, report, buildable };
     } catch (e) {
       return {
         site: null,
+        buildable,
         report: { ok: false, errors: [], warnings: [] },
         error: e instanceof Error ? e.message : String(e),
       };
@@ -313,11 +356,39 @@ export default function BriefingClient({
     }
   }
 
+  // Total built area for preview stats
+  const builtAreaM2 = useMemo(
+    () =>
+      (candidate.site?.buildings ?? []).reduce(
+        (acc, b) => acc + polygonAreaLocal(b.footprintPolygon),
+        0,
+      ),
+    [candidate.site],
+  );
+
   return (
-    <div
-      className="briefing-shell"
-      style={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}
-    >
+    <div className="briefing-shell briefing-shell--v2">
+      <header className="page-header">
+        <div className="stack-sm">
+          <Breadcrumb
+            items={[
+              { label: "Meus terrenos", href: "/terrenos" },
+              { label: terrainName, href: `/terrenos/${terrainId}` },
+              { label: "Briefing" },
+            ]}
+          />
+          <div className="page-title-row">
+            <h1>{terrainName}</h1>
+            <span className="pill pill-neutral mono">
+              {areaM2.toLocaleString("pt-BR", { maximumFractionDigits: 0 })} m²
+            </span>
+          </div>
+          {terrainAddress && (
+            <p className="text-sm muted">{terrainAddress}</p>
+          )}
+        </div>
+      </header>
+
       <BriefingStepper
         steps={STEPS}
         current={step}
@@ -325,26 +396,28 @@ export default function BriefingClient({
         onChange={go}
       />
 
-      <div className="briefing-v2" style={{ flex: 1 }}>
+      <div className="briefing-v2">
         <section
           className="briefing-v2__panel"
           aria-labelledby={`step-${step}`}
         >
-          <header>
+          <div className="briefing-v2__panel-header">
             <h3 id={`step-${step}`}>
-              {step + 1}. {STEPS[step].label}
+              {String(step + 1).padStart(2, "0")} · {STEPS[step].label}
             </h3>
-            {terrainAddress && (
-              <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 4 }}>
-                {terrainAddress} · {areaM2.toFixed(0)} m²
-              </div>
+            {STEPS[step].description && (
+              <span className="briefing-v2__panel-sub">
+                {STEPS[step].description}
+              </span>
             )}
-          </header>
+          </div>
 
           {step === 0 && (
             <StepProgram
               value={state.programa}
               onChange={(p) => setState((s) => ({ ...s, programa: p }))}
+              maxTargetArea={maxTargetArea}
+              buildableAreaM2={buildableAreaM2}
             />
           )}
           {step === 1 && (
@@ -391,7 +464,7 @@ export default function BriefingClient({
           )}
 
           {error && (
-            <p style={{ color: "#fca5a5", fontSize: 12 }} role="alert">
+            <p className="briefing-v2__error" role="alert">
               {error}
             </p>
           )}
@@ -401,19 +474,63 @@ export default function BriefingClient({
           className="briefing-v2__panel"
           aria-label="Pré-visualização da planta"
         >
-          <h3>Planta 2D (preview)</h3>
+          <div className="briefing-v2__panel-header">
+            <h3>Planta 2D · preview</h3>
+            <span className="briefing-v2__panel-sub">
+              Atualiza em tempo real conforme você edita o briefing.
+            </span>
+          </div>
           <LotPreviewSvg
+            polygon={polygon}
             polygonLocal={lot.local}
             edges={edges}
             streetEdges={state.streetEdges}
+            buildable={candidate.buildable}
+            setbacks={state.setbacks}
             buildings={
-              candidate.site?.buildings.map((b) => b.footprintPolygon) ?? []
+              candidate.site?.buildings.map((b) => ({
+                polygon: b.footprintPolygon,
+                use: b.use,
+                name: b.name,
+              })) ?? []
             }
             gates={candidate.site?.gates ?? []}
+            hasFitError={Boolean(candidate.error)}
+            clearHeight={state.clearHeight}
           />
-          <div style={{ fontSize: 11, color: "#64748b" }}>
-            O modelo 3D só é gerado ao final do passo 6.
+          <div className="briefing-v2__preview-stats">
+            <span>
+              Área útil:
+              <strong>
+                {" "}
+                {buildableAreaM2.toLocaleString("pt-BR", {
+                  maximumFractionDigits: 0,
+                })}{" "}
+                m²
+              </strong>
+            </span>
+            <span>
+              Área construída:
+              <strong>
+                {" "}
+                {builtAreaM2.toLocaleString("pt-BR", {
+                  maximumFractionDigits: 0,
+                })}{" "}
+                m²
+              </strong>
+            </span>
+            <span>
+              Galpões:<strong> {state.programa.qty}</strong>
+            </span>
           </div>
+          {candidate.error && (
+            <div className="briefing-v2__preview-error" role="alert">
+              <strong>Não cabe:</strong> {candidate.error}
+            </div>
+          )}
+          <p className="briefing-v2__preview-hint">
+            O modelo 3D só é gerado ao final do passo 6.
+          </p>
         </aside>
       </div>
 
@@ -453,14 +570,21 @@ export default function BriefingClient({
 function StepProgram({
   value,
   onChange,
+  maxTargetArea,
+  buildableAreaM2,
 }: {
   value: Programa;
   onChange: (v: Programa) => void;
+  maxTargetArea: number;
+  buildableAreaM2: number;
 }) {
   return (
-    <div style={{ display: "grid", gap: 14 }}>
+    <div className="briefing-v2__fields">
       <label className="briefing-v2__field">
-        <span>Número de galpões</span>
+        <span className="briefing-v2__field-label">
+          Número de galpões
+          <span className="briefing-v2__field-value">{value.qty}</span>
+        </span>
         <input
           type="number"
           min={1}
@@ -490,15 +614,23 @@ function StepProgram({
         </div>
       </div>
       <label className="briefing-v2__field">
-        <span>
-          Área alvo por galpão: {value.targetAreaM2.toLocaleString("pt-BR")} m²
+        <span className="briefing-v2__field-label">
+          Área alvo por galpão
+          <span className="briefing-v2__field-value">
+            {value.targetAreaM2.toLocaleString("pt-BR")} m² · máx{" "}
+            {maxTargetArea.toLocaleString("pt-BR")} m² · útil{" "}
+            {buildableAreaM2.toLocaleString("pt-BR", {
+              maximumFractionDigits: 0,
+            })}{" "}
+            m²
+          </span>
         </span>
         <input
           type="range"
           min={300}
-          max={20000}
+          max={maxTargetArea}
           step={100}
-          value={value.targetAreaM2}
+          value={Math.min(value.targetAreaM2, maxTargetArea)}
           onChange={(e) =>
             onChange({ ...value, targetAreaM2: Number(e.target.value) })
           }
@@ -507,7 +639,7 @@ function StepProgram({
       <div className="briefing-v2__field">
         <span>Padrão construtivo</span>
         <div className="briefing-v2__seg" role="group">
-          {(["economico", "medio", "alto"] as const).map((s) => (
+          {([ "economico", "medio", "alto"] as const).map((s) => (
             <button
               key={s}
               type="button"
@@ -536,29 +668,19 @@ function StepTerrain({
   onToggleEdge: (idx: number) => void;
   onSetbacks: (sb: { front: number; sides: number; back: number }) => void;
 }) {
+  const labels = { front: "frontal", sides: "laterais", back: "fundos" } as const;
   return (
-    <div style={{ display: "grid", gap: 14 }}>
+    <div className="briefing-v2__fields">
       <div className="briefing-v2__field">
         <span>Arestas voltadas à rua (clique para alternar)</span>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+        <div className="briefing-v2__edges">
           {edges.map((e) => (
             <button
               key={e.index}
               type="button"
               aria-pressed={streetEdges.includes(e.index)}
               onClick={() => onToggleEdge(e.index)}
-              className="briefing-v2__seg"
-              style={{
-                padding: "4px 10px",
-                borderRadius: 6,
-                fontSize: 12,
-                background: streetEdges.includes(e.index)
-                  ? "#f59e0b"
-                  : "#0b1220",
-                color: streetEdges.includes(e.index) ? "#0b1220" : "#cbd5e1",
-                border: "1px solid rgba(255,255,255,0.08)",
-                cursor: "pointer",
-              }}
+              className="briefing-v2__edge-chip"
             >
               Aresta {e.index} · {e.length.toFixed(1)} m
             </button>
@@ -567,8 +689,9 @@ function StepTerrain({
       </div>
       {(["front", "sides", "back"] as const).map((k) => (
         <label key={k} className="briefing-v2__field">
-          <span>
-            Recuo {k} (m): {setbacks[k]}
+          <span className="briefing-v2__field-label">
+            Recuo {labels[k]}
+            <span className="briefing-v2__field-value">{setbacks[k]} m</span>
           </span>
           <input
             type="range"
@@ -604,9 +727,12 @@ function StepPerimeter({
   ) => void;
 }) {
   return (
-    <div style={{ display: "grid", gap: 14 }}>
+    <div className="briefing-v2__fields">
       <label className="briefing-v2__field">
-        <span>Altura do muro (m): {perimeterHeight}</span>
+        <span className="briefing-v2__field-label">
+          Altura do muro
+          <span className="briefing-v2__field-value">{perimeterHeight} m</span>
+        </span>
         <input
           type="range"
           min={1.5}
@@ -638,7 +764,10 @@ function StepPerimeter({
         </div>
       </div>
       <label className="briefing-v2__field">
-        <span>Largura do portão (m): {gateWidth}</span>
+        <span className="briefing-v2__field-label">
+          Largura do portão
+          <span className="briefing-v2__field-value">{gateWidth} m</span>
+        </span>
         <input
           type="range"
           min={SLIDER_RANGES.gateWidth.min}
@@ -664,9 +793,12 @@ function StepBuildings({
   onProgram: (p: Programa) => void;
 }) {
   return (
-    <div style={{ display: "grid", gap: 14 }}>
+    <div className="briefing-v2__fields">
       <label className="briefing-v2__field">
-        <span>Pé-direito útil (m): {clearHeight}</span>
+        <span className="briefing-v2__field-label">
+          Pé-direito útil
+          <span className="briefing-v2__field-value">{clearHeight} m</span>
+        </span>
         <input
           type="range"
           min={SLIDER_RANGES.clearHeight.min}
@@ -705,7 +837,7 @@ function StepCirculation({
   ) => void;
 }) {
   return (
-    <div style={{ display: "grid", gap: 14 }}>
+    <div className="briefing-v2__fields">
       <label className="briefing-v2__field">
         <span>Vagas de carro</span>
         <input
@@ -768,21 +900,37 @@ function StepReview({
 
 // ---- SVG preview --------------------------------------------------------
 
+interface PreviewBuilding {
+  polygon: { x: number; z: number }[];
+  use: BuildingUse;
+  name: string;
+}
+
 function LotPreviewSvg({
+  polygon,
   polygonLocal,
   edges,
   streetEdges,
+  buildable,
+  setbacks,
   buildings,
   gates,
+  hasFitError,
+  clearHeight,
 }: {
+  polygon: LngLat[];
   polygonLocal: { x: number; z: number }[];
   edges: ReturnType<typeof getEdges>;
   streetEdges: number[];
-  buildings: { x: number; z: number }[][];
+  buildable: { x: number; z: number }[] | null;
+  setbacks: { front: number; sides: number; back: number };
+  buildings: PreviewBuilding[];
   gates: { edgeIndex: number; tAlongEdge: number; width: number }[];
+  hasFitError: boolean;
+  clearHeight: number;
 }) {
   const bb = useMemo(() => polygonBBox(polygonLocal), [polygonLocal]);
-  const pad = Math.max(bb.width, bb.depth) * 0.08;
+  const pad = Math.max(bb.width, bb.depth) * 0.12;
   const vbX = bb.minX - pad;
   const vbZ = bb.minZ - pad;
   const vbW = bb.width + pad * 2;
@@ -790,15 +938,66 @@ function LotPreviewSvg({
   const pts = (poly: { x: number; z: number }[]) =>
     poly.map((p) => `${p.x.toFixed(2)},${p.z.toFixed(2)}`).join(" ");
   const streetSet = new Set(streetEdges);
+
+  // Pick a nice scale-bar length (≈ 20% of view width, snapped to 5/10/20/50/100 m).
+  const scaleTarget = vbW * 0.2;
+  const nice = [1, 2, 5, 10, 20, 50, 100, 200, 500];
+  const scaleM =
+    nice.find((n) => n >= scaleTarget) ?? nice[nice.length - 1];
+
+  // Setback labels: classify edges as front/back/sides based on streetEdges
+  // and pick midpoints. For brevity we render the setback value as a tiny
+  // label slightly offset inward along the edge normal.
+  const setbackByEdge = (edgeIdx: number): { value: number; key: string } => {
+    if (streetSet.has(edgeIdx)) return { value: setbacks.front, key: "frente" };
+    // "back" = edge whose midpoint is farthest from the average street edge mid.
+    if (streetSet.size > 0) {
+      const streetMids = edges
+        .filter((e) => streetSet.has(e.index))
+        .map((e) => e.mid);
+      const avg = streetMids.reduce(
+        (a, m) => ({ x: a.x + m.x / streetMids.length, z: a.z + m.z / streetMids.length }),
+        { x: 0, z: 0 },
+      );
+      const e = edges[edgeIdx];
+      const others = edges.filter((o) => !streetSet.has(o.index));
+      const farthest = others.reduce((a, b) => {
+        const da = Math.hypot(a.mid.x - avg.x, a.mid.z - avg.z);
+        const db = Math.hypot(b.mid.x - avg.x, b.mid.z - avg.z);
+        return db > da ? b : a;
+      }, others[0] ?? e);
+      if (farthest && farthest.index === edgeIdx)
+        return { value: setbacks.back, key: "fundos" };
+    }
+    return { value: setbacks.sides, key: "lateral" };
+  };
+
+  // North arrow position (top-right of viewbox)
+  const northX = vbX + vbW - pad * 0.5;
+  const northZ = vbZ + pad * 0.7;
+
+  // Scale bar position (bottom-left)
+  const scaleX = vbX + pad * 0.5;
+  const scaleZ = vbZ + vbH - pad * 0.4;
+
   return (
-    <svg
-      className="briefing-v2__svg"
-      viewBox={`${vbX} ${vbZ} ${vbW} ${vbH}`}
-      preserveAspectRatio="xMidYMid meet"
-      role="img"
-      aria-label="Planta esquemática do terreno"
-    >
-      <polygon className="lot" points={pts(polygonLocal)} />
+    <div className={`briefing-v2__map-wrap${hasFitError ? " briefing-v2__svg--error" : ""}`}>
+      <TerrainThumb polygon={polygon} />
+      <svg
+        className="briefing-v2__svg"
+        viewBox={`${vbX} ${vbZ} ${vbW} ${vbH}`}
+        preserveAspectRatio="xMidYMid meet"
+        role="img"
+        aria-label="Planta esquemática do terreno"
+      >
+        <polygon className="lot" points={pts(polygonLocal)} />
+
+      {/* Buildable region (after setbacks + lane buffer) */}
+      {buildable && buildable.length >= 3 && (
+        <polygon className="buildable" points={pts(buildable)} />
+      )}
+
+      {/* Lot edges with street highlight */}
       {edges.map((e) => (
         <line
           key={e.index}
@@ -809,18 +1008,137 @@ function LotPreviewSvg({
           y2={e.b.z}
         />
       ))}
-      {buildings.map((poly, i) => (
-        <polygon key={i} className="building" points={pts(poly)} />
-      ))}
+
+      {/* Setback labels on each edge (small inward offset) */}
+      {edges.map((e) => {
+        const sb = setbackByEdge(e.index);
+        const off = Math.min(vbW, vbH) * 0.025;
+        const tx = e.mid.x - e.normal.x * off;
+        const tz = e.mid.z - e.normal.z * off;
+        return (
+          <text
+            key={`sb-${e.index}`}
+            className="setback-label"
+            x={tx}
+            y={tz}
+            textAnchor="middle"
+            dominantBaseline="middle"
+          >
+            {sb.value} m
+          </text>
+        );
+      })}
+
+      {/* Buildings colored by typology, with dimension/area labels */}
+      {buildings.map((b, i) => {
+        const bbox = polygonBBox(b.polygon);
+        const cx = bbox.minX + bbox.width / 2;
+        const cz = bbox.minZ + bbox.depth / 2;
+        const area = bbox.width * bbox.depth;
+        return (
+          <g key={i}>
+            <polygon
+              className={`building building--${b.use}`}
+              points={pts(b.polygon)}
+            />
+            <text
+              className="dim-label"
+              x={cx}
+              y={cz - 6}
+              textAnchor="middle"
+              dominantBaseline="middle"
+            >
+              {bbox.width.toFixed(0)} × {bbox.depth.toFixed(0)} m
+            </text>
+            <text
+              className="area-label"
+              x={cx}
+              y={cz + 6}
+              textAnchor="middle"
+              dominantBaseline="middle"
+            >
+              {area.toLocaleString("pt-BR", { maximumFractionDigits: 0 })} m²
+              · PD {clearHeight} m
+            </text>
+          </g>
+        );
+      })}
+
+      {/* Gates as wall openings (line segment proportional to gate width) */}
       {gates.map((g, i) => {
         const e = edges[g.edgeIndex];
         if (!e) return null;
+        const ux = (e.b.x - e.a.x) / e.length;
+        const uz = (e.b.z - e.a.z) / e.length;
         const cx = e.a.x + (e.b.x - e.a.x) * g.tAlongEdge;
         const cz = e.a.z + (e.b.z - e.a.z) * g.tAlongEdge;
-        const r = Math.max(0.5, g.width / 4);
-        return <circle key={i} className="gate" cx={cx} cy={cz} r={r} />;
+        const hw = g.width / 2;
+        return (
+          <line
+            key={i}
+            className="gate"
+            x1={cx - ux * hw}
+            y1={cz - uz * hw}
+            x2={cx + ux * hw}
+            y2={cz + uz * hw}
+          />
+        );
       })}
-    </svg>
+
+      {/* North indicator */}
+      <g>
+        <text
+          className="north"
+          x={northX}
+          y={northZ}
+          textAnchor="middle"
+          dominantBaseline="middle"
+        >
+          N
+        </text>
+        <line
+          className="north-arrow"
+          x1={northX}
+          y1={northZ + pad * 0.15}
+          x2={northX}
+          y2={northZ + pad * 0.55}
+        />
+      </g>
+
+      {/* Scale bar */}
+      <g>
+        <line
+          className="scale-bar"
+          x1={scaleX}
+          y1={scaleZ}
+          x2={scaleX + scaleM}
+          y2={scaleZ}
+        />
+        <line
+          className="scale-bar"
+          x1={scaleX}
+          y1={scaleZ - pad * 0.08}
+          x2={scaleX}
+          y2={scaleZ + pad * 0.08}
+        />
+        <line
+          className="scale-bar"
+          x1={scaleX + scaleM}
+          y1={scaleZ - pad * 0.08}
+          x2={scaleX + scaleM}
+          y2={scaleZ + pad * 0.08}
+        />
+        <text
+          className="scale-bar-label"
+          x={scaleX + scaleM / 2}
+          y={scaleZ + pad * 0.28}
+          textAnchor="middle"
+        >
+          {scaleM} m
+        </text>
+      </g>
+      </svg>
+    </div>
   );
 }
 
