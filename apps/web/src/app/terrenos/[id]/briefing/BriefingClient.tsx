@@ -702,7 +702,7 @@ function StepProgram({
       </label>
       <label className="briefing-v2__field">
         <span className="briefing-v2__field-label">
-          Rotação dos galpões
+          Rotação do conjunto
           <span className="briefing-v2__field-value">{rotationDeg}°</span>
         </span>
         <input
