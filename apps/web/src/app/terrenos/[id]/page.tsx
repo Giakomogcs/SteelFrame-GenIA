@@ -33,12 +33,20 @@ export default async function TerrainPage({
             · {terrain.buildings.length} construção(ões)
           </p>
         </div>
-        <Link
-          href={`/terrenos/${terrain.id}/construir`}
-          className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium hover:bg-emerald-500"
-        >
-          + Construir
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href={`/terrenos/${terrain.id}/briefing`}
+            className="dt-btn-primary text-sm"
+          >
+            ✨ Briefing com IA
+          </Link>
+          <Link
+            href={`/terrenos/${terrain.id}/construir`}
+            className="rounded-md bg-white/10 px-4 py-2 text-sm font-medium hover:bg-white/20"
+          >
+            Wizard rápido
+          </Link>
+        </div>
       </div>
 
       <TerrainEditClient

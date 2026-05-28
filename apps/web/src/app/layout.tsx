@@ -60,6 +60,12 @@ export default function RootLayout({
                 >
                   Terrenos
                 </Link>
+                <Link
+                  href="/base-conhecimento"
+                  className="hidden text-slate-300 hover:text-white md:inline"
+                >
+                  Base de conhecimento
+                </Link>
                 <Link href="/terrenos/novo" className="dt-btn-primary text-xs">
                   + Novo terreno
                 </Link>

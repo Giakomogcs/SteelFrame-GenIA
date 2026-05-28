@@ -69,6 +69,10 @@ export default function TerrainMapClient({
   const [search, setSearch] = useState("");
   const [searchTarget, setSearchTarget] = useState<LngLat | null>(null);
   const [searching, setSearching] = useState(false);
+  const [baseLayer, setBaseLayer] = useState<"satellite" | "street" | "relief">(
+    "satellite",
+  );
+  const [showHillshade, setShowHillshade] = useState(false);
 
   const area = useMemo(() => polygonAreaM2(polygon), [polygon]);
 
@@ -191,18 +195,45 @@ export default function TerrainMapClient({
           style={{ height: "60vh", width: "100%" }}
           scrollWheelZoom
         >
-          {/* Camada satélite (Esri) */}
-          <TileLayer
-            attribution='Tiles &copy; Esri'
-            url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-            maxZoom={20}
-          />
-          {/* Rótulos por cima */}
-          <TileLayer
-            url="https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}"
-            maxZoom={20}
-            opacity={0.7}
-          />
+          {baseLayer === "satellite" && (
+            <>
+              <TileLayer
+                attribution='Tiles &copy; Esri'
+                url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+                maxZoom={20}
+              />
+              <TileLayer
+                url="https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}"
+                maxZoom={20}
+                opacity={0.7}
+              />
+            </>
+          )}
+          {baseLayer === "street" && (
+            <TileLayer
+              attribution='&copy; OpenStreetMap'
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              maxZoom={19}
+            />
+          )}
+          {baseLayer === "relief" && (
+            <>
+              {/* OpenTopoMap: curvas de nível + relevo sombreado (SRTM) */}
+              <TileLayer
+                attribution='Map data: &copy; OpenStreetMap, SRTM | Style: &copy; OpenTopoMap (CC-BY-SA)'
+                url="https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png"
+                maxZoom={17}
+              />
+            </>
+          )}
+          {showHillshade && (
+            <TileLayer
+              attribution='Hillshade &copy; Esri'
+              url="https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/{z}/{y}/{x}"
+              maxZoom={19}
+              opacity={0.5}
+            />
+          )}
 
           <FlyTo target={searchTarget} />
 
@@ -247,7 +278,7 @@ export default function TerrainMapClient({
         </MapContainer>
       </div>
 
-      <div className="flex items-center justify-between text-sm text-slate-300">
+      <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-300">
         <span>
           Vértices: <b>{polygon.length}</b>
           {polygon.length >= 3 && (
@@ -259,13 +290,43 @@ export default function TerrainMapClient({
             </>
           )}
         </span>
-        <span className="text-xs text-slate-500">
-          {editable
-            ? closed
-              ? "Arraste os vértices para ajustar · clique direito remove vértice"
-              : "Clique no mapa para adicionar vértices · feche a forma para confirmar"
-            : "Visualização"}
-        </span>
+        <div className="flex items-center gap-2 text-xs">
+          <div className="inline-flex overflow-hidden rounded-md border border-white/10">
+            {(["satellite", "street", "relief"] as const).map((opt) => (
+              <button
+                key={opt}
+                type="button"
+                onClick={() => setBaseLayer(opt)}
+                className={`px-2 py-1 ${
+                  baseLayer === opt
+                    ? "bg-[#dd1c4a] text-white"
+                    : "bg-white/5 text-white/70 hover:bg-white/10"
+                }`}
+              >
+                {opt === "satellite"
+                  ? "Satélite"
+                  : opt === "street"
+                    ? "Ruas"
+                    : "Relevo (OpenTopoMap)"}
+              </button>
+            ))}
+          </div>
+          <label className="inline-flex items-center gap-1 text-white/70">
+            <input
+              type="checkbox"
+              checked={showHillshade}
+              onChange={(e) => setShowHillshade(e.target.checked)}
+            />
+            Hillshade
+          </label>
+        </div>
+      </div>
+      <div className="text-[11px] text-slate-500">
+        {editable
+          ? closed
+            ? "Arraste os vértices para ajustar · clique direito remove vértice"
+            : "Clique no mapa para adicionar vértices · feche a forma para confirmar"
+          : "Visualização"}
       </div>
     </div>
   );
