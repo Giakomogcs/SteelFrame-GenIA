@@ -17,6 +17,12 @@ interface Props {
   site: SitePlan;
   shedsById?: Record<string, IndustrialShed>;
   lod?: Lod;
+  /**
+   * When true (default), buildings without a linked shed are rendered with
+   * an in-memory shed derived from their footprint/use so walls, roof, docks,
+   * skylights, office annex etc. show up.
+   */
+  synthesizeShed?: boolean;
 }
 
 function disposeRoot(root: THREE.Object3D) {
@@ -31,7 +37,8 @@ function disposeRoot(root: THREE.Object3D) {
 export default function SitePlanViewer3D({
   site,
   shedsById,
-  lod = "structural",
+  lod = "architectural",
+  synthesizeShed = true,
 }: Props) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
@@ -62,7 +69,10 @@ export default function SitePlanViewer3D({
       0.5,
       4000,
     );
-    camera.position.set(120, 90, 120);
+    // Camera lives in the (-X, +Z) quadrant so the rendered scene matches the
+    // 2D editor orientation: +X grows to the right of the screen and +Z grows
+    // downward (south). Without this, +X ends up mirrored to the left.
+    camera.position.set(-120, 90, 120);
     cameraRef.current = camera;
 
     const controls = new OrbitControls(camera, renderer.domElement);
@@ -74,7 +84,7 @@ export default function SitePlanViewer3D({
     const hemi = new THREE.HemisphereLight(0xfff3e0, 0x202833, 0.7);
     scene.add(hemi);
     const dir = new THREE.DirectionalLight(0xffffff, 0.9);
-    dir.position.set(80, 120, 60);
+    dir.position.set(-80, 120, 60);
     scene.add(dir);
     const grid = new THREE.GridHelper(400, 40, 0x1f2937, 0x111827);
     grid.position.y = -0.01;
@@ -120,10 +130,10 @@ export default function SitePlanViewer3D({
       scene.remove(currentGroupRef.current);
       currentGroupRef.current = null;
     }
-    const group = sitePlanTo3D(site, { shedsById, lod });
+    const group = sitePlanTo3D(site, { shedsById, lod, synthesizeShed });
     currentGroupRef.current = group;
     scene.add(group);
-  }, [site, shedsById, lod]);
+  }, [site, shedsById, lod, synthesizeShed]);
 
   return (
     <div

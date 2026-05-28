@@ -5,6 +5,7 @@
 // schemaVersion: "site-1"
 // ============================================================
 import { z } from "zod";
+import { IndustrialShedSchema } from "./shedSchema";
 
 // ---- Primitive geometry --------------------------------------------------
 
@@ -86,6 +87,12 @@ export const BuildingPlacementSchema = z.object({
   rotationRad: z.number().default(0),
   /** Floor elevation derived from the terrain (m above local datum). */
   z0: z.number().default(0),
+  /**
+   * Optional embedded IndustrialShed program. When present, the 3D viewer and
+   * the Details panel use it directly (no synthesis). Populated by the AI
+   * generation pipeline so each building can have its own size/style/zones.
+   */
+  shed: IndustrialShedSchema.optional().nullable(),
 });
 export type BuildingPlacement = z.infer<typeof BuildingPlacementSchema>;
 

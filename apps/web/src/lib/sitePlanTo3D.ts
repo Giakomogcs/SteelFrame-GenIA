@@ -17,6 +17,7 @@
 // ============================================================
 import * as THREE from "three";
 import type { IndustrialShed } from "./shedSchema";
+import { generateFallbackShed } from "./shedDefaults";
 import type {
   BuildingPlacement,
   Gate,
@@ -69,6 +70,75 @@ const MAT_FLOOR = new THREE.MeshStandardMaterial({
   color: 0x334155,
   roughness: 0.9,
 });
+const MAT_WALL_BASE = new THREE.MeshStandardMaterial({
+  color: 0xe7e2d8,
+  roughness: 0.9,
+  metalness: 0.0,
+});
+const MAT_WALL_METAL = new THREE.MeshStandardMaterial({
+  color: 0xbcc4cc,
+  roughness: 0.55,
+  metalness: 0.45,
+});
+const MAT_ROOF_RIDGE = new THREE.MeshStandardMaterial({
+  color: 0x1f2937,
+  roughness: 0.6,
+  metalness: 0.3,
+});
+const MAT_SKYLIGHT = new THREE.MeshStandardMaterial({
+  color: 0x9ad7ff,
+  roughness: 0.2,
+  metalness: 0.1,
+  transparent: true,
+  opacity: 0.55,
+  emissive: 0x4a90c9,
+  emissiveIntensity: 0.25,
+  side: THREE.DoubleSide,
+});
+const MAT_DOCK = new THREE.MeshStandardMaterial({
+  color: 0x111827,
+  roughness: 0.4,
+  metalness: 0.2,
+});
+const MAT_DOCK_FRAME = new THREE.MeshStandardMaterial({
+  color: 0xfacc15,
+  roughness: 0.5,
+  metalness: 0.3,
+});
+const MAT_PORTAL = new THREE.MeshStandardMaterial({
+  color: 0x1e293b,
+  roughness: 0.4,
+  metalness: 0.5,
+});
+const MAT_OFFICE_WALL = new THREE.MeshStandardMaterial({
+  color: 0xeaeaea,
+  roughness: 0.7,
+});
+const MAT_OFFICE_SLAB = new THREE.MeshStandardMaterial({
+  color: 0x9ca3af,
+  roughness: 0.85,
+});
+const MAT_OFFICE_GLASS = new THREE.MeshStandardMaterial({
+  color: 0x60a5fa,
+  roughness: 0.15,
+  metalness: 0.4,
+  transparent: true,
+  opacity: 0.55,
+  emissive: 0x1d4ed8,
+  emissiveIntensity: 0.12,
+});
+const ZONE_COLORS: Record<string, number> = {
+  escritorio: 0x60a5fa,
+  vestiario: 0xa78bfa,
+  refeitorio: 0xf472b6,
+  area_tecnica: 0x6b7280,
+  avcb_hidrante: 0xef4444,
+  recebimento: 0xfacc15,
+  expedicao: 0xfb923c,
+  picking: 0x34d399,
+  armazenagem: 0x475569,
+  producao: 0x06b6d4,
+};
 
 // ---- Builder options -----------------------------------------------------
 
@@ -79,6 +149,48 @@ export interface BuildSiteOptions {
   shedsById?: Record<string, IndustrialShed>;
   /** Render envelope (walls + roof) when "architectural"; only skeleton when "structural". */
   lod?: Lod;
+  /**
+   * When true, buildings without a linked IndustrialShed receive an in-memory
+   * shed derived from `placement.targetAreaM2` + `placement.use` so the viewer
+   * can render walls, roof, docks, office annex, etc. The synthesized shed is
+   * NEVER persisted — it only feeds the renderer.
+   */
+  synthesizeShed?: boolean;
+}
+
+/**
+ * Returns an in-memory IndustrialShed derived from the placement metadata.
+ * Used by the viewer and by UI panels when the placement has no shedId yet.
+ */
+export function deriveShedForPlacement(
+  placement: BuildingPlacement,
+): IndustrialShed {
+  const { w, d } = footprintSize(placement.footprintPolygon);
+  const areaM2 = Math.max(placement.targetAreaM2 ?? 0, Math.round(w * d));
+  const shed = generateFallbackShed({
+    areaM2,
+    use: placement.use,
+    standard: "medio",
+  });
+  // Force the synthesized footprint to match the actual placement polygon so
+  // walls/roof/dock positions line up with the 2D editor.
+  shed.footprint = {
+    width: Math.max(6, Math.round(w)),
+    depth: Math.max(6, Math.round(d)),
+  };
+  shed.structure.freeSpan = Math.min(
+    shed.structure.freeSpan,
+    shed.footprint.width,
+  );
+  const bayCount = Math.max(
+    2,
+    Math.round(shed.footprint.depth / shed.structure.baySpacing),
+  );
+  shed.structure.bayCount = bayCount;
+  shed.structure.baySpacing = Number(
+    (shed.footprint.depth / bayCount).toFixed(2),
+  );
+  return shed;
 }
 
 // ---- Helpers -------------------------------------------------------------
@@ -241,6 +353,13 @@ export function buildShedMesh(
 ): THREE.Group {
   const g = new THREE.Group();
   g.name = `shed:${placement.id}`;
+  g.userData = {
+    kind: "building",
+    placementId: placement.id,
+    placementName: placement.name,
+    use: placement.use,
+    shed,
+  };
   const { w, d } = footprintSize(placement.footprintPolygon);
   const height = shed?.structure.clearHeight ?? 8;
   const freeSpan = shed?.structure.freeSpan ?? Math.min(w, d);
@@ -278,8 +397,31 @@ export function buildShedMesh(
   }
 
   if (lod === "architectural") {
-    addWalls(g, w, d, height, placement.id);
+    const baseH = Math.min(
+      Math.max(0, shed?.envelope.wallBaseHeight ?? 2.5),
+      height - 0.5,
+    );
+    addLayeredWalls(g, w, d, height, baseH, placement.id);
     addGableRoof(g, w, d, height, shed?.roof.slopePct ?? 10, placement.id);
+    if ((shed?.roof.skylightPct ?? 0) > 0) {
+      addSkylightStrips(
+        g,
+        w,
+        d,
+        height,
+        shed?.roof.slopePct ?? 10,
+        shed?.roof.skylightPct ?? 4,
+        placement.id,
+      );
+    }
+    if (shed) {
+      addDocks(g, shed, w, d, placement.id);
+      addOpenings(g, shed, w, d, placement.id);
+      addZoneVolumes(g, shed, w, d, placement.id);
+      if (shed.mezzanine) {
+        addMezzanine(g, shed, w, d, placement.id);
+      }
+    }
   }
 
   return g;
@@ -368,6 +510,44 @@ function addWalls(
   parent.add(right);
 }
 
+/** Walls split into a base (alvenaria) and an upper sheet metal cladding. */
+function addLayeredWalls(
+  parent: THREE.Group,
+  width: number,
+  depth: number,
+  height: number,
+  baseH: number,
+  id: string,
+): void {
+  const upperH = Math.max(0, height - baseH);
+  const walls = [
+    { name: "front", w: width, d: 0.18, x: 0, z: depth / 2, ry: 0 },
+    { name: "back", w: width, d: 0.18, x: 0, z: -depth / 2, ry: 0 },
+    { name: "left", w: 0.18, d: depth, x: -width / 2, z: 0, ry: 0 },
+    { name: "right", w: 0.18, d: depth, x: width / 2, z: 0, ry: 0 },
+  ];
+  for (const wlObj of walls) {
+    if (baseH > 0) {
+      const base = new THREE.Mesh(
+        new THREE.BoxGeometry(wlObj.w, baseH, wlObj.d),
+        MAT_WALL_BASE,
+      );
+      base.position.set(wlObj.x, baseH / 2, wlObj.z);
+      base.name = `wall:${id}:${wlObj.name}:base`;
+      parent.add(base);
+    }
+    if (upperH > 0) {
+      const upper = new THREE.Mesh(
+        new THREE.BoxGeometry(wlObj.w, upperH, wlObj.d),
+        MAT_WALL_METAL,
+      );
+      upper.position.set(wlObj.x, baseH + upperH / 2, wlObj.z);
+      upper.name = `wall:${id}:${wlObj.name}:upper`;
+      parent.add(upper);
+    }
+  }
+}
+
 function addGableRoof(
   parent: THREE.Group,
   width: number,
@@ -394,7 +574,273 @@ function addGableRoof(
     slope.name = `roof:${id}:${dir > 0 ? "R" : "L"}`;
     g.add(slope);
   }
+  // Ridge cap.
+  const ridge = new THREE.Mesh(
+    new THREE.BoxGeometry(0.5, 0.18, depth + 0.4),
+    MAT_ROOF_RIDGE,
+  );
+  ridge.position.y = rise + 0.05;
+  ridge.name = `roof:${id}:ridge`;
+  g.add(ridge);
   parent.add(g);
+}
+
+/** Skylight strips along the roof slopes (sized by `skylightPct`). */
+function addSkylightStrips(
+  parent: THREE.Group,
+  width: number,
+  depth: number,
+  baseY: number,
+  pitchPct: number,
+  skylightPct: number,
+  id: string,
+): void {
+  const halfWidth = width / 2;
+  const rise = halfWidth * (pitchPct / 100);
+  const slopeLen = Math.hypot(halfWidth, rise);
+  // Skylight = fraction of roof area split into 2 strips on each slope.
+  const stripWidth = Math.max(0.6, (slopeLen * skylightPct) / 100 / 2);
+  const g = new THREE.Group();
+  g.position.y = baseY;
+  g.name = `roof:${id}:skylights`;
+  for (const dir of [-1, 1] as const) {
+    const angle = Math.atan2(rise, halfWidth) * dir;
+    const strip = new THREE.Mesh(
+      new THREE.BoxGeometry(stripWidth, 0.06, depth * 0.8),
+      MAT_SKYLIGHT,
+    );
+    // Place at ~60% up the slope from the eave.
+    const t = 0.6;
+    const x = halfWidth * (1 - t) * dir;
+    const y = rise * t + 0.04;
+    strip.position.set(x, y, 0);
+    strip.rotation.z = -angle;
+    strip.name = `skylight:${id}:${dir > 0 ? "R" : "L"}`;
+    g.add(strip);
+  }
+  parent.add(g);
+}
+
+/** Dock doors rendered as colored rectangles flush with the chosen wall. */
+function addDocks(
+  parent: THREE.Group,
+  shed: IndustrialShed,
+  width: number,
+  depth: number,
+  id: string,
+): void {
+  if (!shed.docks || shed.docks.length === 0) return;
+  const dockWidth = 3;
+  const dockHeight = 3.5;
+  // Treat shed's local north (z=depth) as our +Z front.
+  const halfW = width / 2;
+  const halfD = depth / 2;
+  let i = 0;
+  for (const dock of shed.docks) {
+    let x = 0;
+    let z = 0;
+    let rotY = 0;
+    if (dock.wall === "north" || dock.wall === "south") {
+      // Map shed.x in [0..shed.footprint.width] → local [-halfW..halfW].
+      const relX = (dock.x / Math.max(1, shed.footprint.width)) * width;
+      x = -halfW + relX;
+      z = dock.wall === "north" ? halfD - 0.11 : -halfD + 0.11;
+      rotY = 0;
+    } else {
+      const relZ = (dock.z / Math.max(1, shed.footprint.depth)) * depth;
+      z = -halfD + relZ;
+      x = dock.wall === "east" ? halfW - 0.11 : -halfW + 0.11;
+      rotY = Math.PI / 2;
+    }
+    // Door + frame.
+    const door = new THREE.Mesh(
+      new THREE.BoxGeometry(dockWidth, dockHeight, 0.05),
+      MAT_DOCK,
+    );
+    door.position.set(x, dockHeight / 2 + 0.1, z);
+    door.rotation.y = rotY;
+    door.name = `dock:${id}:${i}`;
+    parent.add(door);
+    const frame = new THREE.Mesh(
+      new THREE.BoxGeometry(dockWidth + 0.4, 0.15, 0.05),
+      MAT_DOCK_FRAME,
+    );
+    frame.position.set(x, dockHeight + 0.1, z);
+    frame.rotation.y = rotY;
+    frame.name = `dock:${id}:${i}:lintel`;
+    parent.add(frame);
+    i++;
+  }
+}
+
+/** Sectional portals + man-doors as visible openings on the chosen wall. */
+function addOpenings(
+  parent: THREE.Group,
+  shed: IndustrialShed,
+  width: number,
+  depth: number,
+  id: string,
+): void {
+  if (!shed.openings || shed.openings.length === 0) return;
+  const halfW = width / 2;
+  const halfD = depth / 2;
+  let i = 0;
+  for (const op of shed.openings) {
+    if (
+      op.type !== "portao_seccional" &&
+      op.type !== "portao_enrolar" &&
+      op.type !== "porta_pessoal"
+    ) {
+      i++;
+      continue;
+    }
+    const w = Math.min(op.width, width * 0.5);
+    const h = Math.min(op.height, 6);
+    let x = 0;
+    let z = 0;
+    let rotY = 0;
+    if (op.wall === "north" || op.wall === "south") {
+      const wallLen = width;
+      const relX =
+        (op.xAlongWall / Math.max(1, shed.footprint.width)) * wallLen;
+      x = -halfW + relX + w / 2;
+      z = op.wall === "north" ? halfD - 0.11 : -halfD + 0.11;
+    } else {
+      const wallLen = depth;
+      const relZ =
+        (op.xAlongWall / Math.max(1, shed.footprint.depth)) * wallLen;
+      z = -halfD + relZ + w / 2;
+      x = op.wall === "east" ? halfW - 0.11 : -halfW + 0.11;
+      rotY = Math.PI / 2;
+    }
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.07), MAT_PORTAL);
+    m.position.set(x, h / 2 + (op.elevation || 0), z);
+    m.rotation.y = rotY;
+    m.name = `opening:${id}:${op.type}:${i}`;
+    parent.add(m);
+    i++;
+  }
+}
+
+/** Office / vestiário / refeitório blocks — multi-floor when zone.height fits. */
+function addZoneVolumes(
+  parent: THREE.Group,
+  shed: IndustrialShed,
+  width: number,
+  depth: number,
+  id: string,
+): void {
+  if (!shed.zones || shed.zones.length === 0) return;
+  const halfW = width / 2;
+  const halfD = depth / 2;
+  const sx = width / Math.max(1, shed.footprint.width);
+  const sz = depth / Math.max(1, shed.footprint.depth);
+  let i = 0;
+  for (const zone of shed.zones) {
+    // Only render closed-program zones as solid blocks (skip armazenagem/picking that are open floor).
+    const closed = [
+      "escritorio",
+      "vestiario",
+      "refeitorio",
+      "area_tecnica",
+      "avcb_hidrante",
+    ].includes(zone.type);
+    if (!closed) {
+      i++;
+      continue;
+    }
+    const zw = Math.max(1.5, zone.width * sx);
+    const zd = Math.max(1.5, zone.depth * sz);
+    const zx = -halfW + zone.x * sx + zw / 2;
+    const zz = -halfD + zone.z * sz + zd / 2;
+    const floorH = 3;
+    const totalH = Math.max(
+      floorH,
+      Math.min(zone.height, shed.structure.clearHeight),
+    );
+    const floors = Math.max(1, Math.floor(totalH / floorH));
+    const wallMat =
+      zone.type === "escritorio" ? MAT_OFFICE_GLASS : MAT_OFFICE_WALL;
+    const blockColor = ZONE_COLORS[zone.type] ?? 0x9ca3af;
+    for (let f = 0; f < floors; f++) {
+      const yBase = f * floorH;
+      // Slab.
+      const slab = new THREE.Mesh(
+        new THREE.BoxGeometry(zw, 0.18, zd),
+        MAT_OFFICE_SLAB,
+      );
+      slab.position.set(zx, yBase + 0.09, zz);
+      slab.name = `zone:${id}:${zone.type}:${i}:slab:${f}`;
+      parent.add(slab);
+      // Walls envelope.
+      const wallH = floorH - 0.2;
+      const tinted = wallMat.clone();
+      tinted.color = new THREE.Color(blockColor);
+      tinted.opacity = wallMat.opacity;
+      tinted.transparent = wallMat.transparent;
+      tinted.metalness = wallMat.metalness;
+      tinted.roughness = wallMat.roughness;
+      tinted.emissive = wallMat.emissive
+        ? wallMat.emissive.clone()
+        : new THREE.Color(0x000000);
+      tinted.emissiveIntensity = wallMat.emissiveIntensity ?? 0;
+      // four thin walls
+      const wallFront = new THREE.Mesh(
+        new THREE.BoxGeometry(zw, wallH, 0.08),
+        tinted,
+      );
+      wallFront.position.set(zx, yBase + 0.18 + wallH / 2, zz + zd / 2);
+      wallFront.name = `zone:${id}:${zone.type}:${i}:wall:f:${f}`;
+      parent.add(wallFront);
+      const wallBack = wallFront.clone();
+      wallBack.position.z = zz - zd / 2;
+      wallBack.name = `zone:${id}:${zone.type}:${i}:wall:b:${f}`;
+      parent.add(wallBack);
+      const wallLeft = new THREE.Mesh(
+        new THREE.BoxGeometry(0.08, wallH, zd),
+        tinted,
+      );
+      wallLeft.position.set(zx - zw / 2, yBase + 0.18 + wallH / 2, zz);
+      wallLeft.name = `zone:${id}:${zone.type}:${i}:wall:l:${f}`;
+      parent.add(wallLeft);
+      const wallRight = wallLeft.clone();
+      wallRight.position.x = zx + zw / 2;
+      wallRight.name = `zone:${id}:${zone.type}:${i}:wall:r:${f}`;
+      parent.add(wallRight);
+    }
+    i++;
+  }
+}
+
+function addMezzanine(
+  parent: THREE.Group,
+  shed: IndustrialShed,
+  width: number,
+  depth: number,
+  id: string,
+): void {
+  const m = shed.mezzanine;
+  if (!m) return;
+  const sx = width / Math.max(1, shed.footprint.width);
+  const sz = depth / Math.max(1, shed.footprint.depth);
+  const halfW = width / 2;
+  const halfD = depth / 2;
+  const mw = Math.max(1.5, m.width * sx);
+  const md = Math.max(1.5, m.depth * sz);
+  const mx = -halfW + m.x * sx + mw / 2;
+  const mz = -halfD + m.z * sz + md / 2;
+  const slab = new THREE.Mesh(
+    new THREE.BoxGeometry(mw, 0.2, md),
+    MAT_OFFICE_SLAB,
+  );
+  slab.position.set(mx, m.height, mz);
+  slab.name = `mezzanine:${id}`;
+  parent.add(slab);
+  // Guard rail (thin upper edge).
+  const rail = new THREE.Mesh(new THREE.BoxGeometry(mw, 1.0, 0.04), MAT_BEAM);
+  rail.position.set(mx, m.height + 0.6, mz + md / 2);
+  rail.name = `mezzanine:${id}:rail`;
+  parent.add(rail);
 }
 
 // ---- Top-level builder ---------------------------------------------------
@@ -418,8 +864,10 @@ export function sitePlanTo3D(
   // Buildings layer.
   const buildingsGroup = new THREE.Group();
   buildingsGroup.name = "layer:buildings";
+  const synth = opts.synthesizeShed ?? false;
   for (const placement of site.buildings) {
-    const shed = placement.shedId ? sheds[placement.shedId] : undefined;
+    let shed = placement.shedId ? sheds[placement.shedId] : undefined;
+    if (!shed && synth) shed = deriveShedForPlacement(placement);
     const g = buildShedMesh(placement, shed, lod);
     const c = centroidXZ(placement.footprintPolygon);
     g.position.set(c.x, placement.z0, c.z);

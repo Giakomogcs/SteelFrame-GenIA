@@ -1081,6 +1081,7 @@ textarea {
   position: absolute;
   bottom: var(--space-3);
   right: var(--space-3);
+  z-index: 800;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1106,6 +1107,8 @@ textarea {
   height: 16px;
 }
 .terrain-card:hover .terrain-delete-btn,
+.terrain-card:focus-within .terrain-delete-btn,
+.terrain-delete-btn:hover,
 .terrain-delete-btn:focus-visible {
   opacity: 1;
 }
