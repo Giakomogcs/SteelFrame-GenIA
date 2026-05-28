@@ -4381,10 +4381,23 @@ textarea {
   --color-building-distribution_center: var(--color-primary-500);
 }
 
+/* When briefing wizard is present, lock main to viewport */
+.main:has(.briefing-v2) {
+  overflow: hidden;
+}
+.main:has(.briefing-v2) .page-header {
+  flex-shrink: 0;
+}
+.main:has(.briefing-v2) .briefing-stepper {
+  flex-shrink: 0;
+}
+
 .briefing-v2 {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: var(--space-5);
+  flex: 1 1 0;
+  min-height: 0;
 }
 @media (max-width: 1100px) {
   .briefing-v2 {
@@ -4399,6 +4412,8 @@ textarea {
   border: 1px solid var(--color-stroke);
   border-radius: var(--radius-lg);
   padding: var(--space-5);
+  min-height: 0;
+  overflow-y: auto;
 }
 .briefing-v2__panel h3 {
   margin: 0;
@@ -4564,6 +4579,7 @@ textarea {
   padding: var(--space-4) var(--space-6) var(--space-5);
   border-top: 1px solid var(--color-stroke);
   background: var(--color-background);
+  flex-shrink: 0;
 }
 .briefing-v2__footer .btn {
   padding: var(--space-2) var(--space-4);
@@ -4605,7 +4621,8 @@ textarea {
 .briefing-v2__map-wrap {
   position: relative;
   width: 100%;
-  aspect-ratio: 4 / 3;
+  flex: 1 1 0;
+  min-height: 200px;
   border-radius: var(--radius-md);
   border: 1px solid var(--color-stroke);
   overflow: hidden;

@@ -338,14 +338,6 @@ export function validateSitePlan(
   const minCarStalls = Math.ceil(
     coveredArea * SITE_CONSTRAINTS.parking.minCarStallsPerCoveredArea,
   );
-  if (coveredArea > 0 && carStalls < minCarStalls) {
-    warnings.push(
-      warn(
-        "W101",
-        `Vagas de carro (${carStalls}) abaixo do recomendado (${minCarStalls} para ${coveredArea.toFixed(0)} m² cobertos).`,
-      ),
-    );
-  }
 
   // ---- W102: clear height incompatible with sectional doors ------------
   for (const b of site.buildings) {

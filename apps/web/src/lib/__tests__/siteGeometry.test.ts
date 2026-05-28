@@ -92,13 +92,14 @@ describe("buildPerimeterSegments + placeGates", () => {
 describe("insetConvexPolygon + buildBuildableRegion", () => {
   it("shrinks a square by the inset distance", () => {
     const inner = insetConvexPolygon(square(100), 5);
-    const bb = polygonBBox(inner);
+    expect(inner).not.toBeNull();
+    const bb = polygonBBox(inner!);
     expect(bb.width).toBeCloseTo(90, 3);
     expect(bb.depth).toBeCloseTo(90, 3);
   });
 
-  it("throws when inset collapses polygon", () => {
-    expect(() => insetConvexPolygon(square(10), 6)).toThrow();
+  it("returns null when inset collapses polygon", () => {
+    expect(insetConvexPolygon(square(10), 6)).toBeNull();
   });
 
   it("applies worst-case setback + lane buffer", () => {

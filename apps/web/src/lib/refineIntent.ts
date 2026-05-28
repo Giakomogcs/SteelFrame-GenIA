@@ -62,6 +62,7 @@ function relayout(
     setbacks: site.setbacks,
     streetEdges: site.streetEdges,
   });
+  if (!buildable) return [];
   const bbox = polygonBBox(site.lotPolygonLocal);
   const rotationRad = bbox.width >= bbox.depth ? 0 : Math.PI / 2;
   const fit = fitBuildings({ buildable, requests, rotationRad });

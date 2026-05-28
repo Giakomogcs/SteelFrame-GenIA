@@ -814,18 +814,6 @@ export default async function ReportDetailPage({
                 value: `${site.buildings.length}`,
               },
               {
-                label: "Vagas planejadas (carro / caminhão)",
-                value: (() => {
-                  const car = site.parking
-                    .filter((p) => p.kind === "car")
-                    .reduce((a, p) => a + p.stallCount, 0);
-                  const truck = site.parking
-                    .filter((p) => p.kind === "truck")
-                    .reduce((a, p) => a + p.stallCount, 0);
-                  return `${car} / ${truck}`;
-                })(),
-              },
-              {
                 label: "Portões",
                 value: `${site.gates.length}`,
               },

@@ -267,7 +267,7 @@ export default function LotPreviewMapClient({
               click: () => bld && onBuildingSelect?.(bld.id),
             }}
           >
-            <Tooltip
+            {/* <Tooltip
               permanent
               direction="center"
               className="lot-preview-building-label"
@@ -281,7 +281,7 @@ export default function LotPreviewMapClient({
                   m² · PD {clearHeight} m
                 </div>
               </div>
-            </Tooltip>
+            </Tooltip> */}
           </Polygon>
         );
       })}

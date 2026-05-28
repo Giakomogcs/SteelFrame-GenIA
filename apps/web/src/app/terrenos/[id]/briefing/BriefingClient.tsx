@@ -226,7 +226,7 @@ export default function BriefingClient({
   );
 
   const buildableAreaM2 = useMemo(
-    () => (buildableRegion.length >= 3 ? polygonAreaLocal(buildableRegion) : 0),
+    () => (buildableRegion && buildableRegion.length >= 3 ? polygonAreaLocal(buildableRegion) : 0),
     [buildableRegion],
   );
 
@@ -283,6 +283,14 @@ export default function BriefingClient({
           ? SITE_CONSTRAINTS.circulation.truckLaneMin
           : SITE_CONSTRAINTS.circulation.carLaneMin,
       });
+      if (!buildable) {
+        return {
+          site: null,
+          report: { ok: false, issues: [{ severity: "error", code: "SETBACK_TOO_LARGE", message: "Recuos muito grandes — região construtível desaparece. Reduza os recuos." }] },
+          buildable: null,
+          error: "Recuos muito grandes para este terreno. Reduza os valores de recuo.",
+        };
+      }
       const rotationRad = (state.rotationDeg * Math.PI) / 180;
       const fit = fitBuildings({
         buildable,
@@ -693,7 +701,7 @@ export default function BriefingClient({
             </div>
           )}
           <p className="briefing-v2__preview-hint">
-            O modelo 3D só é gerado ao final do passo 6.
+            O modelo 3D só é gerado ao final do passo {STEPS.length}.
           </p>
         </aside>
       </div>

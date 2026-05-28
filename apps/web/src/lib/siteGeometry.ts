@@ -241,7 +241,7 @@ export function placeGates(
 export function insetConvexPolygon(
   localPolygon: readonly V[],
   distance: number,
-): V[] {
+): V[] | null {
   if (distance <= 0) return localPolygon.slice();
   const edges = getEdges(localPolygon);
   // Each edge defines a half-plane: n · p ≤ c, after shrink: c -= distance.
@@ -267,14 +267,12 @@ export function insetConvexPolygon(
   for (const v of out) {
     for (const l of lines) {
       if (l.nx * v.x + l.nz * v.z > l.c + 1e-6) {
-        throw new Error(
-          "insetConvexPolygon: distance too large — polygon collapses.",
-        );
+        return null; // distance too large — polygon collapses
       }
     }
   }
   if (out.length < 3) {
-    throw new Error("insetConvexPolygon: degenerate result.");
+    return null; // degenerate result
   }
   return out;
 }
@@ -302,7 +300,7 @@ export interface BuildableOptions {
 export function buildBuildableRegion(
   localPolygon: readonly V[],
   opts: BuildableOptions,
-): V[] {
+): V[] | null {
   const lane = opts.laneBufferM ?? 0;
   const worst = Math.max(
     opts.setbacks.front,

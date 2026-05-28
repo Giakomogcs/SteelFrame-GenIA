@@ -186,21 +186,6 @@ export default function StudyShell({
                 Portões: <strong>{site.gates.length}</strong>
               </li>
               <li>Arestas de rua: {site.streetEdges.join(", ") || "—"}</li>
-              <li>
-                Vagas: carro{" "}
-                <strong>
-                  {site.parking
-                    .filter((p) => p.kind === "car")
-                    .reduce((s, p) => s + p.stallCount, 0)}
-                </strong>
-                {" · "}
-                caminhão{" "}
-                <strong>
-                  {site.parking
-                    .filter((p) => p.kind === "truck")
-                    .reduce((s, p) => s + p.stallCount, 0)}
-                </strong>
-              </li>
             </ul>
             {report.errors.length > 0 && (
               <div style={{ marginTop: 8 }}>
@@ -511,16 +496,6 @@ function BuildingDetailsPanel({ site, shedsById }: DetailsProps) {
               )}
             </Section>
 
-            <Section title="Operação">
-              <Row k="Docas" v={`${shed.docks.length}`} />
-              <Row
-                k="Aberturas"
-                v={shed.openings.map((o) => o.type).join(", ") || "—"}
-              />
-              <Row k="Vagas (carro)" v={`${shed.yard.parkingCars}`} />
-              <Row k="Vagas (caminhão)" v={`${shed.yard.parkingTrucks}`} />
-              <Row k="Raio caminhão" v={`${shed.yard.truckCircle_m} m`} />
-            </Section>
 
             <Section title="Segurança / Utilidades">
               <Row
