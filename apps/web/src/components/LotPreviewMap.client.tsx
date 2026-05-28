@@ -244,9 +244,13 @@ export default function LotPreviewMapClient({
         const area = b.bbox.width * b.bbox.depth;
         const bld = buildings[i];
         const isSelected = bld && selectedBuildingId === bld.id;
+        // Position-dependent key forces Tooltip remount at new center
+        const posKey = b.positions.length
+          ? `${b.positions[0][0].toFixed(6)},${b.positions[0][1].toFixed(6)}`
+          : "";
         return (
           <Polygon
-            key={i}
+            key={`${bld?.id ?? i}-${posKey}`}
             positions={b.positions}
             pathOptions={{
               color: isSelected

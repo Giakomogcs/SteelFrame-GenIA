@@ -24,6 +24,7 @@ import {
   detectStreetEdges,
   getEdges,
   placeGates,
+  pointInPolygon,
   polygonAreaLocal,
   polygonBBox,
   projectLotToLocal,
@@ -36,6 +37,30 @@ import {
   type ValidationReport,
 } from "@/lib/sitePlanSchema";
 import LotPreviewMap from "@/components/LotPreviewMap";
+
+/** SAT overlap test for two convex polygons in {x, z} coords. */
+function convexPolygonsOverlap(
+  a: readonly { x: number; z: number }[],
+  b: readonly { x: number; z: number }[],
+): boolean {
+  const axes: { x: number; z: number }[] = [];
+  for (const poly of [a, b]) {
+    for (let i = 0; i < poly.length; i++) {
+      const j = (i + 1) % poly.length;
+      const ex = poly[j].x - poly[i].x;
+      const ez = poly[j].z - poly[i].z;
+      axes.push({ x: -ez, z: ex }); // edge normal
+    }
+  }
+  for (const ax of axes) {
+    let aMin = Infinity, aMax = -Infinity;
+    for (const v of a) { const d = v.x * ax.x + v.z * ax.z; aMin = Math.min(aMin, d); aMax = Math.max(aMax, d); }
+    let bMin = Infinity, bMax = -Infinity;
+    for (const v of b) { const d = v.x * ax.x + v.z * ax.z; bMin = Math.min(bMin, d); bMax = Math.max(bMax, d); }
+    if (aMax <= bMin || bMax <= aMin) return false; // separating axis found
+  }
+  return true; // no separating axis → overlap
+}
 
 const STEPS: StepDef[] = [
   { id: "terreno", label: "Terreno & rua", description: "Arestas e recuos" },
@@ -300,18 +325,21 @@ export default function BriefingClient({
         }
       }
       // Always use placements (even on overflow) so user sees the buildings.
-      let fitError = fit.ok ? undefined : fit.reason;
+      // Re-check bounds with FINAL positions (after all overrides applied).
+      let fitError: string | undefined;
+      if (buildable && buildable.length >= 3) {
+        for (const p of fit.placements) {
+          if (p.footprintPolygon.some((v) => !pointInPolygon(v, buildable!))) {
+            fitError = `Galpão "${p.name}" ultrapassa a região construtível. Reduza área, nº de galpões ou ajuste a rotação.`;
+            break;
+          }
+        }
+      }
 
-      // Collision check: detect AABB overlaps between buildings
+      // Collision check: SAT (Separating Axis Theorem) for convex polygons
       for (let a = 0; a < fit.placements.length && !fitError; a++) {
-        const pa = fit.placements[a].footprintPolygon;
-        const ba = { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity };
-        for (const v of pa) { ba.minX = Math.min(ba.minX, v.x); ba.maxX = Math.max(ba.maxX, v.x); ba.minZ = Math.min(ba.minZ, v.z); ba.maxZ = Math.max(ba.maxZ, v.z); }
         for (let b2 = a + 1; b2 < fit.placements.length; b2++) {
-          const pb = fit.placements[b2].footprintPolygon;
-          const bb2 = { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity };
-          for (const v of pb) { bb2.minX = Math.min(bb2.minX, v.x); bb2.maxX = Math.max(bb2.maxX, v.x); bb2.minZ = Math.min(bb2.minZ, v.z); bb2.maxZ = Math.max(bb2.maxZ, v.z); }
-          if (ba.maxX > bb2.minX && ba.minX < bb2.maxX && ba.maxZ > bb2.minZ && ba.minZ < bb2.maxZ) {
+          if (convexPolygonsOverlap(fit.placements[a].footprintPolygon, fit.placements[b2].footprintPolygon)) {
             fitError = `"${fit.placements[a].name}" e "${fit.placements[b2].name}" estão sobrepostos. Reduza a área, ajuste proporção ou mova os galpões.`;
           }
         }
