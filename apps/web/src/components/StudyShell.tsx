@@ -128,9 +128,7 @@ export default function StudyShell({
           >
             {report.ok ? "✓ válido" : `${report.errors.length} erro(s)`}
           </span>
-          {saving && (
-            <span className="study-shell__saving">salvando…</span>
-          )}
+          {saving && <span className="study-shell__saving">salvando…</span>}
           {!acceptedAt && (
             <button
               type="button"

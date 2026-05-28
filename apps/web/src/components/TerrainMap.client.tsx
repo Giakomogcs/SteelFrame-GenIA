@@ -226,10 +226,12 @@ export default function TerrainMapClient({
     )
       .then((r) => r.json())
       .then(
-        (data: {
-          display_name?: string;
-          address?: NominatimAddress;
-        } | null) => {
+        (
+          data: {
+            display_name?: string;
+            address?: NominatimAddress;
+          } | null,
+        ) => {
           if (data?.display_name) onAddressResolved?.(data.display_name);
           if (data?.address)
             onLocationResolved?.(parseNominatimAddress(data.address));

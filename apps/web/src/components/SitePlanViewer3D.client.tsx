@@ -47,9 +47,19 @@ const LAYER_META: Array<{
 }> = [
   { key: "roof", idx: "L1", name: "Cobertura", tag: "Telhas + skylights" },
   { key: "cladding", idx: "L2", name: "Fechamentos", tag: "Paredes + zonas" },
-  { key: "services", idx: "L3", name: "Instalações & docas", tag: "Docas, portões, perímetro" },
+  {
+    key: "services",
+    idx: "L3",
+    name: "Instalações & docas",
+    tag: "Docas, portões, perímetro",
+  },
   { key: "floor", idx: "L4", name: "Piso", tag: "Contrapiso industrial" },
-  { key: "structure", idx: "L5", name: "Estrutura SF", tag: "Pilares + tesouras" },
+  {
+    key: "structure",
+    idx: "L5",
+    name: "Estrutura SF",
+    tag: "Pilares + tesouras",
+  },
   { key: "foundation", idx: "L6", name: "Fundação", tag: "Terraplenagem" },
 ];
 
@@ -149,10 +159,20 @@ export default function SitePlanViewer3D({
   const controlsRef = useRef<OrbitControls | null>(null);
   const currentGroupRef = useRef<THREE.Group | null>(null);
   const mapPlaneRef = useRef<THREE.Mesh | null>(null);
+  const gridRef = useRef<THREE.GridHelper | null>(null);
   const rafRef = useRef<number | null>(null);
+  /**
+   * Bounding box "real" da cena (pós-build do site). Recalculada após cada
+   * troca de geometria e usada pelos efeitos de câmera para garantir que o
+   * frame inicial enquadre o galpão de verdade, não o lote inteiro.
+   */
+  const sceneBoxRef = useRef<THREE.Box3 | null>(null);
 
   const [cameraMode, setCameraMode] = useState<CameraMode>("iso");
   const [xRay, setXRay] = useState(false);
+  /** Bumped after each geometry rebuild — used to re-run the camera framing
+   *  effect once `sceneBoxRef` is populated. */
+  const [sceneVersion, setSceneVersion] = useState(0);
   const [hideRoof, setHideRoof] = useState(false);
   // Default to satellite so the lote real é mostrado como contexto. Caller
   // pode forçar "off" via mapStyle ou usar mapBackground=false (legacy) para
@@ -184,18 +204,24 @@ export default function SitePlanViewer3D({
     renderer.setPixelRatio(window.devicePixelRatio || 1);
     renderer.setSize(host.clientWidth, host.clientHeight);
     renderer.setClearColor(0x0b1220, 1);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.05;
     host.appendChild(renderer.domElement);
     rendererRef.current = renderer;
 
     const scene = new THREE.Scene();
-    scene.fog = new THREE.Fog(0x0b1220, 200, 800);
+    // Fog desabilitado por padrão — era a causa de o galpão sumir quando a
+    // câmera estava distante do alvo. O efeito de mapa volta a manipular
+    // `scene.fog` se necessário no futuro.
+    scene.fog = null;
     sceneRef.current = scene;
 
     const camera = new THREE.PerspectiveCamera(
       45,
       host.clientWidth / host.clientHeight,
-      0.1,
-      4000,
+      0.5,
+      20000,
     );
     // Camera lives in the (-X, +Z) quadrant so the rendered scene matches the
     // 2D editor orientation: +X grows to the right of the screen and +Z grows
@@ -206,21 +232,31 @@ export default function SitePlanViewer3D({
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.08;
-    // Prevent zooming so close that the WebGL near plane starts clipping the
-    // walls/roof — that was making the shed look "apagado" when approaching.
-    controls.minDistance = 4;
-    controls.maxDistance = 1200;
+    controls.screenSpacePanning = true;
+    controls.minPolarAngle = 0.05;
+    controls.maxPolarAngle = Math.PI / 2 - 0.05;
+    // Os limites de min/max distance são recalculados em runtime pelo efeito
+    // de framing (depende do tamanho da cena). Valores iniciais conservadores.
+    controls.minDistance = 2;
+    controls.maxDistance = 5000;
     controls.target.set(0, 0, 0);
     controlsRef.current = controls;
 
-    const hemi = new THREE.HemisphereLight(0xfff3e0, 0x202833, 0.7);
+    // Iluminação melhorada: hemisférica suave + key light + fill light leve.
+    const hemi = new THREE.HemisphereLight(0xfff3e0, 0x222b3a, 0.9);
     scene.add(hemi);
-    const dir = new THREE.DirectionalLight(0xffffff, 0.9);
-    dir.position.set(-80, 120, 60);
-    scene.add(dir);
-    const grid = new THREE.GridHelper(400, 40, 0x1f2937, 0x111827);
+    const key = new THREE.DirectionalLight(0xffffff, 1.1);
+    key.position.set(-120, 180, 90);
+    scene.add(key);
+    const fill = new THREE.DirectionalLight(0xb3d9ff, 0.35);
+    fill.position.set(120, 60, -90);
+    scene.add(fill);
+    const grid = new THREE.GridHelper(800, 80, 0x1f2937, 0x111827);
     grid.position.y = -0.01;
+    (grid.material as THREE.Material).opacity = 0.45;
+    (grid.material as THREE.Material).transparent = true;
     scene.add(grid);
+    gridRef.current = grid;
 
     const onResize = () => {
       if (!host || !rendererRef.current || !cameraRef.current) return;
@@ -265,6 +301,46 @@ export default function SitePlanViewer3D({
     const group = sitePlanTo3D(site, { shedsById, lod, synthesizeShed });
     currentGroupRef.current = group;
     scene.add(group);
+    // Compute o bbox real da geometria renderizada (ignora mapa/grid). Esse
+    // bbox é a fonte de verdade para a câmera — evita o bug de enquadrar o
+    // lote inteiro quando os galpões ocupam só uma fração do terreno.
+    group.updateMatrixWorld(true);
+    const box = new THREE.Box3();
+    const tmp = new THREE.Box3();
+    group.traverse((obj) => {
+      const mesh = obj as THREE.Mesh;
+      if (!(mesh as { isMesh?: boolean }).isMesh) return;
+      if (!mesh.geometry) return;
+      mesh.geometry.computeBoundingBox?.();
+      const bb = mesh.geometry.boundingBox;
+      if (!bb) return;
+      tmp.copy(bb).applyMatrix4(mesh.matrixWorld);
+      box.union(tmp);
+    });
+    if (!box.isEmpty()) {
+      sceneBoxRef.current = box;
+      const sizeVec = new THREE.Vector3();
+      box.getSize(sizeVec);
+      const span = Math.max(80, Math.max(sizeVec.x, sizeVec.z) * 1.6);
+      const grid = gridRef.current;
+      if (grid) {
+        const center = new THREE.Vector3();
+        box.getCenter(center);
+        grid.position.set(center.x, -0.01, center.z);
+        // Substitui a grid por uma do tamanho certo (cheap recreate).
+        const newGrid = new THREE.GridHelper(span, Math.min(80, Math.max(20, Math.round(span / 10))), 0x1f2937, 0x111827);
+        newGrid.position.copy(grid.position);
+        (newGrid.material as THREE.Material).opacity = 0.45;
+        (newGrid.material as THREE.Material).transparent = true;
+        scene.remove(grid);
+        (grid.material as THREE.Material).dispose?.();
+        grid.geometry?.dispose?.();
+        scene.add(newGrid);
+        gridRef.current = newGrid;
+      }
+    }
+    // Notifica o efeito de framing que o bbox está disponível.
+    setSceneVersion((v) => v + 1);
   }, [site, shedsById, lod, synthesizeShed]);
 
   // Apply X-ray / hide-roof toggles by traversing meshes and tweaking
@@ -370,35 +446,78 @@ export default function SitePlanViewer3D({
     const camera = cameraRef.current;
     const controls = controlsRef.current;
     if (!camera || !controls) return;
-    // Frame around the lot bounding box so presets work for any terrain size.
-    let minX = Infinity,
-      maxX = -Infinity,
-      minZ = Infinity,
-      maxZ = -Infinity;
-    for (const p of site.lotPolygonLocal) {
-      if (p.x < minX) minX = p.x;
-      if (p.x > maxX) maxX = p.x;
-      if (p.z < minZ) minZ = p.z;
-      if (p.z > maxZ) maxZ = p.z;
+
+    // Preferência: bbox real da cena renderizada (calculado após
+    // sitePlanTo3D). Cai para footprint dos prédios e, por último, para o lote.
+    const box = sceneBoxRef.current;
+    let cx: number, cy: number, cz: number, width: number, depth: number, maxY: number;
+    if (box && !box.isEmpty()) {
+      const size = new THREE.Vector3();
+      const center = new THREE.Vector3();
+      box.getSize(size);
+      box.getCenter(center);
+      cx = center.x;
+      cz = center.z;
+      // O centro do enquadramento usa o pé-direito médio: assim a câmera olha
+      // para o meio da edificação em vez de mirar no chão.
+      cy = (box.min.y + box.max.y) / 2;
+      width = Math.max(8, size.x);
+      depth = Math.max(8, size.z);
+      maxY = Math.max(4, size.y);
+    } else {
+      // Fallback: bbox dos polygons do lote.
+      let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+      for (const p of site.lotPolygonLocal) {
+        if (p.x < minX) minX = p.x;
+        if (p.x > maxX) maxX = p.x;
+        if (p.z < minZ) minZ = p.z;
+        if (p.z > maxZ) maxZ = p.z;
+      }
+      if (!isFinite(minX)) { minX = -20; maxX = 20; minZ = -20; maxZ = 20; }
+      cx = (minX + maxX) / 2;
+      cz = (minZ + maxZ) / 2;
+      cy = 4;
+      width = Math.max(8, maxX - minX);
+      depth = Math.max(8, maxZ - minZ);
+      maxY = 12;
     }
-    const cx = (minX + maxX) / 2;
-    const cz = (minZ + maxZ) / 2;
-    const span = Math.max(80, Math.max(maxX - minX, maxZ - minZ) * 1.2);
-    controls.target.set(cx, 0, cz);
+
+    const sceneSpan = Math.max(width, depth, maxY * 2);
+
+    // Distance derivada do FOV + aspect ratio do viewport, com margem.
+    const aspect = camera.aspect || 1;
+    const halfH = sceneSpan / 2;
+    const halfW = Math.max(width, depth) / 2;
+    const vFov = (camera.fov * Math.PI) / 180;
+    const distV = halfH / Math.tan(vFov / 2);
+    const distH = halfW / Math.tan(vFov / 2) / Math.max(aspect, 0.5);
+    // Margem maior no modo n\u00e3o-compacto porque os overlays laterais
+    // (camadas, HUD, env) comem ~30% da \u00e1rea \u00fatil. No compact, margem padr\u00e3o.
+    const margin = compact ? 1.25 : 1.45;
+    const distance = Math.max(distV, distH) * margin;
+
+    controls.target.set(cx, cy, cz);
     if (cameraMode === "top") {
       camera.up.set(0, 0, -1); // +Z appears as "down" on screen → matches 2D editor.
-      camera.position.set(cx, span * 1.2, cz + 0.01);
+      camera.position.set(cx, cy + distance, cz + 0.01);
     } else if (cameraMode === "front") {
       camera.up.set(0, 1, 0);
-      camera.position.set(cx, span * 0.4, cz + span);
+      camera.position.set(cx, cy + distance * 0.35, cz + distance);
     } else {
       camera.up.set(0, 1, 0);
-      // Isometric SW position so +X → screen right, +Z → screen down-ish.
-      camera.position.set(cx - span * 0.6, span * 0.7, cz + span * 0.6);
+      // Isométrica SW: +X → direita da tela, +Z → baixo.
+      const d = distance * 0.6;
+      camera.position.set(cx - d, cy + distance * 0.55, cz + d);
     }
+    // Limites de zoom proporcionais à cena.
+    controls.minDistance = Math.max(2, sceneSpan * 0.06);
+    controls.maxDistance = Math.max(distance * 5, sceneSpan * 12);
+    // Far plane > maxDistance + extensão da cena para evitar clipping.
+    camera.far = Math.max(2000, controls.maxDistance * 4);
+    camera.near = Math.max(0.2, controls.minDistance * 0.05);
     camera.updateProjectionMatrix();
     controls.update();
-  }, [cameraMode, site]);
+  }, [cameraMode, site, shedsById, sceneVersion, compact]);
 
   // Satellite ground plane (Esri World Imagery) — opt-in.
   useEffect(() => {
@@ -584,7 +703,10 @@ export default function SitePlanViewer3D({
         largest.footprintPolygon.length;
       const cos = Math.cos(-rot);
       const sin = Math.sin(-rot);
-      let mnx = Infinity, mxx = -Infinity, mnz = Infinity, mxz = -Infinity;
+      let mnx = Infinity,
+        mxx = -Infinity,
+        mnz = Infinity,
+        mxz = -Infinity;
       for (const p of largest.footprintPolygon) {
         const dx = p.x - cx;
         const dz = p.z - cz;
@@ -604,7 +726,7 @@ export default function SitePlanViewer3D({
     const costBRL = totalArea * 1450;
     const eaveHeight = (() => {
       const shed = largest
-        ? largest.shed ?? shedsById?.[largest.shedId ?? ""]
+        ? (largest.shed ?? shedsById?.[largest.shedId ?? ""])
         : undefined;
       return shed?.structure?.clearHeight ?? 8;
     })();
@@ -638,8 +760,16 @@ export default function SitePlanViewer3D({
       ? LAYER_META.find((l) => l.key === isolatedLayer)
       : undefined;
 
+  const rootClass = [
+    "viewer-3d",
+    compact ? "viewer-3d--compact" : null,
+    pseudoFullscreen ? "viewer-3d--pseudo-full" : null,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
-    <div ref={hostRef} className="viewer-3d">
+    <div ref={hostRef} className={rootClass}>
       {/* ----- HUD (top-right): toolbar enxuto + cards de stats ---------- */}
       <div className="viewer-3d__hud" aria-label="Indicadores e visualização">
         <div
@@ -664,8 +794,25 @@ export default function SitePlanViewer3D({
             title="Esconde o telhado para mostrar o interior do galpão"
           >
             Sem teto
-          </button>
-          {allowFullscreen && (
+          </button>          {compact &&
+            (
+              [
+                { id: "iso", label: "Iso", title: "Câmera isométrica" },
+                { id: "top", label: "Planta", title: "Câmera de cima (planta)" },
+                { id: "front", label: "Lateral", title: "Câmera lateral" },
+              ] as const
+            ).map((m) => (
+              <button
+                key={m.id}
+                type="button"
+                onClick={() => setCameraMode(m.id)}
+                className="viewer-3d__btn"
+                aria-pressed={cameraMode === m.id}
+                title={m.title}
+              >
+                {m.label}
+              </button>
+            ))}          {allowFullscreen && (
             <button
               type="button"
               onClick={toggleFullscreen}
@@ -704,6 +851,7 @@ export default function SitePlanViewer3D({
       </div>
 
       {/* ----- Layer rail (esquerda, centralizado verticalmente) ---------- */}
+      {!compact && (
       <div
         className="viewer-3d__panel viewer-3d__layer-rail"
         aria-label="Camadas construtivas"
@@ -799,8 +947,10 @@ export default function SitePlanViewer3D({
           Restaurar todas
         </button>
       </div>
+      )}
 
       {/* ----- Env-control: basemap + opacidade (bottom-left) ------------- */}
+      {!compact && (
       <div
         className="viewer-3d__panel viewer-3d__env"
         aria-label="Contexto cartográfico"
@@ -852,9 +1002,10 @@ export default function SitePlanViewer3D({
           <output>{Math.round(mapOpacity * 100)}%</output>
         </div>
       </div>
+      )}
 
       {/* ----- Layer focus callout (top-center quando isolado) ------------ */}
-      {focusedLayer && (
+      {!compact && focusedLayer && (
         <div className="viewer-3d__panel viewer-3d__focus" role="status">
           <span className="viewer-3d__focus-tag">{focusedLayer.idx}</span>
           <div>
@@ -872,6 +1023,7 @@ export default function SitePlanViewer3D({
       )}
 
       {/* ----- Bottom-center camera pill (Iso/Planta/Lateral) ------------- */}
+      {!compact && (
       <div
         className="viewer-3d__camera-pill"
         role="toolbar"
@@ -896,6 +1048,7 @@ export default function SitePlanViewer3D({
           </button>
         ))}
       </div>
+      )}
     </div>
   );
 }

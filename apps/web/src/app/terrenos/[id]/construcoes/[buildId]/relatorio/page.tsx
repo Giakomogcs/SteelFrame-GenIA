@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { prisma } from "@sfg/db";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { isIndustrialShed, type IndustrialShed } from "@/lib/shedSchema";
@@ -32,7 +32,16 @@ export default async function RelatorioPage({
   });
   if (!building || building.terrainId !== params.id) notFound();
   const raw = building.model as unknown;
-  if (!isIndustrialShed(raw)) notFound();
+  if (!isIndustrialShed(raw)) {
+    // SitePlan ou modelo legado: tenta redirecionar para o Relatório canônico
+    // gerado pelo briefing (rota /relatorios/[id]).
+    const report = await prisma.report.findFirst({
+      where: { buildingId: building.id },
+      orderBy: [{ status: "asc" }, { version: "desc" }],
+    });
+    if (report) redirect(`/relatorios/${report.id}`);
+    notFound();
+  }
   const shed = raw as IndustrialShed;
   const polygon = building.terrain.polygon as unknown as LngLat[];
   const proj = polygon.length >= 3 ? buildLotProjection(polygon) : null;

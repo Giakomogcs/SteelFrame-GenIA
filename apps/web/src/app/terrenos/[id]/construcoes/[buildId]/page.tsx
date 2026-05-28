@@ -1,12 +1,19 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import nextDynamic from "next/dynamic";
 import { prisma } from "@sfg/db";
 import SteelFrameViewer from "@/components/SteelFrameViewer";
 import ShedViewer from "@/components/ShedViewer";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import type { SteelFrameModel } from "@/lib/steelframe";
 import { isIndustrialShed, type IndustrialShed } from "@/lib/shedSchema";
+import { SitePlanSchema } from "@/lib/sitePlanSchema";
 import type { LngLat } from "@/lib/geo";
+
+const SitePlanViewer3D = nextDynamic(
+  () => import("@/components/SitePlanViewer3D.client"),
+  { ssr: false },
+);
 
 export const dynamic = "force-dynamic";
 
@@ -259,6 +266,102 @@ export default async function BuildingPage({
             </div>
           </div>
         </div>
+      </>
+    );
+  }
+
+  // SitePlan completo (gerado via briefing/IA): renderiza o viewer de site.
+  const sitePlanParsed = SitePlanSchema.safeParse(raw);
+  if (sitePlanParsed.success) {
+    const site = sitePlanParsed.data;
+    const shedsById: Record<string, IndustrialShed> = {};
+    for (const b of site.buildings) {
+      if (b.shed && isIndustrialShed(b.shed)) shedsById[b.id] = b.shed;
+    }
+    const sheds = Object.values(shedsById);
+    const totalCovered = sheds.reduce(
+      (a, s) =>
+        a + (s.estimate.coveredAreaM2 || s.footprint.width * s.footprint.depth),
+      0,
+    );
+    const totalCost = sheds.reduce(
+      (a, s) => a + (s.estimate.totalCost || 0),
+      0,
+    );
+    const totalSteel = sheds.reduce((a, s) => a + (s.estimate.steelKg || 0), 0);
+    return (
+      <>
+        <header className="page-header">
+          <div className="stack-sm">
+            <Breadcrumb
+              items={[
+                { label: "Meus terrenos", href: "/" },
+                {
+                  label: building.terrain.name,
+                  href: `/terrenos/${building.terrainId}`,
+                },
+                {
+                  label: building.name,
+                  href: `/terrenos/${building.terrainId}/construcoes/${building.id}`,
+                },
+                { label: "Visualizador 3D" },
+              ]}
+            />
+            <div className="page-title-row">
+              <h1>{building.name} · Visualizador 3D</h1>
+              <span className="pill pill-success">
+                <span className="dot" />
+                SitePlan · {site.buildings.length}{" "}
+                {site.buildings.length === 1 ? "edificação" : "edificações"}
+              </span>
+              <span className="pill pill-neutral mono">#R-{shortId}</span>
+            </div>
+            <p className="text-sm muted">
+              {totalCovered > 0
+                ? `${totalCovered.toLocaleString("pt-BR")} m² cobertos · `
+                : ""}
+              {totalCost > 0
+                ? `R$ ${(totalCost / 1_000_000).toLocaleString("pt-BR", { maximumFractionDigits: 2 })} M`
+                : "Custo em refino"}
+              {totalSteel > 0
+                ? ` · ${(totalSteel / 1000).toFixed(1)} t de aço`
+                : ""}
+            </p>
+          </div>
+          <div className="row">
+            <Link
+              href={`/terrenos/${building.terrainId}`}
+              className="btn btn-ghost"
+            >
+              ← Terreno
+            </Link>
+            <Link
+              href={`/terrenos/${building.terrainId}/briefing`}
+              className="btn btn-secondary"
+            >
+              Re-rodar com IA
+            </Link>
+          </div>
+        </header>
+
+        <section
+          className="card"
+          style={{ padding: 0, overflow: "hidden", height: 680 }}
+        >
+          <SitePlanViewer3D
+            site={site}
+            shedsById={shedsById}
+            lod="architectural"
+            synthesizeShed
+            mapBackground
+            allowFullscreen
+          />
+        </section>
+
+        <p className="text-xs muted">
+          SitePlan gerado pelo briefing. Use os controles do viewer para mudar
+          câmera, ocultar camadas e explorar a planta.
+        </p>
       </>
     );
   }

@@ -67,7 +67,8 @@ const FACTOR_RATIONALE: Record<string, string> = {
     "Atende NBR 15575 nível intermediário (térmico/acústico).",
   isolamento_alto_desempenho:
     "Atende NBR 15575 nível superior — fechamentos e cobertura com isolamento térmico-acústico.",
-  cobertura_telha_metalica: "Cobertura simples — composição SINAPI de telha metálica.",
+  cobertura_telha_metalica:
+    "Cobertura simples — composição SINAPI de telha metálica.",
   cobertura_telha_termoacustica:
     "Telha sanduíche com EPS/PUR — ganho térmico e acústico.",
   cobertura_sandwich_PIR:
@@ -77,13 +78,14 @@ const FACTOR_RATIONALE: Record<string, string> = {
   fachada_medio: "Esquadrias e recortes geram retrabalho de fechamento.",
   fachada_muito: "Muitos recortes/esquadrias — aumenta horas de instalação.",
   vao_livre: "Vãos > 15 m exigem perfis mais robustos (NBR 8800/NBR 14762).",
-  pavimentos: "Entrepiso steel deck + transmissão de cargas — NBR 8800/NBR 6120.",
+  pavimentos:
+    "Entrepiso steel deck + transmissão de cargas — NBR 8800/NBR 6120.",
   pe_direito: "Pé-direito > 6 m exige colunas e fechamentos maiores.",
   piso_industrial:
     "Pisos > 30 kN/m² (porta-paletes/manufatura) — composição reforçada NBR 6120.",
-  docas: "Cada doca soma nivelador, selo e rebaixo — composição SINAPI específica.",
-  avcb:
-    "Hidrantes, sprinklers, rotas e sinalização conforme NBR 9077 e IT do CBPM.",
+  docas:
+    "Cada doca soma nivelador, selo e rebaixo — composição SINAPI específica.",
+  avcb: "Hidrantes, sprinklers, rotas e sinalização conforme NBR 9077 e IT do CBPM.",
   sem_sondagem:
     "Sem SPT confirmado — fundação superdimensionada por segurança (NBR 6484/6122).",
   sem_topografia: "Sem levantamento planialtimétrico — contingência aplicada.",
@@ -227,7 +229,7 @@ export default async function ReportDetailPage({
       acc + (s.estimate.coveredAreaM2 || s.footprint.width * s.footprint.depth),
     0,
   );
-  const cost = sheds.reduce((acc, s) => acc + (s.estimate.totalCost || 0), 0);  // Reconstrói a viabilidade com fatores SINAPI/CUB para evidenciar decisões.
+  const cost = sheds.reduce((acc, s) => acc + (s.estimate.totalCost || 0), 0); // Reconstrói a viabilidade com fatores SINAPI/CUB para evidenciar decisões.
   // Para múltiplos galpões, computa por edifício e soma os totais; usa o
   // edifício de maior área como referência de fatores na tabela.
   // UF resolvida com fallback: campo estruturado → endereço livre → "BR".
@@ -247,7 +249,10 @@ export default async function ReportDetailPage({
   const viability: ViabilityEstimate | null = dominant
     ? perBuildingViability.length === 1
       ? dominant.estimate
-      : aggregateViability(perBuildingViability.map((p) => p.estimate), dominant.estimate)
+      : aggregateViability(
+          perBuildingViability.map((p) => p.estimate),
+          dominant.estimate,
+        )
     : null;
   const ufState = getCostState(uf);
   const sinapiSeed = viability ? baseCostPerM2(uf, viability.standard) : null;
@@ -372,7 +377,7 @@ export default async function ReportDetailPage({
 
       <section
         className="card"
-        style={{ padding: 0, overflow: "hidden", marginTop: 16, height: 620 }}
+        style={{ padding: 0, overflow: "hidden", marginTop: 16, height: 560, borderRadius: 12 }}
       >
         {site ? (
           <SitePlanViewer3D
@@ -382,6 +387,7 @@ export default async function ReportDetailPage({
             synthesizeShed
             mapBackground
             allowFullscreen
+            compact
           />
         ) : (
           <div className="empty" style={{ padding: 32 }}>
@@ -396,7 +402,9 @@ export default async function ReportDetailPage({
 
       {sheds.length > 0 && (
         <section className="card" style={{ padding: 16, marginTop: 16 }}>
-          <h2 style={{ marginTop: 0, marginBottom: 4, fontSize: "var(--fs-md)" }}>
+          <h2
+            style={{ marginTop: 0, marginBottom: 4, fontSize: "var(--fs-md)" }}
+          >
             Edificações do projeto
           </h2>
           <p className="text-sm muted" style={{ margin: 0, marginBottom: 12 }}>
@@ -457,14 +465,21 @@ export default async function ReportDetailPage({
             }}
           >
             <div>
-              <h2 style={{ marginTop: 0, marginBottom: 4, fontSize: "var(--fs-md)" }}>
+              <h2
+                style={{
+                  marginTop: 0,
+                  marginBottom: 4,
+                  fontSize: "var(--fs-md)",
+                }}
+              >
                 Como chegamos no custo — SINAPI, CUB e fatores de obra
               </h2>
               <p className="text-sm muted" style={{ margin: 0 }}>
                 Banda paramétrica derivada de SINAPI (Caixa/IBGE) por UF,
-                validada contra CUB Sinduscon{ufState !== "BR" ? `-${ufState}` : ""},
-                e ajustada por fatores normativos do projeto (NBR 6120, NBR
-                6123, NBR 8800, NBR 14762, NBR 9077).
+                validada contra CUB Sinduscon
+                {ufState !== "BR" ? `-${ufState}` : ""}, e ajustada por fatores
+                normativos do projeto (NBR 6120, NBR 6123, NBR 8800, NBR 14762,
+                NBR 9077).
               </p>
             </div>
             <span className="pill pill-info">UF: {ufState}</span>
@@ -490,9 +505,7 @@ export default async function ReportDetailPage({
                 {cubBand ? (
                   <>
                     R$ {BRL(cubBand.low)}
-                    <span className="unit">
-                      –{BRL(cubBand.high)}/m²
-                    </span>
+                    <span className="unit">–{BRL(cubBand.high)}/m²</span>
                   </>
                 ) : (
                   <>
@@ -590,7 +603,9 @@ export default async function ReportDetailPage({
               <thead>
                 <tr>
                   <th style={thStyle}>Fator</th>
-                  <th style={{ ...thStyle, textAlign: "right" }}>Ajuste (low–high)</th>
+                  <th style={{ ...thStyle, textAlign: "right" }}>
+                    Ajuste (low–high)
+                  </th>
                   <th style={thStyle}>Por que foi aplicado</th>
                 </tr>
               </thead>
@@ -598,12 +613,21 @@ export default async function ReportDetailPage({
                 {viability.factors
                   .filter(
                     (f) =>
-                      !(f.range.low === 1 && f.range.base === 1 && f.range.high === 1),
+                      !(
+                        f.range.low === 1 &&
+                        f.range.base === 1 &&
+                        f.range.high === 1
+                      ),
                   )
                   .map((f) => (
                     <tr key={f.name}>
                       <td>{FACTOR_LABEL[f.name] ?? f.name}</td>
-                      <td style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
+                      <td
+                        style={{
+                          textAlign: "right",
+                          fontVariantNumeric: "tabular-nums",
+                        }}
+                      >
                         {rangePill(f.range)}
                       </td>
                       <td className="muted">
@@ -654,13 +678,15 @@ export default async function ReportDetailPage({
 
       {citedNorms.length > 0 && (
         <section className="card" style={{ padding: 16, marginTop: 16 }}>
-          <h2 style={{ marginTop: 0, marginBottom: 4, fontSize: "var(--fs-md)" }}>
+          <h2
+            style={{ marginTop: 0, marginBottom: 4, fontSize: "var(--fs-md)" }}
+          >
             Normas técnicas ABNT aplicáveis
           </h2>
           <p className="text-sm muted" style={{ margin: 0, marginBottom: 12 }}>
             Cada decisão estrutural, de cargas, vento, instalações e segurança
-            está ancorada nas NBRs abaixo. Consulte o texto integral no
-            Catálogo ABNT.
+            está ancorada nas NBRs abaixo. Consulte o texto integral no Catálogo
+            ABNT.
           </p>
           <div style={{ overflowX: "auto" }}>
             <table className="rpt-table" style={tableStyle}>
@@ -738,7 +764,11 @@ export default async function ReportDetailPage({
                   Aprovado com {warns} aviso{warns > 1 ? "s" : ""}
                 </span>
               );
-            return <span className="pill pill-success">Aprovado · sem ressalvas</span>;
+            return (
+              <span className="pill pill-success">
+                Aprovado · sem ressalvas
+              </span>
+            );
           })()}
         </div>
         <p className="text-sm muted" style={{ marginTop: 0, marginBottom: 12 }}>
@@ -770,7 +800,8 @@ export default async function ReportDetailPage({
               },
               {
                 label: "Coef. aproveitamento (CA)",
-                value: site.zoning?.ca != null ? site.zoning.ca.toFixed(2) : "—",
+                value:
+                  site.zoning?.ca != null ? site.zoning.ca.toFixed(2) : "—",
               },
               {
                 label: "Edificações",

@@ -444,13 +444,15 @@ export function buildShedMesh(
   g.add(floor);
 
   // Steel-frame skeleton: pairs of columns along Z, trusses on top.
+  // `bayCount` no schema é "Nº de pórticos" → criamos exatamente esse número
+  // de pórticos (não bayCount+1) distribuídos sobre a profundidade REAL do
+  // placement `d` (não `baySpacing × bayCount`, que pode divergir e fazer a
+  // estrutura ultrapassar o tamanho pedido no wizard).
   const halfSpan = Math.min(freeSpan, w) / 2;
-  const usedBayCount = Math.max(1, bayCount);
-  // Centered along Z so the building lines up with footprint centroid.
-  const totalDepth = baySpacing * usedBayCount;
-  const startZ = -totalDepth / 2;
-  for (let i = 0; i <= usedBayCount; i++) {
-    const z = startZ + i * baySpacing;
+  const portalCount = Math.max(1, Math.min(60, bayCount));
+  const portalSpacing = portalCount > 1 ? d / (portalCount - 1) : 0;
+  for (let i = 0; i < portalCount; i++) {
+    const z = portalCount > 1 ? -d / 2 + i * portalSpacing : 0;
     addColumn(g, -halfSpan, z, height, placement.id, i, "L");
     addColumn(g, halfSpan, z, height, placement.id, i, "R");
     addTruss(
@@ -954,7 +956,8 @@ export function sitePlanTo3D(
   for (const placement of site.buildings) {
     // Priority: embedded shed > linked shed via shedId > synthesized fallback.
     let shed: IndustrialShed | undefined =
-      placement.shed ?? (placement.shedId ? sheds[placement.shedId] : undefined);
+      placement.shed ??
+      (placement.shedId ? sheds[placement.shedId] : undefined);
     if (!shed && synth) shed = deriveShedForPlacement(placement);
     const g = buildShedMesh(placement, shed, lod);
     const c = centroidXZ(placement.footprintPolygon);

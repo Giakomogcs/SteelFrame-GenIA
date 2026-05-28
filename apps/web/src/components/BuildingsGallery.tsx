@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { isIndustrialShed, type IndustrialShed } from "@/lib/shedSchema";
+import { SitePlanSchema, type SitePlan } from "@/lib/sitePlanSchema";
 import { DeleteBuildingButton } from "@/components/DeleteBuildingButton";
 import type { LngLat } from "@/lib/geo";
 
@@ -12,6 +13,22 @@ const ShedViewer = dynamic(() => import("@/components/ShedViewer"), {
   ssr: false,
   loading: () => <ViewerSkeleton label="Carregando visualização 3D…" />,
 });
+const SitePlanViewer3D = dynamic(
+  () => import("@/components/SitePlanViewer3D.client"),
+  {
+    ssr: false,
+    loading: () => <ViewerSkeleton label="Carregando SitePlan 3D…" />,
+  },
+);
+
+/** Detecta um SitePlan persistido como Building.model (briefings/accept). */
+function parseSitePlan(model: unknown): SitePlan | null {
+  if (!model || typeof model !== "object") return null;
+  const maybe = model as { schemaVersion?: unknown };
+  if (maybe.schemaVersion !== "site-1") return null;
+  const parsed = SitePlanSchema.safeParse(model);
+  return parsed.success ? parsed.data : null;
+}
 
 interface BuildingDTO {
   id: string;
@@ -58,8 +75,74 @@ function fmtDate(s: string) {
   });
 }
 
-/** Extrai campos comuns de qualquer formato de modelo (industrial novo ou legado). */
+/** Extrai campos comuns de qualquer formato de modelo (SitePlan, shed industrial ou legado). */
 function summarize(model: unknown) {
+  const site = parseSitePlan(model);
+  if (site) {
+    const sheds: IndustrialShed[] = site.buildings
+      .map((b) => b.shed)
+      .filter((s): s is IndustrialShed => !!s && isIndustrialShed(s));
+    const totalCost = sheds.reduce(
+      (acc, s) => acc + (s.estimate.totalCost || 0),
+      0,
+    );
+    // Área coberta: prefere estimate dos sheds embarcados; cai para
+    // targetAreaM2 das BuildingPlacement (estudos sem shed sintetizado ainda).
+    const areaFromSheds = sheds.reduce(
+      (acc, s) =>
+        acc +
+        (s.estimate.coveredAreaM2 || s.footprint.width * s.footprint.depth),
+      0,
+    );
+    const areaFromPlacements = site.buildings.reduce(
+      (acc, b) => acc + (b.targetAreaM2 || 0),
+      0,
+    );
+    const areaM2 = areaFromSheds > 0 ? areaFromSheds : areaFromPlacements;
+    const steelKg = sheds.reduce(
+      (acc, s) => acc + (s.estimate.steelKg || 0),
+      0,
+    );
+    const bays = sheds.reduce((acc, s) => acc + (s.structure.bayCount || 0), 0);
+    const height = sheds.reduce(
+      (max, s) => Math.max(max, s.structure.clearHeight || 0),
+      0,
+    );
+    const costPerM2 = areaM2 > 0 ? totalCost / areaM2 : 0;
+    // Bounding box dos footprints locais para apresentar dimensões agregadas.
+    let minX = Infinity,
+      maxX = -Infinity,
+      minZ = Infinity,
+      maxZ = -Infinity;
+    for (const b of site.buildings) {
+      for (const p of b.footprintPolygon) {
+        if (p.x < minX) minX = p.x;
+        if (p.x > maxX) maxX = p.x;
+        if (p.z < minZ) minZ = p.z;
+        if (p.z > maxZ) maxZ = p.z;
+      }
+    }
+    const bboxW = Number.isFinite(minX) ? maxX - minX : 0;
+    const bboxD = Number.isFinite(minZ) ? maxZ - minZ : 0;
+    const dominantUse = sheds[0]?.use ?? site.buildings[0]?.use ?? "—";
+    const dominantStd = sheds[0]?.standard;
+    return {
+      kind: "site" as const,
+      use: USE_LABEL[dominantUse] ?? dominantUse,
+      standard: dominantStd ? (STANDARD_LABEL[dominantStd] ?? dominantStd) : "—",
+      width: bboxW,
+      depth: bboxD,
+      areaM2,
+      totalCost,
+      costPerM2,
+      steelKg,
+      bays,
+      height,
+      shed: null,
+      site,
+      buildingCount: site.buildings.length,
+    };
+  }
   if (isIndustrialShed(model)) {
     const s = model as IndustrialShed;
     return {
@@ -75,6 +158,8 @@ function summarize(model: unknown) {
       bays: s.structure.bayCount,
       height: s.structure.clearHeight,
       shed: s,
+      site: null as SitePlan | null,
+      buildingCount: 1,
     };
   }
   // Legado (SteelFrameModel ou formato antigo)
@@ -107,7 +192,117 @@ function summarize(model: unknown) {
     bays: m?.bays ?? 0,
     height: m?.height ?? 0,
     shed: null,
+    site: null as SitePlan | null,
+    buildingCount: 0,
   };
+}
+
+/** Mini-thumbnail de um SitePlan: lote + footprints das construções. */
+function SiteThumb({
+  site,
+  selected,
+  W,
+  H,
+}: {
+  site: SitePlan;
+  selected: boolean;
+  W: number;
+  H: number;
+}) {
+  const pad = 8;
+  const lot = site.lotPolygonLocal;
+  if (!lot || lot.length < 3) {
+    return (
+      <div className="building-thumb-empty">
+        <svg viewBox="0 0 24 24" width={28} height={28}>
+          <path
+            d="M3 21V8l9-5 9 5v13H3z"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+          />
+        </svg>
+      </div>
+    );
+  }
+  let minX = Infinity,
+    maxX = -Infinity,
+    minZ = Infinity,
+    maxZ = -Infinity;
+  for (const p of lot) {
+    if (p.x < minX) minX = p.x;
+    if (p.x > maxX) maxX = p.x;
+    if (p.z < minZ) minZ = p.z;
+    if (p.z > maxZ) maxZ = p.z;
+  }
+  const lotW = Math.max(1e-3, maxX - minX);
+  const lotD = Math.max(1e-3, maxZ - minZ);
+  const innerW = W - pad * 2;
+  const innerH = H - pad * 2;
+  const scale = Math.min(innerW / lotW, innerH / lotD);
+  const drawW = lotW * scale;
+  const drawH = lotD * scale;
+  const ox = (W - drawW) / 2;
+  const oy = (H - drawH) / 2;
+  const project = (p: { x: number; z: number }) => ({
+    x: ox + (p.x - minX) * scale,
+    y: oy + (p.z - minZ) * scale,
+  });
+  const lotPath =
+    lot
+      .map((p, i) => {
+        const q = project(p);
+        return `${i === 0 ? "M" : "L"}${q.x.toFixed(1)} ${q.y.toFixed(1)}`;
+      })
+      .join(" ") + " Z";
+  const buildingPaths = site.buildings.map((b) => {
+    const pts = b.footprintPolygon.map(project);
+    return (
+      pts
+        .map(
+          (q, i) => `${i === 0 ? "M" : "L"}${q.x.toFixed(1)} ${q.y.toFixed(1)}`,
+        )
+        .join(" ") + " Z"
+    );
+  });
+  const stroke = selected ? "#D72042" : "rgba(255,255,255,0.45)";
+  const fill = selected ? "rgba(215,32,66,0.22)" : "rgba(255,255,255,0.10)";
+  return (
+    <svg
+      className="building-thumb"
+      viewBox={`0 0 ${W} ${H}`}
+      width="100%"
+      height="100%"
+      preserveAspectRatio="xMidYMid meet"
+    >
+      <path
+        d={lotPath}
+        fill="rgba(56,148,232,0.06)"
+        stroke="rgba(255,255,255,0.35)"
+        strokeWidth={1}
+      />
+      {buildingPaths.map((d, i) => (
+        <path
+          key={i}
+          d={d}
+          fill={fill}
+          stroke={stroke}
+          strokeWidth={1.4}
+        />
+      ))}
+      <text
+        x={W / 2}
+        y={H - 2}
+        fontSize={9}
+        textAnchor="middle"
+        fill="rgba(255,255,255,0.5)"
+        fontFamily="ui-monospace, monospace"
+      >
+        {site.buildings.length}{" "}
+        {site.buildings.length === 1 ? "edificação" : "edificações"}
+      </text>
+    </svg>
+  );
 }
 
 /** Mini-thumbnail top-down em SVG do galpão (footprint + zonas + docas). */
@@ -118,6 +313,11 @@ function ShedThumb({ model, selected }: { model: unknown; selected: boolean }) {
   const pad = 10;
   const innerW = W - pad * 2;
   const innerH = H - pad * 2;
+
+  // SitePlan: desenha lote + footprints reais das construções (top-down).
+  if (sum.kind === "site" && sum.site) {
+    return <SiteThumb site={sum.site} selected={selected} W={W} H={H} />;
+  }
 
   if (!sum.width || !sum.depth) {
     return (
@@ -336,10 +536,30 @@ export default function BuildingsGallery({
           </h2>
           {selectedSum && (
             <p className="buildings-sub">
-              {selectedSum.use} · {selectedSum.standard} ·{" "}
-              {selectedSum.width.toFixed(1)} × {selectedSum.depth.toFixed(1)} m
-              · {Math.round(selectedSum.areaM2).toLocaleString("pt-BR")} m²
-              cobertos
+              {selectedSum.use} · {selectedSum.standard}
+              {selectedSum.kind === "site" && selectedSum.buildingCount > 0 && (
+                <>
+                  {" · "}
+                  <strong>{selectedSum.buildingCount}</strong>{" "}
+                  {selectedSum.buildingCount === 1
+                    ? "edificação"
+                    : "edificações"}
+                </>
+              )}
+              {selectedSum.width > 0 && selectedSum.depth > 0 && (
+                <>
+                  {" · "}
+                  {selectedSum.width.toFixed(1)} ×{" "}
+                  {selectedSum.depth.toFixed(1)} m
+                </>
+              )}
+              {selectedSum.areaM2 > 0 && (
+                <>
+                  {" · "}
+                  {Math.round(selectedSum.areaM2).toLocaleString("pt-BR")} m²
+                  cobertos
+                </>
+              )}
             </p>
           )}
         </div>
@@ -373,7 +593,19 @@ export default function BuildingsGallery({
       {selected && selectedSum && (
         <div className="building-hero">
           <div className="building-hero-viewer">
-            {selectedSum.kind === "shed" && selectedSum.shed ? (
+            {selectedSum.kind === "site" && selectedSum.site ? (
+              <SitePlanViewer3D
+                site={selectedSum.site}
+                shedsById={Object.fromEntries(
+                  selectedSum.site.buildings
+                    .filter((b) => b.shed && isIndustrialShed(b.shed))
+                    .map((b) => [b.id, b.shed as IndustrialShed]),
+                )}
+                lod="architectural"
+                synthesizeShed
+                mapBackground
+              />
+            ) : selectedSum.kind === "shed" && selectedSum.shed ? (
               <ShedViewer
                 shed={selectedSum.shed}
                 polygon={polygon}

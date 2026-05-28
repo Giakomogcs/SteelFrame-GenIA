@@ -67,7 +67,8 @@ async function fetchFromOpenTopography(
   // bufferiza ~150 m em cada lado para sempre incluir células vizinhas
   const latBuf = 150 / 111_320;
   const lngBuf =
-    150 / (111_320 * Math.cos(((bbox.minLat + bbox.maxLat) / 2) * Math.PI / 180));
+    150 /
+    (111_320 * Math.cos((((bbox.minLat + bbox.maxLat) / 2) * Math.PI) / 180));
   const south = bbox.minLat - latBuf;
   const north = bbox.maxLat + latBuf;
   const west = bbox.minLng - lngBuf;

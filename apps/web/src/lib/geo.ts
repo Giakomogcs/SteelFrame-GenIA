@@ -445,9 +445,7 @@ export function computeSlopeFromGrid(
   const sorted = [...hs].sort((a, b) => a - b);
   const mid = Math.floor(sorted.length / 2);
   const hMedian =
-    sorted.length % 2
-      ? sorted[mid]
-      : (sorted[mid - 1] + sorted[mid]) / 2;
+    sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
 
   const sumCut = (H: number) =>
     hs.reduce((s, h) => s + Math.max(0, h - H) * cellAreaM2, 0);
