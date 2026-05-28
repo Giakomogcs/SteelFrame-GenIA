@@ -31,7 +31,6 @@ import {
 import { fitBuildings } from "@/lib/siteLayout";
 import {
   SitePlanSchema,
-  type BuildingUse,
   type SitePlan,
   type ValidationReport,
 } from "@/lib/sitePlanSchema";
@@ -40,8 +39,7 @@ import LotPreviewMap from "@/components/LotPreviewMap";
 const STEPS: StepDef[] = [
   { id: "terreno", label: "Terreno & rua", description: "Arestas e recuos" },
   { id: "perimetro", label: "Perímetro", description: "Muros e portões" },
-  { id: "programa", label: "Programa", description: "Nº de galpões, uso" },
-  { id: "galpoes", label: "Galpões", description: "Dimensões e tipologia" },
+  { id: "programa", label: "Programa & Galpões", description: "Uso, dimensões e tipologia" },
   { id: "circulacao", label: "Circulação", description: "Vagas e vias" },
   { id: "revisao", label: "Revisão", description: "Validar e gerar 3D" },
 ];
@@ -456,26 +454,20 @@ export default function BriefingClient({
               maxQty={maxQty}
               rotationDeg={state.rotationDeg}
               onRotation={(deg) => setState((s) => ({ ...s, rotationDeg: deg }))}
-            />
-          )}
-          {step === 3 && (
-            <StepBuildings
               clearHeight={state.clearHeight}
-              programa={state.programa}
-              gapM={state.gapM}
               onClearHeight={(v) => setState((s) => ({ ...s, clearHeight: v }))}
-              onProgram={(p) => setState((s) => ({ ...s, programa: p }))}
+              gapM={state.gapM}
               onGap={(v) => setState((s) => ({ ...s, gapM: v }))}
             />
           )}
-          {step === 4 && (
+          {step === 3 && (
             <StepCirculation
               carStalls={state.carStalls}
               truckStalls={state.truckStalls}
               onChange={(patch) => setState((s) => ({ ...s, ...patch }))}
             />
           )}
-          {step === 5 && (
+          {step === 4 && (
             <StepReview report={candidate.report} error={candidate.error} />
           )}
 
@@ -571,9 +563,13 @@ export default function BriefingClient({
             type="button"
             className="btn btn--accept"
             onClick={handleGenerate}
-            disabled={submitting || !candidate.report.ok || !candidate.site}
+            disabled={submitting || !candidate.report.ok || !candidate.site || Boolean(candidate.error)}
             title={
-              !candidate.report.ok ? "Corrija os erros antes de gerar." : ""
+              candidate.error
+                ? candidate.error
+                : !candidate.report.ok
+                  ? "Corrija os erros antes de gerar."
+                  : ""
             }
           >
             {submitting ? "Gerando estudo…" : "Gerar estudo 3D"}
@@ -594,6 +590,10 @@ function StepProgram({
   maxQty,
   rotationDeg,
   onRotation,
+  clearHeight,
+  onClearHeight,
+  gapM,
+  onGap,
 }: {
   value: Programa;
   onChange: (v: Programa) => void;
@@ -602,6 +602,10 @@ function StepProgram({
   maxQty: number;
   rotationDeg: number;
   onRotation: (deg: number) => void;
+  clearHeight: number;
+  onClearHeight: (v: number) => void;
+  gapM: number;
+  onGap: (v: number) => void;
 }) {
   return (
     <div className="briefing-v2__fields">
@@ -666,6 +670,34 @@ function StepProgram({
               qty: Math.max(1, Math.min(6, Number(e.target.value))),
             })
           }
+        />
+      </label>
+      <label className="briefing-v2__field">
+        <span className="briefing-v2__field-label">
+          Pé-direito útil
+          <span className="briefing-v2__field-value">{clearHeight} m</span>
+        </span>
+        <input
+          type="range"
+          min={SLIDER_RANGES.clearHeight.min}
+          max={SLIDER_RANGES.clearHeight.max}
+          step={0.5}
+          value={clearHeight}
+          onChange={(e) => onClearHeight(Number(e.target.value))}
+        />
+      </label>
+      <label className="briefing-v2__field">
+        <span className="briefing-v2__field-label">
+          Espaçamento entre galpões
+          <span className="briefing-v2__field-value">{gapM} m</span>
+        </span>
+        <input
+          type="range"
+          min={SITE_CONSTRAINTS.building.minGapBetweenM}
+          max={30}
+          step={0.5}
+          value={gapM}
+          onChange={(e) => onGap(Number(e.target.value))}
         />
       </label>
       <label className="briefing-v2__field">
@@ -821,68 +853,6 @@ function StepPerimeter({
           step={0.5}
           value={gateWidth}
           onChange={(e) => onChange({ gateWidth: Number(e.target.value) })}
-        />
-      </label>
-    </div>
-  );
-}
-
-function StepBuildings({
-  clearHeight,
-  programa,
-  gapM,
-  onClearHeight,
-  onProgram,
-  onGap,
-}: {
-  clearHeight: number;
-  programa: Programa;
-  gapM: number;
-  onClearHeight: (v: number) => void;
-  onProgram: (p: Programa) => void;
-  onGap: (v: number) => void;
-}) {
-  return (
-    <div className="briefing-v2__fields">
-      <label className="briefing-v2__field">
-        <span className="briefing-v2__field-label">
-          Pé-direito útil
-          <span className="briefing-v2__field-value">{clearHeight} m</span>
-        </span>
-        <input
-          type="range"
-          min={SLIDER_RANGES.clearHeight.min}
-          max={SLIDER_RANGES.clearHeight.max}
-          step={0.5}
-          value={clearHeight}
-          onChange={(e) => onClearHeight(Number(e.target.value))}
-        />
-      </label>
-      <label className="briefing-v2__field">
-        <span>Área alvo por galpão (m²)</span>
-        <input
-          type="number"
-          min={300}
-          max={20000}
-          step={50}
-          value={programa.targetAreaM2}
-          onChange={(e) =>
-            onProgram({ ...programa, targetAreaM2: Number(e.target.value) })
-          }
-        />
-      </label>
-      <label className="briefing-v2__field">
-        <span className="briefing-v2__field-label">
-          Espaçamento entre galpões
-          <span className="briefing-v2__field-value">{gapM} m</span>
-        </span>
-        <input
-          type="range"
-          min={SITE_CONSTRAINTS.building.minGapBetweenM}
-          max={30}
-          step={0.5}
-          value={gapM}
-          onChange={(e) => onGap(Number(e.target.value))}
         />
       </label>
     </div>

@@ -4743,6 +4743,34 @@ textarea {
   margin: 0;
 }
 
+/* Leaflet tooltip overrides for lot preview */
+.lot-preview-label {
+  background: rgba(0, 0, 0, 0.7) !important;
+  border: none !important;
+  color: #fff !important;
+  font-family: var(--font-mono) !important;
+  font-size: 9px !important;
+  padding: 1px 4px !important;
+  border-radius: 3px !important;
+  box-shadow: none !important;
+  white-space: nowrap !important;
+}
+.lot-preview-label::before {
+  display: none !important;
+}
+.lot-preview-building-label {
+  background: rgba(0, 0, 0, 0.75) !important;
+  border: none !important;
+  color: #fff !important;
+  font-family: var(--font-mono) !important;
+  padding: 3px 6px !important;
+  border-radius: 4px !important;
+  box-shadow: none !important;
+}
+.lot-preview-building-label::before {
+  display: none !important;
+}
+
 .briefing-v2__validation {
   display: flex;
   flex-direction: column;
