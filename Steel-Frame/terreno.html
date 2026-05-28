@@ -1,0 +1,357 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Terreno #SF-2402 · Cumbica · SteelFrame GenIA</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700;900&family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/app.css">
+<style>
+  .terreno-hero { display: grid; grid-template-columns: 1.4fr 1fr; gap: var(--space-4); }
+  @media (max-width: 1100px) { .terreno-hero { grid-template-columns: 1fr; } }
+  .terreno-map { position: relative; aspect-ratio: 16/9; border:1px solid var(--color-stroke); border-radius: var(--radius-md); overflow: hidden; background: var(--color-surface); }
+  .terreno-map .map-placeholder { position: absolute; inset:0; height:100%; }
+  .terreno-map-overlay { position: absolute; bottom: var(--space-3); left: var(--space-3); right: var(--space-3); display:flex; justify-content:space-between; align-items:flex-end; gap: var(--space-2); }
+  .terreno-map-overlay .layer-chips { display:flex; gap: 6px; flex-wrap: wrap; }
+  .terreno-map-overlay .layer-chips button { font-family: var(--font-mono); font-size: 10px; padding: 4px 10px; border-radius: var(--radius-full); border: 1px solid var(--color-stroke); background: var(--overlay-glass); color: var(--color-text-primary); backdrop-filter: blur(8px); text-transform: uppercase; letter-spacing: 0.06em; cursor: pointer; }
+  .terreno-map-overlay .layer-chips button.active { border-color: var(--color-primary-500); color: var(--color-primary-500); }
+  .terreno-map-meta { font-family: var(--font-mono); font-size: 10px; color: var(--color-text-primary); background: var(--overlay-glass); border:1px solid var(--color-stroke); border-radius: var(--radius-sm); padding: 4px 8px; backdrop-filter: blur(8px); }
+  .terreno-info { background: var(--color-surface); border:1px solid var(--color-stroke); border-radius: var(--radius-md); padding: var(--space-5); display:flex; flex-direction: column; gap: var(--space-4); }
+  .info-row { display:grid; grid-template-columns: 110px 1fr; gap: var(--space-3); align-items: baseline; }
+  .info-row .lbl { font-family: var(--font-mono); font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: 0.06em; color: var(--color-text-secondary); }
+  .info-row .val { font-size: var(--fs-sm); color: var(--color-text-primary); }
+  .info-row .val.mono { font-family: var(--font-mono); }
+  .stat-strip { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-3); }
+  @media (max-width: 920px) { .stat-strip { grid-template-columns: repeat(2, 1fr); } }
+  .stat-strip .stat-card { background: var(--color-surface); border:1px solid var(--color-stroke); border-radius: var(--radius-md); padding: var(--space-4); }
+  .stat-strip .stat-card .stat-lbl { font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; color: var(--color-text-secondary); letter-spacing: 0.08em; margin-bottom: var(--space-2); }
+  .stat-strip .stat-card .stat-val { font-family: var(--font-display); font-size: var(--fs-xl); font-weight: var(--fw-bold); line-height: 1; }
+  .stat-strip .stat-card .stat-val .unit { font-size: 12px; color: var(--color-text-secondary); margin-left: 4px; font-family: var(--font-mono); }
+  .stat-strip .stat-card.accent { border-color: var(--color-primary-500); }
+  .stat-strip .stat-card.accent .stat-val { color: var(--color-primary-500); }
+
+  /* ===== Verdict strip ===== */
+  .verdict-strip {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: var(--space-5);
+    align-items: center;
+    padding: var(--space-5);
+    background:
+      radial-gradient(ellipse at left, rgba(23,163,74,0.16), transparent 60%),
+      linear-gradient(135deg, var(--color-surface-elevated) 0%, var(--color-surface) 100%);
+    border: 1px solid var(--color-stroke);
+    border-left: 4px solid var(--color-success);
+    border-radius: var(--radius-md);
+  }
+  @media (max-width: 980px) { .verdict-strip { grid-template-columns: 1fr; } }
+  .verdict-strip .v-badge {
+    display: inline-flex; align-items: center; gap: var(--space-2);
+    background: var(--color-success-soft); color: var(--color-success);
+    padding: 8px 16px; border-radius: var(--radius-full);
+    font-family: var(--font-mono); font-weight: var(--fw-bold); font-size: 12px;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    border: 1px solid rgba(23,163,74,0.4);
+    white-space: nowrap;
+  }
+  .verdict-strip .v-badge::before {
+    content: ''; width: 8px; height: 8px; border-radius: 50%;
+    background: var(--color-success); box-shadow: 0 0 0 4px rgba(23,163,74,0.25);
+  }
+  .verdict-strip .v-msg { font-size: var(--fs-md); line-height: 1.4; }
+  .verdict-strip .v-msg strong { color: var(--color-primary-500); font-family: var(--font-display); }
+  .verdict-strip .v-msg .v-sub { display: block; color: var(--color-text-secondary); font-size: var(--fs-sm); margin-top: 4px; font-family: var(--font-mono); }
+  .verdict-strip .v-cta { display: flex; gap: var(--space-2); }
+
+  .work-section { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-4); }
+  @media (max-width: 1100px) { .work-section { grid-template-columns: 1fr; } }
+  .work-col { background: var(--color-surface); border:1px solid var(--color-stroke); border-radius: var(--radius-md); overflow: hidden; display:flex; flex-direction: column; }
+  .work-col-head { padding: var(--space-4) var(--space-4) var(--space-3); border-bottom: 1px solid var(--color-stroke); display:flex; justify-content: space-between; align-items: center; gap: var(--space-3); }
+  .work-col-head h3 { font-family: var(--font-display); font-size: var(--fs-md); font-weight: var(--fw-semibold); }
+  .work-col-head .count { font-family: var(--font-mono); font-size: 10px; color: var(--color-text-secondary); padding: 2px 8px; background: var(--color-surface-elevated); border-radius: var(--radius-full); border:1px solid var(--color-stroke); text-transform: uppercase; letter-spacing: 0.08em; }
+  .work-col-body { padding: var(--space-3); display:flex; flex-direction: column; gap: var(--space-2); flex: 1; }
+  .work-col-body a.item { display:block; padding: var(--space-3); border-radius: var(--radius-sm); border:1px solid transparent; text-decoration: none; color: inherit; transition: border-color .15s, background .15s; }
+  .work-col-body a.item:hover { border-color: var(--color-stroke); background: var(--color-surface-elevated); }
+  .work-col-body .item-title { font-size: var(--fs-sm); font-weight: var(--fw-semibold); display:flex; justify-content: space-between; align-items: baseline; gap: var(--space-2); }
+  .work-col-body .item-sub { font-family: var(--font-mono); font-size: 10px; color: var(--color-text-secondary); margin-top: 4px; letter-spacing: 0.04em; }
+  .work-col-body .item-meta { display:flex; gap: var(--space-2); margin-top: var(--space-2); flex-wrap: wrap; }
+  .work-col-footer { padding: var(--space-3); border-top: 1px solid var(--color-stroke); }
+  .work-col-footer .btn { width: 100%; justify-content: center; }
+  .empty-row { padding: var(--space-4); border:1px dashed var(--color-stroke); border-radius: var(--radius-sm); text-align: center; color: var(--color-text-secondary); font-size: var(--fs-xs); font-family: var(--font-mono); }
+  .galpao-mini { display: flex; gap: var(--space-3); align-items: center; }
+  .galpao-mini .thumb { width: 56px; height: 40px; border-radius: var(--radius-sm); background: var(--color-surface-elevated); border: 1px solid var(--color-stroke); flex-shrink: 0; position: relative; overflow: hidden; }
+  .galpao-mini .thumb svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .timeline { position: relative; padding-left: var(--space-4); margin-top: var(--space-4); }
+  .timeline::before { content: ''; position: absolute; left: 5px; top: 6px; bottom: 6px; width: 1px; background: var(--color-stroke); }
+  .timeline .entry { position: relative; padding-bottom: var(--space-3); }
+  .timeline .entry::before { content: ''; position: absolute; left: -15px; top: 6px; width: 10px; height: 10px; border-radius: 50%; background: var(--color-surface); border: 2px solid var(--color-primary-500); }
+  .timeline .entry-time { font-family: var(--font-mono); font-size: 10px; color: var(--color-text-secondary); }
+  .timeline .entry-body { font-size: var(--fs-xs); color: var(--color-text-primary); margin-top: 2px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-mark">DT</div>
+      <div class="brand-text">
+        <span class="brand-name">SteelFrame GenIA</span>
+        <span class="brand-sub">Distrito Tecnológico</span>
+      </div>
+    </div>
+    <div class="sidebar-section">
+      <span class="sidebar-section-label">Operação</span>
+      <a class="nav-item" href="home.html"><svg class="icon-stroke nav-icon" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span>Meus terrenos</span><span class="nav-badge">12</span></a>
+      <a class="nav-item active" href="#"><svg class="icon-stroke nav-icon" viewBox="0 0 24 24"><path d="M12 21s-7-7.5-7-12a7 7 0 1 1 14 0c0 4.5-7 12-7 12z"/><circle cx="12" cy="9" r="2.5"/></svg><span>Terreno #SF-2402</span></a>
+      <a class="nav-item" href="cadastro-terreno.html"><svg class="icon-stroke nav-icon" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg><span>Novo terreno</span></a>
+    </div>
+    <div class="sidebar-section">
+      <span class="sidebar-section-label">Referências</span>
+      <a class="nav-item" href="base-conhecimento.html"><svg class="icon-stroke nav-icon" viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg><span>Base de conhecimento</span></a>
+      <a class="nav-item" href="components.html"><svg class="icon-stroke nav-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="9"/></svg><span>Sistema de design</span></a>
+    </div>
+    <div class="sidebar-user">
+      <div class="avatar">RC</div>
+      <div class="user-meta">
+        <span class="user-name">Renata Couto</span>
+        <span class="user-role">Eng. Civil · SteelFrame BR</span>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="page-header">
+      <div class="stack-sm">
+        <nav class="breadcrumb">
+          <a href="home.html">Meus terrenos</a>
+          <span class="sep">/</span>
+          <span class="crumb-current">Cumbica · #SF-2402</span>
+        </nav>
+        <div class="page-title-row">
+          <h1>Av. Monteiro Lobato, 4.820</h1>
+          <span class="pill pill-success"><span class="dot"></span>Viável</span>
+          <span class="pill pill-neutral mono">5.480 m² · industrial logístico</span>
+        </div>
+        <p class="text-sm muted" style="margin-top:var(--space-2)">CUMBICA · GUARULHOS / SP · CEP 07180-900 · cone de aproximação GRU verificado · zoneamento ZPI-1</p>
+      </div>
+      <div class="row">
+        <a class="btn btn-secondary" href="editar-terreno.html">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+          Editar terreno
+        </a>
+        <a class="btn btn-secondary" href="briefing.html">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+          Novo briefing
+        </a>
+        <a class="btn btn-primary" href="viewer-3d.html">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Estudar novo galpão
+        </a>
+      </div>
+    </header>
+
+    <!-- VERDICT STRIP -->
+    <section class="verdict-strip">
+      <span class="v-badge">Terreno viável</span>
+      <div class="v-msg">
+        Lote de <strong>5.480 m²</strong> em Cumbica comporta até <strong>3.836 m²</strong> de área construída (CA 2,0 · TO 70%) — já estudados <strong>3 galpões</strong>, com R-001 vigente.
+        <span class="v-sub">Sem APP · plano · cone GRU verificado · único risco aberto: sondagem SPT obrigatória antes da fundação</span>
+      </div>
+      <div class="v-cta">
+        <a class="btn btn-secondary btn-sm" href="relatorio.html">Abrir R-001</a>
+        <a class="btn btn-primary btn-sm" href="viewer-3d.html">Estudar novo galpão</a>
+      </div>
+    </section>
+
+    <!-- Hero: mapa + dados -->
+    <section class="terreno-hero">
+      <div class="terreno-map">
+        <div class="map-placeholder show-hillshade show-contours" style="height:100%">
+          <div class="map-grid-overlay"></div><div class="map-hillshade"></div><div class="map-contours"></div>
+          <svg class="map-polygon" style="position:absolute; inset:0; width:100%; height:100%" viewBox="0 0 800 450" preserveAspectRatio="none">
+            <path d="M 120 100 L 680 110 L 690 360 L 130 350 Z" />
+            <circle cx="120" cy="100" r="5"/><circle cx="680" cy="110" r="5"/><circle cx="690" cy="360" r="5"/><circle cx="130" cy="350" r="5"/>
+            <text x="380" y="240" text-anchor="middle" fill="#FF7524" font-family="JetBrains Mono" font-size="13" font-weight="600">5.480 m²</text>
+          </svg>
+        </div>
+        <div class="terreno-map-overlay">
+          <div class="layer-chips">
+            <button class="active">Satélite</button>
+            <button>Ruas</button>
+            <button class="active">Hillshade</button>
+            <button class="active">Curvas</button>
+          </div>
+          <span class="terreno-map-meta">−23.4356 · −46.4731 · 02/05/26</span>
+        </div>
+      </div>
+      <div class="terreno-info">
+        <div class="info-row"><span class="lbl">ID</span><span class="val mono">#SF-2402 · criado 12 abr 2026</span></div>
+        <div class="info-row"><span class="lbl">Endereço</span><span class="val">Av. Monteiro Lobato, 4.820 — Cumbica, Guarulhos / SP · 07180-900</span></div>
+        <div class="info-row"><span class="lbl">Bairro</span><span class="val">Cumbica · corredor Rod. Hélio Smidt</span></div>
+        <div class="info-row"><span class="lbl">Zoneamento</span><span class="val">ZPI-1 (Zona Predominantemente Industrial) · CA máx. 2,0 · TO máx. 70%</span></div>
+        <div class="info-row"><span class="lbl">Restrições</span><span class="val">Cone GRU verificado · altura máx. 18 m · sem APP</span></div>
+        <div class="info-row"><span class="lbl">Cliente</span><span class="val">Logística Bandeirantes Ltda · CNPJ 12.345.678/0001-90</span></div>
+        <div class="info-row"><span class="lbl">Responsável</span><span class="val">Renata Couto · CREA-SP 5070123/D</span></div>
+      </div>
+    </section>
+
+    <!-- KPIs -->
+    <section class="stat-strip">
+      <div class="stat-card"><div class="stat-lbl">Área do terreno</div><div class="stat-val">5.480<span class="unit">m²</span></div></div>
+      <div class="stat-card"><div class="stat-lbl">Capacidade construtiva</div><div class="stat-val">3.836<span class="unit">m² máx.</span></div></div>
+      <div class="stat-card accent"><div class="stat-lbl">Galpão A · custo total</div><div class="stat-val">R$ 4,8<span class="unit">M</span></div></div>
+      <div class="stat-card"><div class="stat-lbl">Custo / m² construído</div><div class="stat-val">R$ 1,71<span class="unit">k</span></div></div>
+    </section>
+
+    <!-- Briefings · Construções (galpões) · Relatórios -->
+    <section class="work-section">
+
+      <!-- Briefings -->
+      <div class="work-col">
+        <div class="work-col-head">
+          <h3>Briefings</h3>
+          <span class="count">3 sessões</span>
+        </div>
+        <div class="work-col-body">
+          <a class="item" href="briefing.html">
+            <div class="item-title">Galpão logístico · cross-docking <span class="pill pill-success" style="font-size:10px"><span class="dot"></span>26/26</span></div>
+            <div class="item-sub">CONCLUÍDO · 18 MAI 2026 · 22 min</div>
+            <div class="item-meta">
+              <span class="chip">CD seco</span><span class="chip">vão 25 m</span><span class="chip">pé-direito 12 m</span>
+            </div>
+          </a>
+          <a class="item" href="briefing.html">
+            <div class="item-title">Galpão industrial leve <span class="pill pill-warning" style="font-size:10px"><span class="dot"></span>14/26</span></div>
+            <div class="item-sub">EM ANDAMENTO · 22 MAI 2026 · pausado em "instalações"</div>
+            <div class="item-meta">
+              <span class="chip">manufatura</span><span class="chip">ponte rolante 5 t</span>
+            </div>
+          </a>
+          <a class="item" href="briefing.html">
+            <div class="item-title">Galpão híbrido + showroom <span class="pill pill-neutral" style="font-size:10px"><span class="dot"></span>0/26</span></div>
+            <div class="item-sub">RASCUNHO · 25 MAI 2026 · não iniciado</div>
+            <div class="item-meta">
+              <span class="chip">multiuso</span><span class="chip">mezanino 240 m²</span>
+            </div>
+          </a>
+        </div>
+        <div class="work-col-footer">
+          <a class="btn btn-secondary btn-sm" href="briefing.html">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Iniciar novo briefing
+          </a>
+        </div>
+      </div>
+
+      <!-- Construções (galpões estudados) -->
+      <div class="work-col">
+        <div class="work-col-head">
+          <h3>Galpões estudados</h3>
+          <span class="count">3 construções</span>
+        </div>
+        <div class="work-col-body">
+          <a class="item" href="viewer-3d.html">
+            <div class="galpao-mini">
+              <div class="thumb">
+                <svg viewBox="0 0 56 40"><path d="M4 30 L4 18 L28 6 L52 18 L52 30 Z" fill="none" stroke="#D72042" stroke-width="1.5"/><line x1="4" y1="30" x2="52" y2="30" stroke="#5E6267" stroke-width="1"/><line x1="20" y1="18" x2="20" y2="30" stroke="#5E6267" stroke-width="0.5"/><line x1="36" y1="18" x2="36" y2="30" stroke="#5E6267" stroke-width="0.5"/></svg>
+              </div>
+              <div style="flex:1">
+                <div class="item-title">Galpão A · CD seco <span class="pill pill-success" style="font-size:10px">viável</span></div>
+                <div class="item-sub">2.800 M² · VÃO 25 M · PÉ-DIREITO 12 M · TELHA TRAPEZOIDAL</div>
+              </div>
+            </div>
+            <div class="item-meta">
+              <span class="chip">aço 142 t</span><span class="chip">R$ 4,8 M</span><span class="chip">R$ 1.714/m²</span>
+            </div>
+          </a>
+          <a class="item" href="viewer-3d.html">
+            <div class="galpao-mini">
+              <div class="thumb">
+                <svg viewBox="0 0 56 40"><path d="M4 30 L4 22 L28 12 L52 22 L52 30 Z" fill="none" stroke="#FF7524" stroke-width="1.5"/><line x1="4" y1="30" x2="52" y2="30" stroke="#5E6267" stroke-width="1"/><rect x="38" y="22" width="10" height="8" fill="none" stroke="#5E6267" stroke-width="0.5"/></svg>
+              </div>
+              <div style="flex:1">
+                <div class="item-title">Galpão B · industrial leve <span class="pill pill-warning" style="font-size:10px">prévia</span></div>
+                <div class="item-sub">1.800 M² · VÃO 20 M · PÉ-DIREITO 9 M · PONTE ROLANTE</div>
+              </div>
+            </div>
+            <div class="item-meta">
+              <span class="chip">aço 98 t</span><span class="chip">R$ 3,4 M</span><span class="chip">R$ 1.888/m²</span>
+            </div>
+          </a>
+          <a class="item" href="viewer-3d.html">
+            <div class="galpao-mini">
+              <div class="thumb">
+                <svg viewBox="0 0 56 40"><path d="M4 30 L4 16 L28 4 L52 16 L52 30 Z" fill="none" stroke="#5E6267" stroke-width="1.5"/><line x1="4" y1="30" x2="52" y2="30" stroke="#5E6267" stroke-width="1"/><rect x="14" y="22" width="8" height="8" fill="none" stroke="#5E6267" stroke-width="0.5"/><rect x="32" y="22" width="8" height="8" fill="none" stroke="#5E6267" stroke-width="0.5"/></svg>
+              </div>
+              <div style="flex:1">
+                <div class="item-title">Galpão C · híbrido + mezanino <span class="pill pill-neutral" style="font-size:10px">rascunho</span></div>
+                <div class="item-sub">2.400 M² + MEZ. 240 M² · VÃO 22 M · PÉ-DIREITO 11 M</div>
+              </div>
+            </div>
+            <div class="item-meta">
+              <span class="chip">aço — t</span><span class="chip">R$ — M</span><span class="chip">geometria pendente</span>
+            </div>
+          </a>
+        </div>
+        <div class="work-col-footer">
+          <a class="btn btn-primary btn-sm" href="viewer-3d.html">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Estudar novo galpão
+          </a>
+        </div>
+      </div>
+
+      <!-- Relatórios -->
+      <div class="work-col">
+        <div class="work-col-head">
+          <h3>Relatórios de viabilidade</h3>
+          <span class="count">2 emitidos</span>
+        </div>
+        <div class="work-col-body">
+          <a class="item" href="relatorio.html">
+            <div class="item-title">R-001 · Galpão A · CD seco <span class="pill pill-success" style="font-size:10px">vigente</span></div>
+            <div class="item-sub">EMITIDO 20 MAI 2026 · 12 BLOCOS · PDF 2,4 MB</div>
+            <div class="item-meta">
+              <span class="chip">com / sem demo</span><span class="chip">R$ 1.714/m²</span><span class="chip">12 fontes citadas</span>
+            </div>
+          </a>
+          <a class="item" href="relatorio.html">
+            <div class="item-title">R-002 · Galpão B · industrial leve <span class="pill pill-neutral" style="font-size:10px">prévia</span></div>
+            <div class="item-sub">RASCUNHO · 23 MAI 2026 · faltam riscos técnicos</div>
+            <div class="item-meta">
+              <span class="chip">prévia parcial</span><span class="chip">aguarda sondagem</span>
+            </div>
+          </a>
+          <div class="empty-row">+ relatórios surgem aqui ao gerar do briefing concluído</div>
+        </div>
+        <div class="work-col-footer">
+          <a class="btn btn-secondary btn-sm" href="relatorio.html">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="14 3 14 9 20 9"/></svg>
+            Abrir último relatório
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <!-- Atividade -->
+    <section style="background: var(--color-surface); border:1px solid var(--color-stroke); border-radius: var(--radius-md); padding: var(--space-5)">
+      <div class="row-between" style="margin-bottom: var(--space-3)">
+        <h3 style="font-family: var(--font-display); font-size: var(--fs-md); font-weight: var(--fw-semibold)">Atividade recente neste terreno</h3>
+        <span class="text-xs muted mono">últimos 14 dias</span>
+      </div>
+      <div class="timeline">
+        <div class="entry"><div class="entry-time">25 MAI · 09:42</div><div class="entry-body">Renata C. criou rascunho de briefing "Galpão híbrido + showroom".</div></div>
+        <div class="entry"><div class="entry-time">23 MAI · 17:08</div><div class="entry-body">Agente gerou prévia de R-002 (Galpão B) — flag: aguarda sondagem SPT antes de fechar fundação.</div></div>
+        <div class="entry"><div class="entry-time">22 MAI · 14:11</div><div class="entry-body">Briefing "Galpão industrial leve" pausado em "instalações" — perguntas 14–26 pendentes.</div></div>
+        <div class="entry"><div class="entry-time">20 MAI · 11:30</div><div class="entry-body">R-001 (Galpão A · CD seco) emitido e exportado em PDF.</div></div>
+        <div class="entry"><div class="entry-time">18 MAI · 16:25</div><div class="entry-body">Briefing "Galpão logístico · cross-docking" concluído (26/26).</div></div>
+        <div class="entry"><div class="entry-time">12 ABR · 10:02</div><div class="entry-body">Terreno cadastrado · polígono 4 vértices · endereço vinculado via Nominatim.</div></div>
+      </div>
+    </section>
+  </main>
+</div>
+</body>
+</html>

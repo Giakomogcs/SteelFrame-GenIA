@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@sfg/db";
+import { MAX_TERRAIN_AREA_M2, MIN_TERRAIN_AREA_M2 } from "@/lib/geo";
 
 const CreateTerrainSchema = z.object({
   name: z.string().min(1).max(120),
@@ -8,7 +9,13 @@ const CreateTerrainSchema = z.object({
   polygon: z.array(z.tuple([z.number(), z.number()])).min(3),
   centerLng: z.number(),
   centerLat: z.number(),
-  areaM2: z.number().nonnegative(),
+  areaM2: z
+    .number()
+    .min(MIN_TERRAIN_AREA_M2, `Área mínima ${MIN_TERRAIN_AREA_M2} m².`)
+    .max(
+      MAX_TERRAIN_AREA_M2,
+      `Área máxima ${MAX_TERRAIN_AREA_M2 / 10_000} ha — selecione um lote, não uma região.`
+    ),
 });
 
 export async function GET() {

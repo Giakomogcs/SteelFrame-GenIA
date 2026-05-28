@@ -1,0 +1,367 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Wireframes lo-fi · 8 telas · SteelFrame GenIA</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700;900&family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/app.css">
+<style>
+  .wire-page {
+    max-width: 1320px; margin: 0 auto; padding: var(--space-8) var(--space-6);
+  }
+  .wire-head { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: var(--space-8); flex-wrap: wrap; gap: var(--space-4); }
+  .wire-head h1 { font-size: var(--fs-2xl); margin-bottom: var(--space-2); }
+  .wire-head .sub { color: var(--color-text-secondary); max-width: 60ch; }
+  .wire-grid {
+    display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-8);
+  }
+  @media (max-width: 920px) { .wire-grid { grid-template-columns: 1fr; } }
+
+  .wire-card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-stroke);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    display: flex; flex-direction: column;
+  }
+  .wire-card-head {
+    padding: var(--space-3) var(--space-4);
+    border-bottom: 1px solid var(--color-stroke);
+    display: flex; justify-content: space-between; align-items: center;
+    background: var(--color-surface-elevated);
+  }
+  .wire-card-head .wire-id {
+    font-family: var(--font-mono);
+    font-size: var(--fs-xs);
+    color: var(--color-primary-500);
+    font-weight: var(--fw-semibold);
+  }
+  .wire-card-head .wire-name { font-size: var(--fs-body); font-weight: var(--fw-semibold); }
+  .wire-card-head .wire-route { font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--color-text-secondary); }
+
+  /* Wire frame canvas */
+  .wire-canvas {
+    aspect-ratio: 4/3;
+    background:
+      linear-gradient(180deg, #18181b, #1d1d20);
+    background-image:
+      linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+    background-size: 16px 16px;
+    padding: 16px;
+    display: grid;
+    gap: 8px;
+    grid-template-rows: 32px 1fr 24px;
+  }
+  /* Lo-fi shapes */
+  .box {
+    background: rgba(255,255,255,0.06);
+    border: 1px dashed rgba(255,255,255,0.20);
+    border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--font-mono); font-size: 10px;
+    color: rgba(255,255,255,0.55);
+    text-transform: uppercase; letter-spacing: 0.05em;
+    padding: 4px;
+    overflow: hidden;
+  }
+  .box.solid { background: rgba(255,255,255,0.12); border-style: solid; color: rgba(255,255,255,0.8); }
+  .box.accent { border-color: var(--color-primary-500); color: var(--color-primary-500); }
+  .box.fill-accent { background: var(--color-primary-soft); border-color: var(--color-primary-500); color: var(--color-primary-500); font-weight:600; }
+
+  /* Layout patterns */
+  .row { display: flex; gap: 8px; }
+  .col { display: flex; flex-direction: column; gap: 8px; }
+  .wire-canvas .canvas-row { display: grid; gap: 8px; }
+  .wire-canvas .grid-3 { grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .wire-canvas .grid-4 { grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .wire-canvas .grid-2-1 { grid-template-columns: 2fr 1fr; gap: 8px; }
+  .wire-canvas .grid-1-2 { grid-template-columns: 1fr 2fr; gap: 8px; }
+  .h-full { height: 100%; }
+
+  .wire-notes {
+    padding: var(--space-3) var(--space-4);
+    background: var(--color-surface);
+    border-top: 1px solid var(--color-stroke);
+    font-size: var(--fs-sm);
+    color: var(--color-text-secondary);
+  }
+  .wire-notes ul { margin: 0; padding-left: var(--space-4); }
+  .wire-notes li { margin: 2px 0; }
+</style>
+</head>
+<body>
+<div class="wire-page">
+  <header class="wire-head">
+    <div>
+      <h1>Wireframes lo-fi · 8 telas</h1>
+      <p class="sub">Estrutura de informação e hierarquia antes da fidelidade visual. Cada quadro indica IA, principais áreas e CTAs — sem cor, sem ilustração.</p>
+    </div>
+    <a href="index.html" class="btn btn-secondary btn-sm">← Voltar ao índice</a>
+  </header>
+
+  <section class="wire-grid">
+
+    <!-- 1 · Home -->
+    <article class="wire-card">
+      <header class="wire-card-head">
+        <div><span class="wire-id">01</span> <span class="wire-name">Home · Meus terrenos</span></div>
+        <span class="wire-route">/</span>
+      </header>
+      <div class="wire-canvas">
+        <div class="row" style="align-items:center">
+          <div class="box solid" style="width: 22%">SIDEBAR · brand</div>
+          <div class="box" style="flex:1">BREADCRUMB · "Meus terrenos · 12"</div>
+          <div class="box fill-accent" style="width: 140px">+ NOVO TERRENO</div>
+        </div>
+        <div class="canvas-row" style="grid-template-columns: 22% 1fr; height:100%">
+          <div class="col">
+            <div class="box solid">Nav: Meus terrenos</div>
+            <div class="box">Novo terreno</div>
+            <div class="box">Briefings ativos</div>
+            <div class="box">Relatórios</div>
+            <div class="box" style="flex:1">— · — · —</div>
+            <div class="box solid">Avatar + nome</div>
+          </div>
+          <div class="col">
+            <div class="canvas-row grid-4">
+              <div class="box solid">KPI · área total</div>
+              <div class="box accent">KPI · custo R$</div>
+              <div class="box solid">KPI · R$/m²</div>
+              <div class="box solid">KPI · pipeline</div>
+            </div>
+            <div class="box">FILTROS · busca · cidade · tipo · status · view toggle</div>
+            <div class="canvas-row grid-3" style="flex:1">
+              <div class="box">CARD terreno · sat thumb · status · m² · custo</div>
+              <div class="box">CARD terreno</div>
+              <div class="box">CARD terreno</div>
+              <div class="box">CARD terreno</div>
+              <div class="box">CARD terreno</div>
+              <div class="box">CARD terreno</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="wire-notes"><ul><li>CTA primário fixo no header.</li><li>Cards têm miniatura de satélite + pílula de status (viável / em briefing / bloqueado).</li><li>Sidebar com nº badges para itens com atividade.</li></ul></div>
+    </article>
+
+    <!-- 2 · Cadastro -->
+    <article class="wire-card">
+      <header class="wire-card-head">
+        <div><span class="wire-id">02</span> <span class="wire-name">Cadastro de terreno</span></div>
+        <span class="wire-route">/terrenos/novo</span>
+      </header>
+      <div class="wire-canvas">
+        <div class="row"><div class="box solid" style="width:22%">SIDEBAR</div><div class="box" style="flex:1">BREADCRUMB · "Novo terreno"</div><div class="box fill-accent" style="width:140px">CONTINUAR →</div></div>
+        <div class="canvas-row grid-2-1" style="height:100%">
+          <div class="col">
+            <div class="box solid" style="height:100%; position:relative">
+              MAPA SATÉLITE FULLSCREEN<br>+ polígono desenhado + section line AA'
+              <div style="position:absolute; top:8px; left:8px; display:flex; flex-direction:column; gap:4px">
+                <div class="box accent" style="width:32px; height:24px; padding:0">▱</div>
+                <div class="box" style="width:32px; height:24px; padding:0">↔</div>
+                <div class="box" style="width:32px; height:24px; padding:0">⌖</div>
+                <div class="box" style="width:32px; height:24px; padding:0">✕</div>
+              </div>
+              <div style="position:absolute; bottom:8px; left:8px; display:flex; gap:4px">
+                <div class="box fill-accent" style="padding:2px 6px">satélite</div>
+                <div class="box" style="padding:2px 6px">ruas</div>
+                <div class="box fill-accent" style="padding:2px 6px">relevo</div>
+                <div class="box fill-accent" style="padding:2px 6px">curvas</div>
+              </div>
+            </div>
+          </div>
+          <div class="col">
+            <div class="box solid">BUSCA endereço (Nominatim)</div>
+            <div class="canvas-row" style="grid-template-columns:1fr 1fr"><div class="box accent">Área 312 m²</div><div class="box">Perímetro 72m</div><div class="box">Frente 12m</div><div class="box">Cota 742m</div></div>
+            <div class="box accent">SLOPE bar · "Leve 6,3%"</div>
+            <div class="box solid">LAYERS toggle list (4 switches)</div>
+            <div class="box" style="flex:1">CHART · perfil de elevação AA' (OpenTopography)</div>
+            <div class="row"><div class="box" style="flex:1">← Voltar</div><div class="box fill-accent" style="flex:1">Iniciar briefing</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="wire-notes"><ul><li>Área e perímetro recalculam em tempo real conforme o usuário desenha.</li><li>Camadas de relevo vêm do OpenTopography (SRTM 30m).</li><li>Section line AA' arrasta — vira input do chart de perfil.</li></ul></div>
+    </article>
+
+    <!-- 3 · Editor de terreno -->
+    <article class="wire-card">
+      <header class="wire-card-head">
+        <div><span class="wire-id">03</span> <span class="wire-name">Editor de terreno</span></div>
+        <span class="wire-route">/terrenos/[id]</span>
+      </header>
+      <div class="wire-canvas">
+        <div class="row"><div class="box solid" style="width:22%">SIDEBAR</div><div class="box" style="flex:1">BREADCRUMB · "Vila Madalena · 312 m²"</div><div class="row" style="gap:4px"><div class="box" style="width:80px">Iniciar briefing</div><div class="box fill-accent" style="width:90px">Construir →</div></div></div>
+        <div class="canvas-row grid-2-1" style="height:100%">
+          <div class="col">
+            <div class="box solid" style="height:62%; position:relative">
+              MAPA com vértices arrastáveis<br>(clique direito = remover)
+            </div>
+            <div class="box" style="flex:1">CORTE TOPOGRÁFICO AA' · linha arrastável · profile chart</div>
+          </div>
+          <div class="col">
+            <div class="box solid">TABS · Terreno · Documentos · Histórico</div>
+            <div class="box accent">VÉRTICES (4) · lista lat/lng · m²</div>
+            <div class="box">CAMADAS toggles · satélite/ruas/relevo/curvas</div>
+            <div class="box">HISTÓRICO de edições (undo/redo)</div>
+            <div class="box" style="flex:1">PRÉVIA construções vinculadas (cards mini)</div>
+          </div>
+        </div>
+      </div>
+      <div class="wire-notes"><ul><li>Toda alteração de vértice recalcula área + perfil de corte.</li><li>Histórico permite voltar 10 estados (Cmd+Z).</li></ul></div>
+    </article>
+
+    <!-- 4 · Briefing -->
+    <article class="wire-card">
+      <header class="wire-card-head">
+        <div><span class="wire-id">04</span> <span class="wire-name">Briefing conversacional</span></div>
+        <span class="wire-route">/terrenos/[id]/construir</span>
+      </header>
+      <div class="wire-canvas">
+        <div class="row"><div class="box solid" style="width:22%">SIDEBAR</div><div class="box" style="flex:1">"Agente Pré-Projeto" · progresso 12/26</div><div class="box fill-accent" style="width:140px">Gerar relatório</div></div>
+        <div class="canvas-row" style="grid-template-columns: 1fr 1fr; height:100%">
+          <div class="col">
+            <div class="box solid">HEAD · agente + progress 12/26</div>
+            <div class="box" style="flex:1">FEED de mensagens<br>(agente / usuário)<br>+ section dividers<br>+ chips de resposta rápida</div>
+            <div class="box solid">INPUT chat + anexar + enviar</div>
+          </div>
+          <div class="col">
+            <div class="box solid">TABS · Mapa/relevo · Volume 3D · Premissas (12)</div>
+            <div class="box accent" style="height:35%">MAPA + polígono + footprint demolição</div>
+            <div class="box accent" style="height:25%">3D ISO + HUD vivo (m², peso, pé-direito)</div>
+            <div class="box" style="flex:1">LEDGER de premissas extraídas (10 itens, status check/live/pending)</div>
+          </div>
+        </div>
+      </div>
+      <div class="wire-notes"><ul><li>Momento "uau": painel direito reage em tempo real à conversa.</li><li>Chips de resposta rápida cobrem 26 perguntas do briefing original.</li><li>Tom didático no chat (resposta da pesquisa).</li></ul></div>
+    </article>
+
+    <!-- 5 · Wizard construção -->
+    <article class="wire-card">
+      <header class="wire-card-head">
+        <div><span class="wire-id">05</span> <span class="wire-name">Wizard de construção</span></div>
+        <span class="wire-route">/terrenos/[id]/construir (wizard)</span>
+      </header>
+      <div class="wire-canvas">
+        <div class="row"><div class="box solid" style="width:22%">SIDEBAR</div><div class="box" style="flex:1">BREADCRUMB</div><div class="box" style="width:120px">Salvar rascunho</div></div>
+        <div class="col" style="height:100%">
+          <div class="box solid">STEPPER · ① Identificação → ② Material/Orçamento → ③ Geometria → ④ Revisão</div>
+          <div class="canvas-row grid-2-1" style="flex:1">
+            <div class="col">
+              <div class="box accent">FORM · Identificação<br>(nome, tipo de obra, uso final)</div>
+              <div class="box">FORM · Material e orçamento<br>(perfis, acabamentos, BDI, faixa de orçamento)</div>
+              <div class="box">FORM · Geometria<br>(área, pavimentos, vão, pé-direito)</div>
+              <div class="box">FORM · Revisão (read-only)</div>
+            </div>
+            <div class="col">
+              <div class="box solid">PREVIEW lateral 3D mini</div>
+              <div class="box accent">FAB ✨ "Sugerir com IA"</div>
+              <div class="box">PRÓXIMA ETAPA · custo estimado live</div>
+            </div>
+          </div>
+          <div class="row"><div class="box" style="flex:1">← Voltar</div><div class="box fill-accent" style="flex:1">Próximo →</div></div>
+        </div>
+      </div>
+      <div class="wire-notes"><ul><li>FAB "Sugerir com IA" preenche campos vazios com base no briefing.</li><li>Cada etapa atualiza o preview 3D mini.</li></ul></div>
+    </article>
+
+    <!-- 6 · Visualizador 3D -->
+    <article class="wire-card">
+      <header class="wire-card-head">
+        <div><span class="wire-id">06</span> <span class="wire-name">Visualizador 3D</span></div>
+        <span class="wire-route">/terrenos/[id]/construcoes/[buildId]</span>
+      </header>
+      <div class="wire-canvas">
+        <div class="row"><div class="box solid" style="width:22%">SIDEBAR</div><div class="box" style="flex:1">BREADCRUMB</div><div class="row" style="gap:4px"><div class="box" style="width:80px">Export GLTF</div><div class="box" style="width:70px">Export IFC</div><div class="box fill-accent" style="width:110px">Atualizar relatório</div></div></div>
+        <div class="canvas-row grid-2-1" style="height:100%">
+          <div class="box solid" style="position:relative; padding:0; display:block">
+            <div style="position:absolute; inset:0; display:grid; place-items:center; font-size:11px; color:rgba(255,255,255,0.55); font-family: var(--font-mono); text-transform:uppercase">VIEWPORT 3D · react-three-fiber · OrbitControls</div>
+            <div style="position:absolute; top:8px; right:8px; display:flex; flex-direction:column; gap:4px">
+              <div class="box accent" style="width:110px">HUD · 3,2 t aço</div>
+              <div class="box accent" style="width:110px">HUD · R$ 487k</div>
+              <div class="box" style="width:110px">HUD · 130 m²</div>
+              <div class="box" style="width:110px">HUD · 12,4×10,5</div>
+            </div>
+            <div style="position:absolute; bottom:8px; left:50%; transform:translateX(-50%); display:flex; gap:4px">
+              <div class="box fill-accent" style="width:24px; height:24px; padding:0">↻</div>
+              <div class="box" style="width:24px; height:24px; padding:0">⤧</div>
+              <div class="box" style="width:24px; height:24px; padding:0">🔍</div>
+              <div class="box" style="width:24px; height:24px; padding:0">▣</div>
+              <div class="box" style="width:24px; height:24px; padding:0">◰</div>
+            </div>
+            <div style="position:absolute; bottom:16px; right:16px" class="box fill-accent">✨ Sugerir com IA</div>
+          </div>
+          <div class="col">
+            <div class="box solid">Identificação · nome construção</div>
+            <div class="box accent">Geometria · 4 sliders (vão, PD, mez., telhado)</div>
+            <div class="box">Aberturas · contadores</div>
+            <div class="box">Cobertura · 3 switches</div>
+            <div class="box" style="flex:1">Saídas · GLTF · IFC · PNG</div>
+          </div>
+        </div>
+      </div>
+      <div class="wire-notes"><ul><li>HUD aparece no canto enquanto a câmera orbita.</li><li>Sliders no painel direito atualizam viewport em tempo real.</li></ul></div>
+    </article>
+
+    <!-- 7 · Relatório -->
+    <article class="wire-card">
+      <header class="wire-card-head">
+        <div><span class="wire-id">07</span> <span class="wire-name">Relatório de Viabilidade</span></div>
+        <span class="wire-route">/terrenos/[id]/relatorio</span>
+      </header>
+      <div class="wire-canvas">
+        <div class="row"><div class="box solid" style="width:22%">SIDEBAR</div><div class="box" style="flex:1">BREADCRUMB · "Relatório #SF-2401"</div><div class="row" style="gap:4px"><div class="box" style="width:90px">Compartilhar</div><div class="box fill-accent" style="width:90px">PDF ↓</div></div></div>
+        <div class="col" style="height:100%; gap:6px">
+          <div class="box accent">01 · RESUMO (full-width, 4 stats: custo c/ demo · custo s/ demo · R$/m² · prazo)</div>
+          <div class="canvas-row grid-3"><div class="box">02 · Localização (minimapa)</div><div class="box">03 · Tipo de obra</div><div class="box">04 · Premissas (26)</div></div>
+          <div class="canvas-row" style="grid-template-columns: 1fr 1fr"><div class="box accent">05 · Cenário SEM demolição</div><div class="box accent">06 · Cenário COM demolição</div></div>
+          <div class="canvas-row" style="grid-template-columns: 5fr 7fr"><div class="box">07 · Custo / m² · 3 colunas (SF · alvenaria · Δ)</div><div class="box accent">08 · MACROETAPAS · 8 barras com faixas SINAPI</div></div>
+          <div class="canvas-row" style="grid-template-columns: 1fr 1fr"><div class="box">09 · Riscos técnicos (3 cards)</div><div class="box">10 · Documentos (checklist 8)</div></div>
+          <div class="box">11 · Próximos passos (4 cards numerados)</div>
+          <div class="box fill-accent">12 · AVISO TÉCNICO OBRIGATÓRIO</div>
+        </div>
+      </div>
+      <div class="wire-notes"><ul><li>Formato dashboard grid Datadog-style (resposta da pesquisa).</li><li>Aviso técnico aparece sempre, full-width, com borda vermelha.</li></ul></div>
+    </article>
+
+    <!-- 8 · Base de conhecimento -->
+    <article class="wire-card">
+      <header class="wire-card-head">
+        <div><span class="wire-id">08</span> <span class="wire-name">Base de Conhecimento</span></div>
+        <span class="wire-route">/base-conhecimento (pública)</span>
+      </header>
+      <div class="wire-canvas">
+        <div class="row"><div class="box solid" style="width:22%">SIDEBAR (logada) ou TOPBAR (pública)</div><div class="box" style="flex:1">"Fontes consultadas pelo agente"</div></div>
+        <div class="canvas-row grid-2-1" style="height:100%">
+          <div class="col">
+            <div class="box accent">HERO · "Toda estimativa do GenIA é rastreável a uma fonte normativa"</div>
+            <div class="canvas-row grid-3" style="flex:1">
+              <div class="box">SINAPI · composições</div>
+              <div class="box">CUB Sinduscon-SP</div>
+              <div class="box">GeoSampa · zoneamento</div>
+              <div class="box">ABNT Catálogo</div>
+              <div class="box">OpenTopography</div>
+              <div class="box">NBR 16970 SF</div>
+              <div class="box">NBR 15575 Habitação</div>
+              <div class="box">NBR 6120/6123 cargas</div>
+              <div class="box">NBR 8800/14762 aço</div>
+            </div>
+          </div>
+          <div class="col">
+            <div class="box solid">FILTROS · normas · órgãos · ano</div>
+            <div class="box">BUSCA</div>
+            <div class="box" style="flex:1">CITAÇÕES recentes do agente (timeline)</div>
+          </div>
+        </div>
+      </div>
+      <div class="wire-notes"><ul><li>Pública (sem login) por questão de transparência institucional.</li><li>Cada card linka pro PDF / site oficial em nova aba.</li></ul></div>
+    </article>
+
+  </section>
+</div>
+</body>
+</html>

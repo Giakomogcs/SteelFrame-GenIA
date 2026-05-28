@@ -1,0 +1,683 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Relatório de Viabilidade · SteelFrame GenIA</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700;900&family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/app.css">
+<style>
+  .report-grid {
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    gap: var(--space-4);
+    align-items: stretch;
+  }
+  .rcard {
+    background: var(--color-surface);
+    border: 1px solid var(--color-stroke);
+    border-radius: var(--radius-md);
+    padding: var(--space-5);
+    display: flex; flex-direction: column;
+    gap: var(--space-3);
+  }
+  .rcard .rcard-head {
+    display: flex; justify-content: space-between; align-items: flex-start; gap: var(--space-3);
+  }
+  .rcard .rcard-title {
+    font-size: var(--fs-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--color-text-secondary);
+    font-weight: var(--fw-semibold);
+    font-family: var(--font-mono);
+  }
+  .rcard .rcard-block {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--color-text-muted);
+    background: var(--color-surface-elevated);
+    padding: 2px 6px;
+    border-radius: var(--radius-sm);
+  }
+
+  /* Spans */
+  .span-3 { grid-column: span 3; } .span-4 { grid-column: span 4; }
+  .span-5 { grid-column: span 5; } .span-6 { grid-column: span 6; }
+  .span-7 { grid-column: span 7; } .span-8 { grid-column: span 8; }
+  .span-12 { grid-column: span 12; }
+  @media (max-width: 1280px) {
+    .span-3, .span-4, .span-5 { grid-column: span 6; }
+    .span-7, .span-8 { grid-column: span 12; }
+  }
+  @media (max-width: 760px) { [class*="span-"] { grid-column: span 12; } }
+
+  /* Big-number stats */
+  .big-num {
+    font-family: var(--font-display);
+    font-size: 48px;
+    font-weight: var(--fw-bold);
+    line-height: 1;
+    letter-spacing: -0.03em;
+  }
+  .big-num .unit { font-size: 18px; color: var(--color-text-secondary); margin-left: 6px; font-family: var(--font-mono); }
+  .delta {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-family: var(--font-mono); font-size: var(--fs-xs);
+    padding: 2px 8px; border-radius: var(--radius-full);
+  }
+  .delta-up   { background: var(--color-danger-soft); color: var(--color-danger); }
+  .delta-down { background: var(--color-success-soft); color: var(--color-success); }
+
+  /* Mini map for location card */
+  .mini-map { aspect-ratio: 16/9; border-radius: var(--radius-md); position: relative; overflow: hidden; }
+
+  /* Bar chart — macroetapas */
+  .bar-chart { display: flex; flex-direction: column; gap: var(--space-3); }
+  .bar-row { display: grid; grid-template-columns: 200px 1fr 120px; gap: var(--space-3); align-items: center; font-size: var(--fs-sm); }
+  .bar-row .label { display: flex; flex-direction: column; }
+  .bar-row .label-main { font-weight: var(--fw-semibold); color: var(--color-text-primary); }
+  .bar-row .label-sub { font-size: var(--fs-xs); color: var(--color-text-secondary); font-family: var(--font-mono); }
+  .bar-track {
+    position: relative;
+    height: 28px;
+    background: var(--color-surface-elevated);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+  }
+  .bar-range {
+    position: absolute; top: 0; bottom: 0;
+    background: var(--color-primary-soft);
+    border-left: 2px solid var(--color-primary-500);
+    border-right: 2px solid var(--color-primary-500);
+  }
+  .bar-fill {
+    position: absolute; top: 0; bottom: 0; left: 0;
+    background: linear-gradient(90deg, var(--color-borgonha), var(--color-primary-500));
+    border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+  }
+  .bar-row .amount { font-family: var(--font-mono); text-align: right; font-weight: var(--fw-semibold); }
+  .bar-row .amount .pct { display: block; font-size: var(--fs-xs); color: var(--color-text-secondary); font-weight: var(--fw-regular); }
+
+  /* Risk list */
+  .risk-row {
+    display: grid; grid-template-columns: 32px 1fr auto; gap: var(--space-3);
+    padding: var(--space-3); border: 1px solid var(--color-stroke);
+    border-radius: var(--radius-md);
+    background: var(--color-surface-elevated);
+  }
+  .risk-row .risk-icon {
+    width: 32px; height: 32px; border-radius: var(--radius-md);
+    display: grid; place-items: center;
+  }
+  .risk-row.high .risk-icon  { background: var(--color-danger-soft); color: var(--color-danger); }
+  .risk-row.med  .risk-icon  { background: var(--color-warning-soft); color: var(--color-warning); }
+  .risk-row.low  .risk-icon  { background: var(--color-info-soft); color: var(--color-info); }
+  .risk-row .risk-title { font-weight: var(--fw-semibold); margin-bottom: 2px; }
+  .risk-row .risk-desc  { color: var(--color-text-secondary); font-size: var(--fs-sm); }
+
+  /* Doc/step list with check marker */
+  .doc-list { display: flex; flex-direction: column; gap: var(--space-2); }
+  .doc-row {
+    display: grid; grid-template-columns: 20px 1fr auto; gap: var(--space-3);
+    align-items: center; padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--color-stroke); border-radius: var(--radius-md);
+    background: var(--color-surface-elevated);
+    font-size: var(--fs-sm);
+  }
+  .doc-row .doc-mark {
+    width: 18px; height: 18px; border-radius: var(--radius-sm);
+    border: 1.5px solid var(--color-stroke-input);
+  }
+  .doc-row.done .doc-mark {
+    background: var(--color-success); border-color: var(--color-success);
+    display: grid; place-items: center; color: var(--color-text-primary);
+  }
+  .doc-row .doc-meta { font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--color-text-secondary); }
+
+  /* Step numbered cards */
+  .step-card {
+    background: var(--color-surface-elevated);
+    border: 1px solid var(--color-stroke);
+    border-radius: var(--radius-md);
+    padding: var(--space-4);
+    display: flex; flex-direction: column; gap: var(--space-2);
+  }
+  .step-card .num-badge {
+    width: 28px; height: 28px; border-radius: var(--radius-full);
+    background: var(--color-primary-soft);
+    color: var(--color-primary-500);
+    display: grid; place-items: center;
+    font-family: var(--font-mono); font-weight: var(--fw-bold);
+    font-size: var(--fs-sm);
+  }
+  .step-card h4 { font-size: var(--fs-body); }
+  .step-card p { font-size: var(--fs-sm); color: var(--color-text-secondary); }
+
+  /* ===== Hero verdict ===== */
+  .verdict {
+    position: relative;
+    grid-column: span 12;
+    background:
+      radial-gradient(ellipse at top right, rgba(23,163,74,0.18), transparent 55%),
+      linear-gradient(135deg, var(--color-surface-elevated) 0%, var(--color-surface) 100%);
+    border: 1px solid var(--color-stroke);
+    border-left: 4px solid var(--color-success);
+    border-radius: var(--radius-md);
+    padding: var(--space-6);
+    display: grid;
+    grid-template-columns: 1fr 1px 1.6fr;
+    gap: var(--space-6);
+    align-items: stretch;
+    overflow: hidden;
+  }
+  @media (max-width: 1100px) { .verdict { grid-template-columns: 1fr; } .verdict .v-sep { display:none; } }
+  .verdict .v-sep { background: var(--color-stroke); width: 1px; }
+  .verdict .v-stamp {
+    display: inline-flex; align-items: center; gap: var(--space-2);
+    font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--color-text-secondary);
+    margin-bottom: var(--space-3);
+  }
+  .verdict .v-label {
+    display: inline-flex; align-items: center; gap: var(--space-2);
+    background: var(--color-success-soft); color: var(--color-success);
+    padding: 6px 14px; border-radius: var(--radius-full);
+    font-family: var(--font-mono); font-weight: var(--fw-bold); font-size: 11px;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    border: 1px solid rgba(23,163,74,0.4);
+  }
+  .verdict .v-label::before {
+    content: ''; width: 8px; height: 8px; border-radius: 50%;
+    background: var(--color-success); box-shadow: 0 0 0 4px rgba(23,163,74,0.25);
+  }
+  .verdict h2 {
+    font-family: var(--font-display);
+    font-size: clamp(28px, 3.2vw, 42px);
+    line-height: 1.05; letter-spacing: -0.02em;
+    margin: var(--space-3) 0 var(--space-3);
+    max-width: 22ch;
+  }
+  .verdict h2 em { font-style: normal; color: var(--color-primary-500); }
+  .verdict .v-sub { color: var(--color-text-secondary); font-size: var(--fs-sm); max-width: 50ch; }
+
+  .v-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-5); align-content: center; }
+  @media (max-width: 720px) { .v-metrics { grid-template-columns: 1fr 1fr; } }
+  .v-metric { display: flex; flex-direction: column; gap: 4px; }
+  .v-metric .m-lbl { font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--color-text-secondary); }
+  .v-metric .m-val {
+    font-family: var(--font-display); font-weight: var(--fw-bold);
+    font-size: clamp(28px, 2.6vw, 38px); line-height: 1; letter-spacing: -0.02em;
+  }
+  .v-metric .m-val .unit { font-family: var(--font-mono); font-size: 13px; color: var(--color-text-secondary); margin-left: 4px; font-weight: var(--fw-medium); }
+  .v-metric .m-val.accent { color: var(--color-primary-500); }
+  .v-metric .m-foot { font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--color-text-secondary); }
+  .v-metric .m-foot.up { color: var(--color-success); }
+
+  /* ===== Side-by-side scenarios ===== */
+  .scenario-compare { display: grid; grid-template-columns: 1fr 60px 1fr; gap: var(--space-3); align-items: stretch; }
+  @media (max-width: 980px) { .scenario-compare { grid-template-columns: 1fr; } .scenario-compare .vs { display:none; } }
+  .scenario {
+    background: var(--color-surface-elevated);
+    border: 1px solid var(--color-stroke);
+    border-radius: var(--radius-md);
+    padding: var(--space-5);
+    display: flex; flex-direction: column; gap: var(--space-3);
+    position: relative;
+  }
+  .scenario.winner { border-color: var(--color-primary-500); box-shadow: 0 0 0 3px var(--color-primary-soft); }
+  .scenario.winner::after {
+    content: 'RECOMENDADO'; position: absolute; top: -10px; right: var(--space-4);
+    background: var(--color-primary-500); color: white;
+    font-family: var(--font-mono); font-size: 9px; font-weight: var(--fw-bold);
+    letter-spacing: 0.18em; padding: 4px 10px; border-radius: var(--radius-full);
+  }
+  .scenario .s-head { display: flex; justify-content: space-between; align-items: baseline; }
+  .scenario .s-name { font-weight: var(--fw-semibold); font-size: var(--fs-md); }
+  .scenario .s-cost { font-family: var(--font-display); font-weight: var(--fw-bold); font-size: 36px; line-height: 1; letter-spacing: -0.02em; }
+  .scenario.winner .s-cost { color: var(--color-primary-500); }
+  .scenario .s-cost .unit { font-family: var(--font-mono); font-size: 14px; color: var(--color-text-secondary); margin-left: 4px; font-weight: var(--fw-medium); }
+  .scenario .s-range { font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--color-text-secondary); }
+  .scenario .s-bullets { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 4px; }
+  .scenario .s-bullets li { font-size: var(--fs-sm); display: flex; gap: 8px; }
+  .scenario .s-bullets li::before { content: '·'; color: var(--color-primary-500); font-weight: bold; }
+  .scenario-compare .vs {
+    display: grid; place-items: center;
+    font-family: var(--font-display); font-weight: var(--fw-bold);
+    color: var(--color-text-muted); font-size: var(--fs-md); letter-spacing: 0.1em;
+  }
+
+  /* ===== KPI strip ===== */
+  .kpi-strip { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-3); grid-column: span 12; }
+  @media (max-width: 900px) { .kpi-strip { grid-template-columns: 1fr 1fr; } }
+  .kpi {
+    background: var(--color-surface); border: 1px solid var(--color-stroke);
+    border-radius: var(--radius-md); padding: var(--space-4);
+    display: flex; flex-direction: column; gap: 6px;
+    position: relative; overflow: hidden;
+  }
+  .kpi::before {
+    content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--color-primary-500);
+  }
+  .kpi.alt::before { background: var(--color-orange); }
+  .kpi.good::before { background: var(--color-success); }
+  .kpi.warn::before { background: var(--color-warning); }
+  .kpi .k-lbl { font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--color-text-secondary); }
+  .kpi .k-val { font-family: var(--font-display); font-weight: var(--fw-bold); font-size: 30px; line-height: 1; letter-spacing: -0.02em; }
+  .kpi .k-val .unit { font-family: var(--font-mono); font-size: 12px; color: var(--color-text-secondary); margin-left: 4px; font-weight: var(--fw-medium); }
+  .kpi .k-sub { font-family: var(--font-mono); font-size: 10px; color: var(--color-text-secondary); }
+
+  /* Disclaimer banner (mandatory) */
+  .disclaimer {
+    background:
+      linear-gradient(135deg, var(--color-primary-soft), transparent),
+      var(--color-surface);
+    border: 1px solid var(--color-primary-500);
+    border-left: 4px solid var(--color-primary-500);
+    border-radius: var(--radius-md);
+    padding: var(--space-4) var(--space-5);
+    display: grid;
+    grid-template-columns: 36px 1fr;
+    gap: var(--space-4);
+  }
+  .disclaimer .ico {
+    width: 36px; height: 36px; border-radius: var(--radius-full);
+    background: var(--color-primary-600);
+    display: grid; place-items: center; color: var(--color-text-primary);
+  }
+  .disclaimer h4 { font-size: var(--fs-body); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.06em; }
+  .disclaimer p { font-size: var(--fs-sm); color: var(--color-text-primary); line-height: 1.6; }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-mark">DT</div>
+      <div class="brand-text">
+        <span class="brand-name">SteelFrame GenIA</span>
+        <span class="brand-sub">Distrito Tecnológico</span>
+      </div>
+    </div>
+    <div class="sidebar-section">
+      <span class="sidebar-section-label">Operação</span>
+      <a class="nav-item" href="home.html"><svg class="icon-stroke nav-icon" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span>Meus terrenos</span></a>
+      <a class="nav-item" href="cadastro-terreno.html"><svg class="icon-stroke nav-icon" viewBox="0 0 24 24"><path d="M12 21s-7-7.5-7-12a7 7 0 1 1 14 0c0 4.5-7 12-7 12z"/><circle cx="12" cy="9" r="2.5"/></svg><span>Novo terreno</span></a>
+      <a class="nav-item" href="briefing.html"><svg class="icon-stroke nav-icon" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 4.5-7.79L3 7"/><path d="M3 3v4h4"/></svg><span>Briefings ativos</span><span class="nav-badge">3</span></a>
+      <a class="nav-item active" href="#"><svg class="icon-stroke nav-icon" viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="14 3 14 9 20 9"/></svg><span>Relatórios</span></a>
+    </div>
+    <div class="sidebar-section">
+      <span class="sidebar-section-label">Referências</span>
+      <a class="nav-item" href="base-conhecimento.html"><svg class="icon-stroke nav-icon" viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg><span>Base de conhecimento</span></a>
+      <a class="nav-item" href="components.html"><svg class="icon-stroke nav-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="9"/></svg><span>Sistema de design</span></a>
+    </div>
+    <div class="sidebar-user">
+      <div class="avatar">RC</div>
+      <div class="user-meta">
+        <span class="user-name">Renata Couto</span>
+        <span class="user-role">Eng. Civil · SteelFrame BR</span>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="page-header">
+      <div class="stack-sm">
+        <nav class="breadcrumb">
+          <a href="home.html">Meus terrenos</a>
+          <span class="sep">/</span>
+          <a href="terreno.html">Cumbica · 5.480 m²</a>
+          <span class="sep">/</span>
+          <span class="crumb-current">R-001 · Galpão A · CD seco</span>
+        </nav>
+        <div class="page-title-row">
+          <h1>Relatório de Viabilidade · Galpão logístico</h1>
+          <span class="pill pill-success"><span class="dot"></span>Gerado</span>
+          <span class="pill pill-neutral mono">v3 · 28/mai/2026 14:02</span>
+        </div>
+        <p class="text-sm muted" style="margin-top:var(--space-2)">Galpão A · CD seco · 2.800 m² · vão livre 25 m · pé-direito 12 m · cobertura metálica trapezoidal · fechamento em telha sanduíche</p>
+      </div>
+      <div class="row">
+        <button class="btn btn-ghost">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg>
+          Compartilhar link
+        </button>
+        <button class="btn btn-secondary">Re-rodar com IA</button>
+        <button class="btn btn-primary">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Exportar PDF
+        </button>
+      </div>
+    </header>
+
+    <!-- Dashboard grid -->
+    <section class="report-grid">
+
+      <!-- HERO VERDICT -->
+      <article class="verdict">
+        <div>
+          <div class="v-stamp">Relatório R-001 · Galpão A · CD seco · v3 · 28/mai/2026</div>
+          <span class="v-label">Viável</span>
+          <h2>Galpão logístico de <em>2.800 m²</em> com vão livre de <em>25 m</em>, executável em 4–6 meses.</h2>
+          <p class="v-sub">Lote de 5.480 m² em Cumbica (ZPI-1), plano (2,1%), sem APP, dentro do cone de aproximação GRU. Estimativa preliminar baseada em SINAPI mai/26 + CUB Sinduscon-SP R8-N + cotação CSN/Gerdau aço galvanizado.</p>
+        </div>
+        <div class="v-sep"></div>
+        <div class="v-metrics">
+          <div class="v-metric">
+            <span class="m-lbl">Custo total</span>
+            <div class="m-val accent">R$ 4,8<span class="unit">M</span></div>
+            <span class="m-foot">faixa P10–P90 · R$ 4,3M — R$ 5,2M</span>
+          </div>
+          <div class="v-metric">
+            <span class="m-lbl">Custo / m² construído</span>
+            <div class="m-val">R$ 1.714</div>
+            <span class="m-foot up">↓ 36% vs. alvenaria pré-moldada</span>
+          </div>
+          <div class="v-metric">
+            <span class="m-lbl">Prazo de execução</span>
+            <div class="m-val">4–6<span class="unit">meses</span></div>
+            <span class="m-foot up">↓ 3 meses vs. concreto</span>
+          </div>
+        </div>
+      </article>
+
+      <!-- KPI STRIP -->
+      <div class="kpi-strip">
+        <div class="kpi">
+          <span class="k-lbl">Aço estrutural</span>
+          <div class="k-val">142<span class="unit">t</span></div>
+          <span class="k-sub">perfis Gerdau · 50,7 kg/m²</span>
+        </div>
+        <div class="kpi alt">
+          <span class="k-lbl">Vão livre · pé-direito</span>
+          <div class="k-val">25<span class="unit">× 12 m</span></div>
+          <span class="k-sub">treliça metálica · sem pilar interno</span>
+        </div>
+        <div class="kpi good">
+          <span class="k-lbl">Documentos prontos</span>
+          <div class="k-val">4<span class="unit">/ 8</span></div>
+          <span class="k-sub">faltam sondagem + topografia</span>
+        </div>
+        <div class="kpi warn">
+          <span class="k-lbl">Riscos abertos</span>
+          <div class="k-val">3<span class="unit">· 1 alto</span></div>
+          <span class="k-sub">SPT obrigatória antes da fundação</span>
+        </div>
+      </div>
+
+      <!-- BLOCO 2 · LOCALIZAÇÃO -->
+      <article class="rcard span-4">
+        <div class="rcard-head">
+          <span class="rcard-title">02 · Localização</span>
+          <span class="rcard-block">GeoSampa</span>
+        </div>
+        <div class="mini-map map-placeholder show-hillshade show-contours" style="aspect-ratio: 16/10;">
+          <div class="map-grid-overlay"></div>
+          <div class="map-hillshade"></div>
+          <div class="map-contours"></div>
+          <svg class="map-polygon" style="position:absolute; inset:0; width:100%; height:100%;" viewBox="0 0 1000 600" preserveAspectRatio="none">
+            <path d="M 180 130 L 820 145 L 840 470 L 160 460 Z"/>
+          </svg>
+        </div>
+        <div class="grid-2">
+          <div><span class="text-xs muted mono">ENDEREÇO</span><div class="text-sm" style="font-weight:600;margin-top:2px">Av. Monteiro Lobato, 4.820</div></div>
+          <div><span class="text-xs muted mono">BAIRRO</span><div class="text-sm" style="font-weight:600;margin-top:2px">Cumbica · Guarulhos / SP</div></div>
+          <div><span class="text-xs muted mono">ZONEAMENTO</span><div class="text-sm" style="font-weight:600;margin-top:2px">ZPI-1 · CA 2,0 · TO 70%</div></div>
+          <div><span class="text-xs muted mono">INCLINAÇÃO</span><div class="text-sm" style="font-weight:600;margin-top:2px">2,1% · plano</div></div>
+        </div>
+      </article>
+
+      <!-- BLOCO 3 · TIPO DE OBRA -->
+      <article class="rcard span-4">
+        <div class="rcard-head">
+          <span class="rcard-title">03 · Tipo de obra</span>
+          <span class="rcard-block">Briefing #26-26</span>
+        </div>
+        <h3 style="font-size: var(--fs-lg)">Galpão logístico · cross-docking seco</h3>
+        <p class="muted text-sm">Centro de distribuição para operação seca de e-commerce. Estrutura metálica com treliça em arco rebaixado, fechamento sanduíche, piso industrial nivelado a laser e 8 docas niveladoras hidráulicas.</p>
+        <div class="row" style="flex-wrap: wrap; gap: var(--space-2)">
+          <span class="pill pill-primary"><span class="dot"></span>2.800 m²</span>
+          <span class="pill pill-primary"><span class="dot"></span>vão livre 25 m</span>
+          <span class="pill pill-primary"><span class="dot"></span>pé-direito 12 m</span>
+          <span class="pill pill-primary"><span class="dot"></span>8 docas niveladoras</span>
+          <span class="pill pill-neutral"><span class="dot"></span>padrão industrial classe A</span>
+        </div>
+      </article>
+
+      <!-- BLOCO 4 · PREMISSAS -->
+      <article class="rcard span-4">
+        <div class="rcard-head">
+          <span class="rcard-title">04 · Premissas técnicas</span>
+          <span class="rcard-block">26 / 26</span>
+        </div>
+        <table class="ds-table" style="font-size: var(--fs-sm)">
+          <tbody>
+            <tr><td>Área construída</td><td class="num-col">2.800 m²</td></tr>
+            <tr><td>Pé-direito</td><td class="num-col">12,0 m</td></tr>
+            <tr><td>Vão livre</td><td class="num-col">25,0 m</td></tr>
+            <tr><td>Peso aço</td><td class="num-col">142 t</td></tr>
+            <tr><td>Cobertura</td><td class="num-col">Telha trapezoidal 0,5 mm</td></tr>
+            <tr><td>Fechamento</td><td class="num-col">Sanduíche PIR 50 mm</td></tr>
+            <tr><td>Docas</td><td class="num-col">8 níveis + 2 ao solo</td></tr>
+            <tr><td>BDI</td><td class="num-col">26%</td></tr>
+          </tbody>
+        </table>
+      </article>
+
+      <!-- BLOCOS 5–6 · COMPARATIVO DE CENÁRIOS -->
+      <article class="rcard span-12">
+        <div class="rcard-head">
+          <span class="rcard-title">05–06 · Cenário sem vs. com demolição da edificação existente</span>
+          <span class="rcard-block">2 hipóteses</span>
+        </div>
+        <div class="scenario-compare">
+          <div class="scenario">
+            <div class="s-head">
+              <span class="s-name">A · Sem demolição</span>
+              <span class="pill pill-neutral" style="font-size:10px">construção em área limpa</span>
+            </div>
+            <div class="s-cost">R$ 4,75<span class="unit">M</span></div>
+            <span class="s-range">faixa P10–P90 · R$ 4,28M — R$ 5,24M · ±10% SINAPI</span>
+            <ul class="s-bullets">
+              <li>Usa apenas a porção sul do lote (~3.200 m² livres)</li>
+              <li>Edificação existente (galpão antigo 480 m²) permanece</li>
+              <li>Acesso de caminhão pelo lado norte fica reduzido</li>
+              <li>Sem caçamba, sem bota-fora, sem licença de demolição</li>
+            </ul>
+          </div>
+          <div class="vs">VS</div>
+          <div class="scenario winner">
+            <div class="s-head">
+              <span class="s-name">B · Com demolição</span>
+              <span class="pill pill-primary" style="font-size:10px">+ R$ 47k · + 12 dias</span>
+            </div>
+            <div class="s-cost">R$ 4,80<span class="unit">M</span></div>
+            <span class="s-range">faixa P10–P90 · R$ 4,33M — R$ 5,28M · inclui caçamba + licença</span>
+            <ul class="s-bullets">
+              <li>Demole galpão antigo (480 m², estrutura precária)</li>
+              <li>Aproveita os 5.480 m² inteiros — pátio de manobra completo</li>
+              <li>Layout otimizado: 8 docas alinhadas à avenida</li>
+              <li>+1,2% no custo total compra +47% de capacidade operacional</li>
+            </ul>
+          </div>
+        </div>
+      </article>
+
+      <!-- BLOCO 7 · CUSTO POR M² -->
+      <article class="rcard span-5">
+        <div class="rcard-head">
+          <span class="rcard-title">07 · Custo por m² · galpão SF vs. concorrentes</span>
+          <span class="rcard-block">CUB-SP R8-N</span>
+        </div>
+        <div style="display:flex; flex-direction:column; gap: var(--space-3)">
+          <div>
+            <div class="row-between" style="font-size: var(--fs-sm); margin-bottom: 4px"><span style="font-weight:600; color: var(--color-primary-500)">SteelFrame (este projeto)</span><span class="mono" style="font-weight:600; color: var(--color-primary-500)">R$ 1.714 / m²</span></div>
+            <div style="height:10px; background: var(--color-surface-elevated); border-radius: var(--radius-full); overflow:hidden"><div style="width: 63%; height:100%; background: linear-gradient(90deg, var(--color-borgonha), var(--color-primary-500)); border-radius: inherit"></div></div>
+          </div>
+          <div>
+            <div class="row-between" style="font-size: var(--fs-sm); margin-bottom: 4px"><span>Pré-moldado de concreto</span><span class="mono">R$ 2.180 / m²</span></div>
+            <div style="height:10px; background: var(--color-surface-elevated); border-radius: var(--radius-full); overflow:hidden"><div style="width: 80%; height:100%; background: var(--color-text-muted); border-radius: inherit"></div></div>
+          </div>
+          <div>
+            <div class="row-between" style="font-size: var(--fs-sm); margin-bottom: 4px"><span>Alvenaria estrutural</span><span class="mono">R$ 2.690 / m²</span></div>
+            <div style="height:10px; background: var(--color-surface-elevated); border-radius: var(--radius-full); overflow:hidden"><div style="width: 100%; height:100%; background: var(--color-text-muted); border-radius: inherit"></div></div>
+          </div>
+        </div>
+        <p class="text-xs muted" style="margin-top: var(--space-2)"><strong style="color: var(--color-success)">Economia de R$ 1,3 M</strong> vs. alvenaria estrutural em galpão equivalente. Referência: CUB-SP mai/26 + SINAPI 32412/33152/33891.</p>
+      </article>
+
+      <!-- BLOCO 8 · MACROETAPAS -->
+      <article class="rcard span-7">
+        <div class="rcard-head">
+          <span class="rcard-title">08 · Composição por macroetapas</span>
+          <span class="rcard-block">Faixas SINAPI</span>
+        </div>
+        <div class="bar-chart">
+          <div class="bar-row">
+            <div class="label"><span class="label-main">Projetos</span><span class="label-sub">3–8% · faixa</span></div>
+            <div class="bar-track"><div class="bar-range" style="left:3%; right:92%"></div><div class="bar-fill" style="width:5%"></div></div>
+            <div class="amount">R$ 240k<span class="pct">5,0%</span></div>
+          </div>
+          <div class="bar-row">
+            <div class="label"><span class="label-main">Fundação</span><span class="label-sub">8–15% · faixa</span></div>
+            <div class="bar-track"><div class="bar-range" style="left:8%; right:85%"></div><div class="bar-fill" style="width:11%"></div></div>
+            <div class="amount">R$ 528k<span class="pct">11,0%</span></div>
+          </div>
+          <div class="bar-row">
+            <div class="label"><span class="label-main">Estrutura SF</span><span class="label-sub">18–28% · faixa · 142 t aço</span></div>
+            <div class="bar-track"><div class="bar-range" style="left:18%; right:72%"></div><div class="bar-fill" style="width:23%"></div></div>
+            <div class="amount">R$ 1,10M<span class="pct">23,0%</span></div>
+          </div>
+          <div class="bar-row">
+            <div class="label"><span class="label-main">Fechamentos</span><span class="label-sub">15–25% · sanduíche PIR</span></div>
+            <div class="bar-track"><div class="bar-range" style="left:15%; right:75%"></div><div class="bar-fill" style="width:19%"></div></div>
+            <div class="amount">R$ 912k<span class="pct">19,0%</span></div>
+          </div>
+          <div class="bar-row">
+            <div class="label"><span class="label-main">Cobertura</span><span class="label-sub">8–15% · telha trapez. 0,5</span></div>
+            <div class="bar-track"><div class="bar-range" style="left:8%; right:85%"></div><div class="bar-fill" style="width:11%"></div></div>
+            <div class="amount">R$ 528k<span class="pct">11,0%</span></div>
+          </div>
+          <div class="bar-row">
+            <div class="label"><span class="label-main">Instalações</span><span class="label-sub">10–18% · elétrica + hidráulica</span></div>
+            <div class="bar-track"><div class="bar-range" style="left:10%; right:82%"></div><div class="bar-fill" style="width:13%"></div></div>
+            <div class="amount">R$ 624k<span class="pct">13,0%</span></div>
+          </div>
+          <div class="bar-row">
+            <div class="label"><span class="label-main">Acabamentos</span><span class="label-sub">8–15% · piso industrial + docas</span></div>
+            <div class="bar-track"><div class="bar-range" style="left:8%; right:85%"></div><div class="bar-fill" style="width:10%"></div></div>
+            <div class="amount">R$ 480k<span class="pct">10,0%</span></div>
+          </div>
+          <div class="bar-row">
+            <div class="label"><span class="label-main">Contingência</span><span class="label-sub">8–15% · reserva técnica</span></div>
+            <div class="bar-track"><div class="bar-range" style="left:8%; right:85%"></div><div class="bar-fill" style="width:8%"></div></div>
+            <div class="amount">R$ 388k<span class="pct">8,0%</span></div>
+          </div>
+        </div>
+      </article>
+
+      <!-- BLOCO 9 · RISCOS -->
+      <article class="rcard span-6">
+        <div class="rcard-head">
+          <span class="rcard-title">09 · Riscos técnicos</span>
+          <span class="rcard-block">3 abertos · 1 alto</span>
+        </div>
+        <div class="stack-sm" style="gap: var(--space-2)">
+          <div class="risk-row high">
+            <div class="risk-icon"><svg class="icon-stroke" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.46 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
+            <div>
+              <div class="risk-title">Sondagem SPT obrigatória antes da fundação</div>
+              <div class="risk-desc">Cumbica está sobre solo aluvionar do rio Baquirivu — variação argila/silte exige 6 furos de 12 m. Define radier estaqueado vs. sapatas isoladas (NBR 6122 + NBR 16970).</div>
+            </div>
+            <span class="pill pill-danger"><span class="dot"></span>Alto</span>
+          </div>
+          <div class="risk-row med">
+            <div class="risk-icon"><svg class="icon-stroke" viewBox="0 0 24 24"><path d="M12 9v4"/><circle cx="12" cy="17" r="0.5"/><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg></div>
+            <div>
+              <div class="risk-title">Cone de aproximação GRU · altura máx. 18 m</div>
+              <div class="risk-desc">Cobertura no vértice mais alto fica em 14,2 m (margem 3,8 m). Painéis fotovoltaicos elevados ou antenas ficam vetados sem consulta DECEA.</div>
+            </div>
+            <span class="pill pill-warning"><span class="dot"></span>Médio</span>
+          </div>
+          <div class="risk-row low">
+            <div class="risk-icon"><svg class="icon-stroke" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>
+            <div>
+              <div class="risk-title">Variação de preço do aço galvanizado</div>
+              <div class="risk-desc">CSN/Gerdau cotação variou ±7% no último semestre. Em 142 t isso equivale a ±R$ 248k. Travar contrato com fornecedor reduz o risco.</div>
+            </div>
+            <span class="pill pill-info"><span class="dot"></span>Baixo</span>
+          </div>
+        </div>
+      </article>
+
+      <!-- BLOCO 10 · DOCUMENTOS -->
+      <article class="rcard span-6">
+        <div class="rcard-head">
+          <span class="rcard-title">10 · Documentos necessários</span>
+          <span class="rcard-block">4 de 8 prontos</span>
+        </div>
+        <div class="doc-list">
+          <div class="doc-row done"><div class="doc-mark"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div><span>Matrícula atualizada do imóvel</span><span class="doc-meta">Cartório · ok</span></div>
+          <div class="doc-row done"><div class="doc-mark"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div><span>IPTU 2026</span><span class="doc-meta">PMSP · ok</span></div>
+          <div class="doc-row done"><div class="doc-mark"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div><span>Certidão de zoneamento ZPI-1</span><span class="doc-meta">GeoSampa Gru · ok</span></div>
+          <div class="doc-row done"><div class="doc-mark"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div><span>Consulta DECEA (cone GRU)</span><span class="doc-meta">aprovado até 18 m</span></div>
+          <div class="doc-row"><div class="doc-mark"></div><span>Sondagem SPT · 6 furos × 12 m</span><span class="doc-meta">pendente · ~R$ 9,8k</span></div>
+          <div class="doc-row"><div class="doc-mark"></div><span>Levantamento planialtimétrico</span><span class="doc-meta">pendente · ~R$ 4,2k</span></div>
+          <div class="doc-row"><div class="doc-mark"></div><span>Projeto arquitetônico aprovado PMG</span><span class="doc-meta">depende de arquiteto industrial</span></div>
+          <div class="doc-row"><div class="doc-mark"></div><span>ART estrutural + RRT arquitetônico</span><span class="doc-meta">CREA-SP / CAU-BR</span></div>
+        </div>
+      </article>
+
+      <!-- BLOCO 11 · PRÓXIMOS PASSOS -->
+      <article class="rcard span-12">
+        <div class="rcard-head">
+          <span class="rcard-title">11 · Próximos passos sugeridos</span>
+          <span class="rcard-block">7 dias</span>
+        </div>
+        <div class="grid-4">
+          <div class="step-card">
+            <div class="num-badge">1</div>
+            <h4>Contratar sondagem SPT</h4>
+            <p>6 furos de 12 m em malha. Libera o cálculo da fundação (radier estaqueado provável).</p>
+            <span class="text-xs muted mono">~R$ 9,8k · 7 dias</span>
+          </div>
+          <div class="step-card">
+            <div class="num-badge">2</div>
+            <h4>Levantamento planialtimétrico</h4>
+            <p>Refina curva OpenTopography com precisão de obra para o piso industrial nivelado a laser.</p>
+            <span class="text-xs muted mono">~R$ 4,2k · 4 dias</span>
+          </div>
+          <div class="step-card">
+            <div class="num-badge">3</div>
+            <h4>Validar com arquiteto industrial</h4>
+            <p>Aprovar layout de docas, pátio de manobra e fluxo de caminhões classe 9 articulados.</p>
+            <span class="text-xs muted mono">~R$ 64k · 6 semanas</span>
+          </div>
+          <div class="step-card">
+            <div class="num-badge">4</div>
+            <h4>Travar cotação de aço</h4>
+            <p>Pré-contrato com CSN/Gerdau para 142 t — fixa preço por 90 dias e mitiga risco baixo.</p>
+            <span class="text-xs muted mono">2 semanas</span>
+          </div>
+        </div>
+      </article>
+
+      <!-- BLOCO 12 · AVISO TÉCNICO (mandatory) -->
+      <article class="rcard span-12 disclaimer">
+        <div class="ico">
+          <svg class="icon-stroke" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        </div>
+        <div>
+          <h4>12 · Aviso técnico obrigatório</h4>
+          <p>Esta estimativa é preliminar e serve para estudo de viabilidade. Não substitui projeto arquitetônico, projeto estrutural, ART/RRT, orçamento executivo, sondagem, levantamento topográfico, aprovação legal ou consulta formal a fornecedores.</p>
+        </div>
+      </article>
+
+    </section>
+  </main>
+</div>
+</body>
+</html>

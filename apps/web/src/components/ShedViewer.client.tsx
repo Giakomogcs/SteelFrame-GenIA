@@ -1,649 +1,946 @@
 "use client";
 
-import { Canvas } from "@react-three/fiber";
-import {
-  OrbitControls,
-  Grid,
-  Environment,
-  Html,
-  GizmoHelper,
-  GizmoViewport,
-} from "@react-three/drei";
+/**
+ * ShedViewer.client.tsx
+ * --------------------------------------------------------------
+ * Visualizador 3D paramétrico do galpão (réplica funcional do
+ * protótipo `Steel-Frame/viewer-3d.html`).
+ *
+ *  • 6 camadas construtivas agrupadas (L1 fundação → L6 cobertura)
+ *  • Layer-rail à esquerda com isolate / toggle visibility
+ *  • Modo "Explodir" (0–120) com stagger por camada
+ *  • Ambiente (Satélite/Relevo/Ruas/Off) + opacidade
+ *  • HUD com peso de aço, custo, área, vão·pé-direito
+ *  • Anotações de cotagem nas faces frente/lateral
+ *  • Presets de câmera (planta/frente/lado/iso)
+ *  • Atalho Esc para sair do modo isolado
+ */
+
+import { Canvas, useThree, useFrame } from "@react-three/fiber";
+import { OrbitControls, Grid, Html } from "@react-three/drei";
 import * as THREE from "three";
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { IndustrialShed } from "@/lib/shedSchema";
-import { getShedMaterial, type PBRMaterialDef } from "@/lib/shedMaterials";
 import type { LngLat } from "@/lib/geo";
-import { toLocalMeters } from "@/lib/geo";
+import {
+  deriveLayers,
+  LAYER_COLOR,
+  EXPLODE_OFFSET,
+  LAYER_ORDER,
+  type LayerId,
+  type LayerSpec,
+} from "@/lib/shedLayers";
 
 interface Props {
   shed: IndustrialShed;
   polygon?: LngLat[];
   height?: string;
+  /** Modo compacto: esconde overlays (layer-rail, hud, env-control, bottom bar, FAB). Usado em previews dentro de outras pages. */
+  compact?: boolean;
 }
 
-const COLUMN = 0.35; // seção da coluna (m)
-const BEAM = 0.2;
+type EnvMode = "satellite" | "relief" | "streets" | "off";
+type ViewPreset = "iso" | "plan" | "front" | "side";
 
-function mat(name?: string) {
-  return getShedMaterial(name);
-}
+const BRL = (n: number) =>
+  n >= 1_000_000
+    ? `R$ ${(n / 1_000_000).toFixed(2).replace(".", ",")} M`
+    : n >= 1_000
+    ? `R$ ${Math.round(n / 1_000)} mil`
+    : `R$ ${n.toFixed(0)}`;
 
-function PBRMat({ def, side }: { def: PBRMaterialDef; side?: THREE.Side }) {
+const fmtInt = (n: number) =>
+  n.toLocaleString("pt-BR", { maximumFractionDigits: 0 });
+
+// =============================================================
+// CENA 3D
+// =============================================================
+
+function LayerGroup({
+  layer,
+  visible,
+  isolated,
+  explode,
+  xray = false,
+  children,
+}: {
+  layer: LayerId;
+  visible: boolean;
+  isolated: LayerId | null;
+  explode: number;
+  xray?: boolean;
+  children: React.ReactNode;
+}) {
+  const groupRef = useRef<THREE.Group>(null);
+  const offset = EXPLODE_OFFSET[layer];
+  const targetY = (explode / 120) * offset * 6;
+  // Raio-X: cobertura e vedação ficam translúcidas para ver a estrutura
+  // interna (treliças, colunas, mezanino). Outras camadas não afetadas.
+  const xrayMult =
+    xray && (layer === "roof" || layer === "cladding") ? 0.18 : 1;
+  const dim = (isolated && isolated !== layer ? 0.08 : 1) * xrayMult;
+
+  useFrame(() => {
+    if (!groupRef.current) return;
+    groupRef.current.position.y = THREE.MathUtils.lerp(
+      groupRef.current.position.y,
+      targetY,
+      0.18
+    );
+  });
+
   return (
-    <meshStandardMaterial
-      color={def.color}
-      roughness={def.roughness}
-      metalness={def.metalness}
-      opacity={def.opacity ?? 1}
-      transparent={def.transparent ?? false}
-      side={side}
-    />
+    <group ref={groupRef} visible={visible} userData={{ layer }}>
+      {/* Dim non-isolated layers by wrapping children with material adjustments via group opacity through traversal. */}
+      <DimWrap dim={dim}>{children}</DimWrap>
+    </group>
   );
 }
 
-// ---- Estrutura: colunas + tesouras ---------------------------------------
-function Frames({ shed }: { shed: IndustrialShed }) {
-  const { footprint, structure, roof } = shed;
-  const m = mat("aco_pintado_cinza");
-  const cols: JSX.Element[] = [];
-  const beams: JSX.Element[] = [];
-  const rise = (footprint.width / 2) * (roof.slopePct / 100);
-
-  for (let i = 0; i <= structure.bayCount; i++) {
-    const z = i * structure.baySpacing;
-    // 2 colunas por pórtico
-    [-1, 1].forEach((side) => {
-      const x = footprint.width / 2 + (side * footprint.width) / 2;
-      cols.push(
-        <mesh
-          key={`c-${i}-${side}`}
-          position={[x, structure.clearHeight / 2, z]}
-          castShadow
-        >
-          <boxGeometry args={[COLUMN, structure.clearHeight, COLUMN]} />
-          <PBRMat def={m} />
-        </mesh>,
-      );
+/** Aplica fade nos materiais quando outra camada está isolada. */
+function DimWrap({
+  dim,
+  children,
+}: {
+  dim: number;
+  children: React.ReactNode;
+}) {
+  const ref = useRef<THREE.Group>(null);
+  useEffect(() => {
+    if (!ref.current) return;
+    ref.current.traverse((o) => {
+      const mesh = o as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      mats.forEach((m) => {
+        const mat = m as THREE.MeshStandardMaterial;
+        if (!mat) return;
+        mat.transparent = dim < 1;
+        mat.opacity = dim;
+        mat.needsUpdate = true;
+      });
     });
+  });
+  return <group ref={ref}>{children}</group>;
+}
 
-    // Tesoura (banzo inferior + 2 inclinadas + montante central)
-    const span = footprint.width;
-    beams.push(
-      <group
-        key={`t-${i}`}
-        position={[footprint.width / 2, structure.clearHeight, z]}
-      >
-        <mesh>
-          <boxGeometry args={[span, BEAM, BEAM]} />
-          <PBRMat def={mat("aco_galvanizado")} />
-        </mesh>
-        {[-1, 1].map((dir) => {
-          const half = span / 2;
-          const len = Math.sqrt(half * half + rise * rise);
-          const angle = Math.atan2(rise, half) * dir;
-          return (
-            <mesh
-              key={dir}
-              position={[(half / 2) * dir, rise / 2, 0]}
-              rotation={[0, 0, -angle]}
-            >
-              <boxGeometry args={[len, BEAM, BEAM]} />
-              <PBRMat def={mat("aco_galvanizado")} />
-            </mesh>
-          );
-        })}
-        {rise > 0.3 && (
-          <mesh position={[0, rise / 2, 0]}>
-            <boxGeometry args={[BEAM * 0.8, rise, BEAM * 0.8]} />
-            <PBRMat def={mat("aco_pintado_cinza")} />
-          </mesh>
-        )}
-      </group>,
+function Foundation({ shed }: { shed: IndustrialShed }) {
+  const { footprint, structure } = shed;
+  const w = footprint.width;
+  const d = footprint.depth;
+  const bays = structure.bayCount;
+  const spacing = structure.baySpacing;
+  const blocks: JSX.Element[] = [];
+  // Sapatas isoladas: 2 por pórtico.
+  for (let i = 0; i < bays; i++) {
+    const z = -d / 2 + (i + 0.5) * spacing;
+    blocks.push(
+      <mesh key={`fl-${i}`} position={[-w / 2 + 0.6, -0.35, z]}>
+        <boxGeometry args={[1.4, 0.6, 1.4]} />
+        <meshStandardMaterial color={LAYER_COLOR.foundation} roughness={0.85} />
+      </mesh>
+    );
+    blocks.push(
+      <mesh key={`fr-${i}`} position={[w / 2 - 0.6, -0.35, z]}>
+        <boxGeometry args={[1.4, 0.6, 1.4]} />
+        <meshStandardMaterial color={LAYER_COLOR.foundation} roughness={0.85} />
+      </mesh>
     );
   }
-
+  // Viga baldrame (perímetro).
   return (
-    <>
-      {cols}
-      {beams}
-    </>
+    <group>
+      {blocks}
+      <mesh position={[0, -0.05, -d / 2]}>
+        <boxGeometry args={[w, 0.2, 0.4]} />
+        <meshStandardMaterial color={LAYER_COLOR.foundation} roughness={0.9} />
+      </mesh>
+      <mesh position={[0, -0.05, d / 2]}>
+        <boxGeometry args={[w, 0.2, 0.4]} />
+        <meshStandardMaterial color={LAYER_COLOR.foundation} roughness={0.9} />
+      </mesh>
+      <mesh position={[-w / 2, -0.05, 0]}>
+        <boxGeometry args={[0.4, 0.2, d]} />
+        <meshStandardMaterial color={LAYER_COLOR.foundation} roughness={0.9} />
+      </mesh>
+      <mesh position={[w / 2, -0.05, 0]}>
+        <boxGeometry args={[0.4, 0.2, d]} />
+        <meshStandardMaterial color={LAYER_COLOR.foundation} roughness={0.9} />
+      </mesh>
+    </group>
   );
 }
 
-// ---- Telhado ---------------------------------------------------------------
+function Structure({ shed }: { shed: IndustrialShed }) {
+  const { footprint, structure, roof } = shed;
+  const w = footprint.width;
+  const d = footprint.depth;
+  const bays = structure.bayCount;
+  const spacing = structure.baySpacing;
+  const ch = structure.clearHeight;
+  const rise =
+    roof.type === "gable" ? (w / 2) * (roof.slopePct / 100) : 0.3;
+  const col = 0.32;
+  const beam = 0.22;
+  const elements: JSX.Element[] = [];
+
+  for (let i = 0; i < bays; i++) {
+    const z = -d / 2 + (i + 0.5) * spacing;
+    // colunas
+    elements.push(
+      <mesh key={`cl-${i}`} position={[-w / 2 + col / 2, ch / 2, z]}>
+        <boxGeometry args={[col, ch, col]} />
+        <meshStandardMaterial color={LAYER_COLOR.structure} metalness={0.4} roughness={0.5} />
+      </mesh>,
+      <mesh key={`cr-${i}`} position={[w / 2 - col / 2, ch / 2, z]}>
+        <boxGeometry args={[col, ch, col]} />
+        <meshStandardMaterial color={LAYER_COLOR.structure} metalness={0.4} roughness={0.5} />
+      </mesh>
+    );
+    // duas águas (gable): duas vigas inclinadas
+    if (roof.type === "gable") {
+      const half = w / 2;
+      const len = Math.sqrt(half * half + rise * rise);
+      const angle = Math.atan2(rise, half);
+      elements.push(
+        <mesh
+          key={`bl-${i}`}
+          position={[-half / 2, ch + rise / 2, z]}
+          rotation={[0, 0, -angle]}
+        >
+          <boxGeometry args={[len, beam, beam]} />
+          <meshStandardMaterial color={LAYER_COLOR.structure} metalness={0.4} roughness={0.5} />
+        </mesh>,
+        <mesh
+          key={`br-${i}`}
+          position={[half / 2, ch + rise / 2, z]}
+          rotation={[0, 0, angle]}
+        >
+          <boxGeometry args={[len, beam, beam]} />
+          <meshStandardMaterial color={LAYER_COLOR.structure} metalness={0.4} roughness={0.5} />
+        </mesh>
+      );
+    } else {
+      // viga horizontal (shed/flat)
+      elements.push(
+        <mesh key={`bb-${i}`} position={[0, ch + beam / 2, z]}>
+          <boxGeometry args={[w, beam, beam]} />
+          <meshStandardMaterial color={LAYER_COLOR.structure} metalness={0.4} roughness={0.5} />
+        </mesh>
+      );
+    }
+  }
+
+  // terças (longitudinais)
+  const purlinCount = 5;
+  for (let p = 0; p < purlinCount; p++) {
+    const x = -w / 2 + ((p + 0.5) * w) / purlinCount;
+    const yTop =
+      roof.type === "gable"
+        ? ch + rise * (1 - Math.abs(x) / (w / 2))
+        : ch + beam;
+    elements.push(
+      <mesh key={`pu-${p}`} position={[x, yTop, 0]}>
+        <boxGeometry args={[0.1, 0.1, d]} />
+        <meshStandardMaterial color={LAYER_COLOR.structure} metalness={0.5} roughness={0.4} />
+      </mesh>
+    );
+  }
+  return <group>{elements}</group>;
+}
+
+function Floor({ shed }: { shed: IndustrialShed }) {
+  const w = shed.footprint.width;
+  const d = shed.footprint.depth;
+  return (
+    <mesh position={[0, 0.05, 0]} receiveShadow>
+      <boxGeometry args={[w - 0.6, 0.1, d - 0.6]} />
+      <meshStandardMaterial color={LAYER_COLOR.floor} roughness={0.7} />
+    </mesh>
+  );
+}
+
+function Services({ shed }: { shed: IndustrialShed }) {
+  const w = shed.footprint.width;
+  const d = shed.footprint.depth;
+  const docks = shed.docks ?? [];
+  const meshes: JSX.Element[] = [];
+  docks.forEach((dk, i) => {
+    let x = 0;
+    let z = 0;
+    if (dk.wall === "south") {
+      x = (dk.x ?? 0) - w / 2;
+      z = d / 2 - 1.6;
+    } else if (dk.wall === "north") {
+      x = (dk.x ?? 0) - w / 2;
+      z = -d / 2 + 1.6;
+    } else if (dk.wall === "east") {
+      x = w / 2 - 1.6;
+      z = (dk.z ?? 0) - d / 2;
+    } else {
+      x = -w / 2 + 1.6;
+      z = (dk.z ?? 0) - d / 2;
+    }
+    meshes.push(
+      <mesh key={`dk-${i}`} position={[x, 0.6, z]}>
+        <boxGeometry args={[3, 1.2, 2.4]} />
+        <meshStandardMaterial color={LAYER_COLOR.services} roughness={0.6} />
+      </mesh>
+    );
+  });
+  // hidrantes ao longo da fachada principal
+  const hyd = Math.min(shed.utilities?.hydrants ?? 0, 8);
+  for (let i = 0; i < hyd; i++) {
+    const x = -w / 2 + ((i + 1) * w) / (hyd + 1);
+    meshes.push(
+      <mesh key={`hy-${i}`} position={[x, 0.5, d / 2 + 0.6]}>
+        <cylinderGeometry args={[0.15, 0.15, 1, 12]} />
+        <meshStandardMaterial color={LAYER_COLOR.services} roughness={0.5} />
+      </mesh>
+    );
+  }
+  return <group>{meshes}</group>;
+}
+
+function Cladding({ shed }: { shed: IndustrialShed }) {
+  const w = shed.footprint.width;
+  const d = shed.footprint.depth;
+  const ch = shed.structure.clearHeight;
+  const base = shed.envelope.wallBaseHeight ?? 2.5;
+  const wallThk = 0.12;
+
+  return (
+    <group>
+      {/* base (alvenaria) — tonalidade mais escura */}
+      <mesh position={[0, base / 2, -d / 2]}>
+        <boxGeometry args={[w, base, wallThk]} />
+        <meshStandardMaterial color="#5e1a2a" roughness={0.85} />
+      </mesh>
+      <mesh position={[0, base / 2, d / 2]}>
+        <boxGeometry args={[w, base, wallThk]} />
+        <meshStandardMaterial color="#5e1a2a" roughness={0.85} />
+      </mesh>
+      <mesh position={[-w / 2, base / 2, 0]}>
+        <boxGeometry args={[wallThk, base, d]} />
+        <meshStandardMaterial color="#5e1a2a" roughness={0.85} />
+      </mesh>
+      <mesh position={[w / 2, base / 2, 0]}>
+        <boxGeometry args={[wallThk, base, d]} />
+        <meshStandardMaterial color="#5e1a2a" roughness={0.85} />
+      </mesh>
+      {/* telha lateral acima da base */}
+      <mesh position={[0, base + (ch - base) / 2, -d / 2]}>
+        <boxGeometry args={[w, ch - base, wallThk]} />
+        <meshStandardMaterial color={LAYER_COLOR.cladding} roughness={0.55} metalness={0.2} />
+      </mesh>
+      <mesh position={[0, base + (ch - base) / 2, d / 2]}>
+        <boxGeometry args={[w, ch - base, wallThk]} />
+        <meshStandardMaterial color={LAYER_COLOR.cladding} roughness={0.55} metalness={0.2} />
+      </mesh>
+      <mesh position={[-w / 2, base + (ch - base) / 2, 0]}>
+        <boxGeometry args={[wallThk, ch - base, d]} />
+        <meshStandardMaterial color={LAYER_COLOR.cladding} roughness={0.55} metalness={0.2} />
+      </mesh>
+      <mesh position={[w / 2, base + (ch - base) / 2, 0]}>
+        <boxGeometry args={[wallThk, ch - base, d]} />
+        <meshStandardMaterial color={LAYER_COLOR.cladding} roughness={0.55} metalness={0.2} />
+      </mesh>
+    </group>
+  );
+}
+
 function Roof({ shed }: { shed: IndustrialShed }) {
   const { footprint, structure, roof } = shed;
   const w = footprint.width;
   const d = footprint.depth;
-  const cover = mat(roof.cover);
-  const baseY = structure.clearHeight;
-  const rise = (w / 2) * (roof.slopePct / 100);
+  const ch = structure.clearHeight;
+  const overhang = roof.overhang ?? 0.6;
 
-  if (roof.type === "flat") {
+  if (roof.type === "gable") {
+    const half = w / 2;
+    const rise = half * (roof.slopePct / 100);
+    const len = Math.sqrt(half * half + rise * rise);
+    const angle = Math.atan2(rise, half);
     return (
-      <mesh position={[w / 2, baseY + 0.05, d / 2]} receiveShadow castShadow>
-        <boxGeometry
-          args={[w + roof.overhang * 2, 0.1, d + roof.overhang * 2]}
-        />
-        <PBRMat def={cover} side={THREE.DoubleSide} />
-      </mesh>
-    );
-  }
-
-  if (roof.type === "shed") {
-    const slope = Math.atan2(rise * 2, w);
-    const len = Math.sqrt(w * w + rise * 2 * (rise * 2));
-    return (
-      <mesh
-        position={[w / 2, baseY + rise, d / 2]}
-        rotation={[0, 0, -slope]}
-        castShadow
-      >
-        <boxGeometry args={[len, 0.08, d + roof.overhang * 2]} />
-        <PBRMat def={cover} side={THREE.DoubleSide} />
-      </mesh>
-    );
-  }
-
-  if (roof.type === "sawtooth") {
-    const teeth = Math.max(2, Math.round(d / 8));
-    const toothDepth = d / teeth;
-    const items: JSX.Element[] = [];
-    for (let i = 0; i < teeth; i++) {
-      const z = i * toothDepth + toothDepth / 2;
-      const slope = Math.atan2(rise * 1.4, toothDepth);
-      const len = Math.sqrt(
-        toothDepth * toothDepth + rise * 1.4 * (rise * 1.4),
-      );
-      items.push(
+      <group>
         <mesh
-          key={i}
-          position={[w / 2, baseY + rise * 0.7, z]}
-          rotation={[slope, 0, 0]}
-          castShadow
+          position={[-half / 2, ch + rise / 2 + 0.05, 0]}
+          rotation={[0, 0, -angle]}
         >
-          <boxGeometry args={[w + roof.overhang * 2, 0.08, len]} />
-          <PBRMat def={cover} side={THREE.DoubleSide} />
-        </mesh>,
-      );
-      // janela vertical (clerestory)
-      items.push(
+          <boxGeometry args={[len + overhang, 0.12, d + overhang * 2]} />
+          <meshStandardMaterial color={LAYER_COLOR.roof} roughness={0.5} metalness={0.3} />
+        </mesh>
         <mesh
-          key={`g-${i}`}
-          position={[w / 2, baseY + rise * 1.4, z - toothDepth / 2 + 0.05]}
+          position={[half / 2, ch + rise / 2 + 0.05, 0]}
+          rotation={[0, 0, angle]}
         >
-          <boxGeometry args={[w, rise * 1.4, 0.05]} />
-          <PBRMat def={mat("vidro_clear")} />
-        </mesh>,
-      );
-    }
-    return <>{items}</>;
-  }
-
-  // gable (default)
-  return (
-    <group position={[w / 2, baseY, d / 2]}>
-      {[-1, 1].map((dir) => {
-        const half = w / 2;
-        const slope = Math.atan2(rise, half);
-        const len = Math.sqrt(half * half + rise * rise);
-        return (
-          <mesh
-            key={dir}
-            position={[(half / 2) * dir, rise / 2, 0]}
-            rotation={[0, 0, -slope * dir]}
-            castShadow
-          >
-            <boxGeometry args={[len, 0.08, d + roof.overhang * 2]} />
-            <PBRMat def={cover} side={THREE.DoubleSide} />
-          </mesh>
-        );
-      })}
-    </group>
-  );
-}
-
-// ---- Lanternins / skylights ----------------------------------------------
-function Skylights({ shed }: { shed: IndustrialShed }) {
-  const { footprint, structure, roof } = shed;
-  if (roof.skylightPct <= 0 || roof.type === "sawtooth") return null;
-  const baseY = structure.clearHeight;
-  const total = roof.skylightPct / 100;
-  const stripeArea = footprint.width * footprint.depth * total;
-  const count = Math.max(1, Math.round(footprint.depth / 12));
-  const stripeLen = footprint.width * 0.6;
-  const stripeWidth = stripeArea / count / stripeLen;
-  const rise = (footprint.width / 2) * (roof.slopePct / 100);
-
-  return (
-    <>
-      {Array.from({ length: count }).map((_, i) => {
-        const z = footprint.depth * ((i + 1) / (count + 1));
-        return (
-          <mesh
-            key={i}
-            position={[footprint.width / 2, baseY + rise + 0.05, z]}
-          >
-            <boxGeometry args={[stripeLen, 0.02, Math.max(0.8, stripeWidth)]} />
-            <PBRMat def={mat("policarbonato")} />
-          </mesh>
-        );
-      })}
-    </>
-  );
-}
-
-// ---- Paredes externas com fechamento ------------------------------------
-function Walls({ shed }: { shed: IndustrialShed }) {
-  const { footprint, structure, envelope, openings } = shed;
-  const w = footprint.width;
-  const d = footprint.depth;
-  const h = structure.clearHeight;
-
-  const baseMat = mat(envelope.walls);
-  const upperMat = mat("telha_lateral");
-  const baseH = Math.min(envelope.wallBaseHeight, h);
-
-  // Render base de alvenaria (até wallBaseHeight) e fechamento superior em telha
-  function wall(
-    key: string,
-    wall: "north" | "south" | "east" | "west",
-    px: number,
-    pz: number,
-    length: number,
-    rotY: number,
-  ) {
-    const wallOpenings = openings.filter((o) => o.wall === wall);
-
-    // Função auxiliar para criar segmento subtraindo aberturas
-    type Seg = [number, number]; // start, end ao longo da parede
-    let base: Seg[] = [[0, length]];
-    let top: Seg[] = [[0, length]];
-
-    for (const op of wallOpenings) {
-      const s = op.xAlongWall;
-      const e = Math.min(length, op.xAlongWall + op.width);
-      const opTop = op.elevation + op.height;
-      // Corta base se a abertura toca a faixa [0..baseH]
-      if (op.elevation < baseH) {
-        base = base.flatMap((seg): Seg[] => {
-          if (e <= seg[0] || s >= seg[1]) return [seg];
-          const out: Seg[] = [];
-          if (s > seg[0]) out.push([seg[0], s]);
-          if (e < seg[1]) out.push([e, seg[1]]);
-          return out;
-        });
-      }
-      // Corta topo se a abertura toca a faixa [baseH..h]
-      if (opTop > baseH) {
-        top = top.flatMap((seg): Seg[] => {
-          if (e <= seg[0] || s >= seg[1]) return [seg];
-          const out: Seg[] = [];
-          if (s > seg[0]) out.push([seg[0], s]);
-          if (e < seg[1]) out.push([e, seg[1]]);
-          return out;
-        });
-      }
-    }
-
-    return (
-      <group key={key} position={[px, 0, pz]} rotation={[0, rotY, 0]}>
-        {base.map(([s, e], i) => (
-          <mesh
-            key={`b-${i}`}
-            position={[(s + e) / 2, baseH / 2, 0]}
-            castShadow
-            receiveShadow
-          >
-            <boxGeometry args={[Math.max(0.01, e - s), baseH, 0.18]} />
-            <PBRMat def={baseMat} />
-          </mesh>
-        ))}
-        {top.map(([s, e], i) => (
-          <mesh
-            key={`t-${i}`}
-            position={[(s + e) / 2, baseH + (h - baseH) / 2, 0]}
-            castShadow
-          >
-            <boxGeometry
-              args={[Math.max(0.01, e - s), Math.max(0.01, h - baseH), 0.12]}
-            />
-            <PBRMat def={upperMat} />
-          </mesh>
-        ))}
-        {/* Aberturas: render visual dos portões/janelas */}
-        {wallOpenings.map((op, i) => (
-          <OpeningMesh key={i} op={op} wallLen={length} />
-        ))}
+          <boxGeometry args={[len + overhang, 0.12, d + overhang * 2]} />
+          <meshStandardMaterial color={LAYER_COLOR.roof} roughness={0.5} metalness={0.3} />
+        </mesh>
+        {/* cumeeira */}
+        <mesh position={[0, ch + rise + 0.08, 0]}>
+          <boxGeometry args={[0.4, 0.08, d + overhang * 2]} />
+          <meshStandardMaterial color="#ff924a" roughness={0.4} metalness={0.4} />
+        </mesh>
       </group>
     );
   }
 
+  // shed / flat / sawtooth simplificados como laje inclinada
+  const rise = w * (roof.slopePct / 100);
+  const angle = Math.atan2(rise, w);
   return (
-    <>
-      {wall("S", "south", 0, 0, w, 0)}
-      {wall("N", "north", w, d, w, Math.PI)}
-      {wall("W", "west", 0, d, d, -Math.PI / 2)}
-      {wall("E", "east", w, 0, d, Math.PI / 2)}
-    </>
+    <mesh position={[0, ch + rise / 2 + 0.05, 0]} rotation={[0, 0, angle]}>
+      <boxGeometry args={[w + overhang * 2, 0.12, d + overhang * 2]} />
+      <meshStandardMaterial color={LAYER_COLOR.roof} roughness={0.5} metalness={0.3} />
+    </mesh>
   );
 }
 
-function OpeningMesh({
-  op,
-  wallLen,
+function GroundEnv({
+  envMode,
+  envOpacity,
+  shed,
 }: {
-  op: IndustrialShed["openings"][number];
-  wallLen: number;
+  envMode: EnvMode;
+  envOpacity: number;
+  shed: IndustrialShed;
 }) {
-  void wallLen;
-  const isPortao =
-    op.type === "portao_seccional" || op.type === "portao_enrolar";
-  const isPorta = op.type.startsWith("porta");
-  const isJanela = op.type === "janela_alta" || op.type === "lanternim";
-  const material = isPortao
-    ? mat("portao_seccional")
-    : isPorta
-      ? mat("aco_pintado_branco")
-      : isJanela
-        ? mat("vidro_clear")
-        : mat("esquadria_aluminio");
-  const cx = op.xAlongWall + op.width / 2;
-  const cy = op.elevation + op.height / 2;
-  return (
-    <mesh position={[cx, cy, 0.01]}>
-      <boxGeometry args={[op.width, op.height, 0.05]} />
-      <PBRMat def={material} />
-    </mesh>
-  );
-}
+  const size = Math.max(shed.lot.width, shed.lot.depth, 80) * 1.5;
+  if (envMode === "off") return null;
 
-// ---- Zonas internas (chão colorido + caixa fina demarcando) -------------
-function Zones({ shed }: { shed: IndustrialShed }) {
-  const colorByType: Record<string, string> = {
-    armazenagem: "#3b82f6",
-    picking: "#22d3ee",
-    expedicao: "#f59e0b",
-    recebimento: "#fb923c",
-    escritorio: "#a78bfa",
-    vestiario: "#10b981",
-    refeitorio: "#10b981",
-    area_tecnica: "#6b7280",
-    avcb_hidrante: "#ef4444",
-    producao: "#dd1c4a",
-  };
+  const color =
+    envMode === "satellite"
+      ? "#3a4232"
+      : envMode === "relief"
+      ? "#5a5142"
+      : "#2a2d33";
 
   return (
-    <>
-      {shed.zones.map((z, i) => {
-        const color = colorByType[z.type] ?? "#94a3b8";
-        const cx = z.x + z.width / 2;
-        const cz = z.z + z.depth / 2;
-        return (
-          <group key={i}>
-            <mesh
-              position={[cx, 0.03, cz]}
-              rotation={[-Math.PI / 2, 0, 0]}
-              receiveShadow
-            >
-              <planeGeometry args={[z.width, z.depth]} />
-              <meshStandardMaterial color={color} transparent opacity={0.18} />
-            </mesh>
-            {/* moldura */}
-            <lineSegments position={[cx, 0.04, cz]}>
-              <edgesGeometry
-                args={[new THREE.BoxGeometry(z.width, 0.01, z.depth)]}
-              />
-              <lineBasicMaterial color={color} />
-            </lineSegments>
-            <Html position={[cx, z.height * 0.5, cz]} center>
-              <div
-                className="rounded bg-black/70 px-2 py-0.5 text-[10px] uppercase tracking-wide text-white"
-                style={{ borderLeft: `3px solid ${color}` }}
-              >
-                {z.name}
-              </div>
-            </Html>
-          </group>
-        );
-      })}
-    </>
-  );
-}
-
-// ---- Mezanino -----------------------------------------------------------
-function Mezzanine({ shed }: { shed: IndustrialShed }) {
-  if (!shed.mezzanine) return null;
-  const m = shed.mezzanine;
-  return (
-    <mesh
-      position={[m.x + m.width / 2, m.height, m.z + m.depth / 2]}
-      castShadow
-      receiveShadow
-    >
-      <boxGeometry args={[m.width, 0.2, m.depth]} />
-      <PBRMat def={mat("aco_pintado_branco")} />
-    </mesh>
-  );
-}
-
-// ---- Docas (plataformas externas) ---------------------------------------
-function Docks({ shed }: { shed: IndustrialShed }) {
-  const items: JSX.Element[] = [];
-  const w = shed.footprint.width;
-  const d = shed.footprint.depth;
-  for (let i = 0; i < shed.docks.length; i++) {
-    const dock = shed.docks[i];
-    const W = 3.5;
-    const D = 1.5;
-    const H = dock.type === "elevada" ? 1.4 : 1.1;
-    let px = dock.x;
-    let pz = dock.z;
-    if (dock.wall === "north") {
-      px = dock.x;
-      pz = d + D / 2;
-    } else if (dock.wall === "south") {
-      pz = -D / 2;
-    } else if (dock.wall === "west") {
-      px = -D / 2;
-    } else if (dock.wall === "east") {
-      px = w + D / 2;
-    }
-    items.push(
-      <mesh key={i} position={[px, H / 2, pz]} castShadow receiveShadow>
-        <boxGeometry args={[W, H, D]} />
-        <PBRMat def={mat("concreto_armado")} />
-      </mesh>,
-    );
-  }
-  return <>{items}</>;
-}
-
-// ---- Pátio + perímetro --------------------------------------------------
-function Yard({ shed }: { shed: IndustrialShed }) {
-  const { lot, footprint, setbacks, perimeter } = shed;
-  const offset = {
-    x: -setbacks.sides - (lot.width - footprint.width - 2 * setbacks.sides) / 2,
-    z: -setbacks.front,
-  };
-  return (
-    <group position={[offset.x, 0, offset.z]}>
-      {/* asfalto/pátio */}
+    <group>
       <mesh
-        position={[lot.width / 2, -0.005, lot.depth / 2]}
+        position={[0, -0.7, 0]}
         rotation={[-Math.PI / 2, 0, 0]}
         receiveShadow
       >
-        <planeGeometry args={[lot.width, lot.depth]} />
-        <PBRMat def={mat("asfalto")} />
+        <planeGeometry args={[size, size]} />
+        <meshStandardMaterial
+          color={color}
+          transparent
+          opacity={envOpacity}
+          roughness={1}
+        />
       </mesh>
-      {/* muro perimetral */}
-      {(["N", "S", "E", "W"] as const).map((side) => {
-        const h = perimeter.fenceHeight;
-        if (side === "N")
-          return (
-            <mesh
-              key="N"
-              position={[lot.width / 2, h / 2, lot.depth]}
-              castShadow
-            >
-              <boxGeometry args={[lot.width, h, 0.2]} />
-              <PBRMat def={mat(perimeter.fenceType)} />
-            </mesh>
-          );
-        if (side === "S")
-          return (
-            <mesh key="S" position={[lot.width / 2, h / 2, 0]} castShadow>
-              <boxGeometry args={[lot.width, h, 0.2]} />
-              <PBRMat def={mat(perimeter.fenceType)} />
-            </mesh>
-          );
-        if (side === "E")
-          return (
-            <mesh
-              key="E"
-              position={[lot.width, h / 2, lot.depth / 2]}
-              castShadow
-            >
-              <boxGeometry args={[0.2, h, lot.depth]} />
-              <PBRMat def={mat(perimeter.fenceType)} />
-            </mesh>
-          );
-        return (
-          <mesh key="W" position={[0, h / 2, lot.depth / 2]} castShadow>
-            <boxGeometry args={[0.2, h, lot.depth]} />
-            <PBRMat def={mat(perimeter.fenceType)} />
-          </mesh>
-        );
-      })}
+      {/* vizinhos */}
+      <NeighborBoxes shed={shed} opacity={envOpacity} />
     </group>
   );
 }
 
-// ---- Contorno do polígono do terreno ------------------------------------
-function PolygonOutline({
-  polygon,
-  origin,
-  offset,
+function NeighborBoxes({
+  shed,
+  opacity,
 }: {
-  polygon: LngLat[];
-  origin: LngLat;
-  offset: { x: number; z: number };
+  shed: IndustrialShed;
+  opacity: number;
 }) {
-  const points = useMemo(() => {
-    const local = toLocalMeters(polygon, origin);
-    const closed = [...local, local[0]];
-    return closed.map(
-      (p) => new THREE.Vector3(p.x + offset.x, 0.05, -p.y + offset.z),
-    );
-  }, [polygon, origin, offset]);
-  const geom = useMemo(
-    () => new THREE.BufferGeometry().setFromPoints(points),
-    [points],
-  );
+  const w = shed.footprint.width;
+  const d = shed.footprint.depth;
+  const boxes: [number, number, number, number, number][] = [
+    [-w * 0.9, 4, -d * 0.7, 14, 22],
+    [w * 0.95, 5, -d * 0.4, 16, 18],
+    [-w * 0.7, 3.5, d * 0.85, 12, 14],
+    [w * 0.6, 4.2, d * 0.95, 18, 12],
+  ];
   return (
-    <line>
-      <primitive object={geom} attach="geometry" />
-      <lineBasicMaterial color="#22d3ee" />
-    </line>
+    <group>
+      {boxes.map(([x, h, z, bw, bd], i) => (
+        <mesh key={i} position={[x, h / 2, z]}>
+          <boxGeometry args={[bw, h, bd]} />
+          <meshStandardMaterial
+            color="#3d4148"
+            transparent
+            opacity={opacity * 0.6}
+            roughness={0.9}
+          />
+        </mesh>
+      ))}
+    </group>
   );
 }
 
-export default function ShedViewer({ shed, polygon, height }: Props) {
-  const { footprint } = shed;
-  const camDist =
-    Math.max(footprint.width, footprint.depth, shed.lot.width, shed.lot.depth) *
-      1.1 +
-    25;
+function DimensionAnnotations({ shed }: { shed: IndustrialShed }) {
+  const w = shed.footprint.width;
+  const d = shed.footprint.depth;
+  const ch = shed.structure.clearHeight;
+  const labelStyle: React.CSSProperties = {
+    background: "rgba(18,18,18,0.88)",
+    border: "1px solid rgba(215,32,66,0.5)",
+    color: "#fff",
+    padding: "3px 8px",
+    borderRadius: 6,
+    fontFamily: "var(--font-mono, ui-monospace)",
+    fontSize: 11,
+    whiteSpace: "nowrap",
+    pointerEvents: "none",
+  };
+  return (
+    <group>
+      <Html position={[0, -0.6, d / 2 + 2]} center>
+        <div style={labelStyle}>{w.toFixed(1)} m</div>
+      </Html>
+      <Html position={[w / 2 + 2, -0.6, 0]} center>
+        <div style={labelStyle}>{d.toFixed(1)} m</div>
+      </Html>
+      <Html position={[w / 2 + 1.4, ch / 2, d / 2 + 1.4]} center>
+        <div style={labelStyle}>pé-direito {ch.toFixed(1)} m</div>
+      </Html>
+    </group>
+  );
+}
+
+function CameraRig({ preset }: { preset: ViewPreset }) {
+  const { camera } = useThree();
+  useEffect(() => {
+    const cam = camera as THREE.PerspectiveCamera;
+    // Posições enquadram um galpão de até ~60×150×12 m com folga.
+    const targets: Record<ViewPreset, [number, number, number]> = {
+      iso: [70, 50, 90],
+      plan: [0, 180, 0.001], // topo, quase ortográfico
+      front: [0, 25, 140],
+      side: [140, 25, 0],
+    };
+    const t = targets[preset];
+    cam.position.set(t[0], t[1], t[2]);
+    cam.lookAt(0, 6, 0);
+    cam.updateProjectionMatrix();
+  }, [preset, camera]);
+  return null;
+}
+
+// =============================================================
+// OVERLAY UI (camadas, HUD, ambiente, presets, AI fab)
+// =============================================================
+
+function LayerRail({
+  layers,
+  visible,
+  isolated,
+  explode,
+  onToggle,
+  onIsolate,
+  onExplode,
+}: {
+  layers: LayerSpec[];
+  visible: Record<LayerId, boolean>;
+  isolated: LayerId | null;
+  explode: number;
+  onToggle: (id: LayerId) => void;
+  onIsolate: (id: LayerId | null) => void;
+  onExplode: (v: number) => void;
+}) {
+  return (
+    <div className="layer-rail">
+      <div className="layer-rail-head">
+        <span className="lr-title">Camadas</span>
+        <span className="lr-sub">isolar · esconder · explodir</span>
+      </div>
+      <div className="layer-chips">
+        {/* renderiza de cima → baixo: roof → foundation (como no protótipo) */}
+        {[...layers].reverse().map((L) => {
+          const isVisible = visible[L.id];
+          const isActive = isolated === L.id;
+          return (
+            <button
+              key={L.id}
+              className={`layer-chip lc-${L.id} ${isActive ? "active" : ""}`}
+              aria-pressed={isVisible}
+              onClick={() => onIsolate(isActive ? null : L.id)}
+              style={{ ["--lc-color" as any]: L.color }}
+            >
+              <span className="lc-tag" style={{ background: L.color }}>
+                {L.idx}
+              </span>
+              <span>
+                <span className="lc-name">{L.name}</span>
+                <br />
+                <span className="lc-meta">{L.meta}</span>
+              </span>
+              <span
+                className="lc-toggle"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggle(L.id);
+                }}
+                title={isVisible ? "Ocultar" : "Mostrar"}
+              >
+                {isVisible ? "●" : "○"}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      <div className="layer-explode">
+        <label htmlFor="explode">Explodir</label>
+        <input
+          type="range"
+          id="explode"
+          min={0}
+          max={120}
+          value={explode}
+          onChange={(e) => onExplode(parseInt(e.target.value, 10))}
+        />
+        <output>{explode}</output>
+      </div>
+    </div>
+  );
+}
+
+function LayerFocus({
+  layer,
+  spec,
+  onClose,
+}: {
+  layer: LayerId;
+  spec: LayerSpec;
+  onClose: () => void;
+}) {
+  return (
+    <div className="layer-focus" style={{ ["--lf-color" as any]: spec.color }}>
+      <span className="lf-tag" style={{ background: spec.color }}>
+        {spec.idx}
+      </span>
+      <div className="lf-info">
+        <div className="lf-name">{spec.name}</div>
+        <div className="lf-meta">{spec.meta}</div>
+      </div>
+      <button className="lf-close" onClick={onClose} aria-label="Sair do isolamento">
+        ✕
+      </button>
+    </div>
+  );
+}
+
+function HudStats({ shed }: { shed: IndustrialShed }) {
+  const area = Math.max(
+    shed.estimate.coveredAreaM2 || shed.footprint.width * shed.footprint.depth,
+    1
+  );
+  const steelT = (shed.estimate.steelKg || 0) / 1000;
+  const total = shed.estimate.totalCost || area * shed.estimate.costPerM2;
+  return (
+    <div className="hud-stats">
+      <div className="hud-card accent">
+        <div className="hud-label">Peso aço</div>
+        <div className="hud-value">{steelT.toFixed(1)} t</div>
+      </div>
+      <div className="hud-card accent">
+        <div className="hud-label">Custo total</div>
+        <div className="hud-value">{BRL(total)}</div>
+      </div>
+      <div className="hud-card">
+        <div className="hud-label">Área coberta</div>
+        <div className="hud-value">{fmtInt(area)} m²</div>
+      </div>
+      <div className="hud-card">
+        <div className="hud-label">Dimensões</div>
+        <div className="hud-value">
+          {shed.footprint.width.toFixed(0)} × {shed.footprint.depth.toFixed(0)} m
+        </div>
+      </div>
+      <div className="hud-card">
+        <div className="hud-label">Vão · pé-direito</div>
+        <div className="hud-value">
+          {shed.structure.freeSpan.toFixed(0)} · {shed.structure.clearHeight.toFixed(1)} m
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function EnvControl({
+  envMode,
+  envOpacity,
+  onMode,
+  onOpacity,
+}: {
+  envMode: EnvMode;
+  envOpacity: number;
+  onMode: (m: EnvMode) => void;
+  onOpacity: (v: number) => void;
+}) {
+  const modes: { id: EnvMode; label: string }[] = [
+    { id: "satellite", label: "Satélite" },
+    { id: "relief", label: "Relevo" },
+    { id: "streets", label: "Ruas" },
+    { id: "off", label: "Off" },
+  ];
+  return (
+    <div className="env-control">
+      <div className="env-pills">
+        {modes.map((m) => (
+          <button
+            key={m.id}
+            className={`env-pill ${envMode === m.id ? "active" : ""}`}
+            onClick={() => onMode(m.id)}
+          >
+            {m.label}
+          </button>
+        ))}
+      </div>
+      <div className="env-opacity-row">
+        <span>Opacidade</span>
+        <input
+          type="range"
+          min={0}
+          max={100}
+          value={Math.round(envOpacity * 100)}
+          onChange={(e) => onOpacity(parseInt(e.target.value, 10) / 100)}
+        />
+        <output>{Math.round(envOpacity * 100)}%</output>
+      </div>
+    </div>
+  );
+}
+
+function ViewportBottomBar({
+  preset,
+  onPreset,
+  xray,
+  onXray,
+}: {
+  preset: ViewPreset;
+  onPreset: (p: ViewPreset) => void;
+  xray: boolean;
+  onXray: (v: boolean) => void;
+}) {
+  const presets: { id: ViewPreset; label: string }[] = [
+    { id: "iso", label: "Isométrica" },
+    { id: "plan", label: "Planta" },
+    { id: "front", label: "Frente" },
+    { id: "side", label: "Lado" },
+  ];
+  return (
+    <div className="viewport-bottom-bar">
+      {presets.map((p) => (
+        <button
+          key={p.id}
+          className={`vp-btn ${preset === p.id ? "active" : ""}`}
+          onClick={() => onPreset(p.id)}
+        >
+          {p.label}
+        </button>
+      ))}
+      <div style={{ width: 1, height: 18, background: "var(--color-stroke)" }} />
+      <button
+        className={`vp-btn ${xray ? "active" : ""}`}
+        onClick={() => onXray(!xray)}
+        title="Raio-X: cobertura e vedação translúcidas (ver estrutura interna)"
+      >
+        Raio-X
+      </button>
+    </div>
+  );
+}
+
+// =============================================================
+// COMPONENTE PRINCIPAL
+// =============================================================
+
+export default function ShedViewerClient({ shed, height = "70vh", compact = false }: Props) {
+  const layers = useMemo(() => deriveLayers(shed), [shed]);
+  const layerMap = useMemo(
+    () =>
+      layers.reduce<Record<LayerId, LayerSpec>>((acc, l) => {
+        acc[l.id] = l;
+        return acc;
+      }, {} as Record<LayerId, LayerSpec>),
+    [layers]
+  );
+
+  const [visible, setVisible] = useState<Record<LayerId, boolean>>(() =>
+    LAYER_ORDER.reduce(
+      (acc, id) => ({ ...acc, [id]: true }),
+      {} as Record<LayerId, boolean>
+    )
+  );
+  const [isolated, setIsolated] = useState<LayerId | null>(null);
+  const [explode, setExplode] = useState(0);
+  const [envMode, setEnvMode] = useState<EnvMode>("satellite");
+  const [envOpacity, setEnvOpacity] = useState(0.6);
+  const [preset, setPreset] = useState<ViewPreset>("iso");
+  const [xray, setXray] = useState(false);
+
+  // Esc → sair do isolamento
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isolated) setIsolated(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isolated]);
+
+  const onToggle = (id: LayerId) =>
+    setVisible((prev) => ({ ...prev, [id]: !prev[id] }));
 
   return (
-    <div
-      className="overflow-hidden rounded-xl border border-white/10 bg-[#0e0c11]"
-      style={{ height: height ?? "70vh" }}
-    >
+    <div className="viewport" style={{ height, position: "relative" }}>
       <Canvas
         shadows
-        camera={{ position: [camDist, camDist * 0.65, camDist], fov: 42 }}
+        camera={{ position: [55, 38, 65], fov: 38 }}
+        dpr={[1, 2]}
+        gl={{ antialias: true }}
+        style={{ background: "linear-gradient(180deg, #1d1c22 0%, #121212 100%)" }}
       >
-        <color attach="background" args={["#0e0c11"]} />
-        <fog attach="fog" args={["#0e0c11", camDist * 0.8, camDist * 4]} />
-        <ambientLight intensity={0.45} />
+        <ambientLight intensity={0.55} />
         <directionalLight
-          position={[camDist * 0.6, camDist * 0.9, camDist * 0.4]}
-          intensity={1.05}
+          position={[40, 60, 30]}
+          intensity={1.1}
           castShadow
-          shadow-mapSize={[2048, 2048]}
+          shadow-mapSize-width={1024}
+          shadow-mapSize-height={1024}
         />
-        <Environment preset="warehouse" />
+        <directionalLight position={[-30, 20, -20]} intensity={0.35} />
 
         <Grid
-          args={[400, 400]}
+          position={[0, -0.69, 0]}
+          args={[200, 200]}
           cellSize={1}
-          cellThickness={0.4}
-          cellColor="#33222b"
+          cellThickness={0.6}
+          cellColor="#2b2b32"
           sectionSize={10}
-          sectionThickness={1}
-          sectionColor="#dd1c4a"
-          fadeDistance={250}
+          sectionThickness={1.2}
+          sectionColor="#3a3a44"
+          fadeDistance={140}
           fadeStrength={1.2}
           infiniteGrid
         />
 
-        <Yard shed={shed} />
+        <GroundEnv envMode={envMode} envOpacity={envOpacity} shed={shed} />
 
-        {/* Laje do galpão */}
-        <mesh
-          position={[footprint.width / 2, 0.01, footprint.depth / 2]}
-          rotation={[-Math.PI / 2, 0, 0]}
-          receiveShadow
+        <LayerGroup
+          layer="foundation"
+          visible={visible.foundation}
+          isolated={isolated}
+          explode={explode}
         >
-          <planeGeometry args={[footprint.width, footprint.depth]} />
-          <PBRMat def={getShedMaterial(shed.floor.type)} />
-        </mesh>
-
-        <Zones shed={shed} />
-        <Frames shed={shed} />
-        <Walls shed={shed} />
-        <Roof shed={shed} />
-        <Skylights shed={shed} />
-        <Mezzanine shed={shed} />
-        <Docks shed={shed} />
-
-        {polygon && polygon.length >= 3 && (
-          <PolygonOutline
-            polygon={polygon}
-            origin={[shed.lot.width / 2, shed.lot.depth / 2] as LngLat}
-            offset={{ x: 0, z: 0 }}
-          />
-        )}
-
-        <Html
-          position={[
-            footprint.width / 2,
-            shed.structure.clearHeight + 5,
-            footprint.depth / 2,
-          ]}
-          center
+          <Foundation shed={shed} />
+        </LayerGroup>
+        <LayerGroup
+          layer="structure"
+          visible={visible.structure}
+          isolated={isolated}
+          explode={explode}
         >
-          <div className="rounded-md bg-[#1f1c23]/95 px-3 py-1.5 text-[11px] font-medium uppercase tracking-wide text-white shadow-lg">
-            {footprint.width.toFixed(1)} × {footprint.depth.toFixed(1)} m ·
-            pé-direito {shed.structure.clearHeight} m
-          </div>
-        </Html>
+          <Structure shed={shed} />
+        </LayerGroup>
+        <LayerGroup
+          layer="floor"
+          visible={visible.floor}
+          isolated={isolated}
+          explode={explode}
+        >
+          <Floor shed={shed} />
+        </LayerGroup>
+        <LayerGroup
+          layer="services"
+          visible={visible.services}
+          isolated={isolated}
+          explode={explode}
+        >
+          <Services shed={shed} />
+        </LayerGroup>
+        <LayerGroup
+          layer="cladding"
+          visible={visible.cladding}
+          isolated={isolated}
+          explode={explode}
+          xray={xray}
+        >
+          <Cladding shed={shed} />
+        </LayerGroup>
+        <LayerGroup
+          layer="roof"
+          visible={visible.roof}
+          isolated={isolated}
+          explode={explode}
+          xray={xray}
+        >
+          <Roof shed={shed} />
+        </LayerGroup>
 
+        <DimensionAnnotations shed={shed} />
+
+        <CameraRig preset={preset} />
         <OrbitControls
-          makeDefault
           enableDamping
-          target={[footprint.width / 2, 0, footprint.depth / 2]}
+          dampingFactor={0.08}
+          target={[0, 6, 0]}
+          // Permite rotacionar livremente — inclusive olhar de baixo para
+          // contar treliças/colunas a partir da planta invertida.
+          minPolarAngle={0}
+          maxPolarAngle={Math.PI}
+          // Zoom amplo: chega bem perto para inspecionar conexões e bem longe
+          // para enquadrar o lote inteiro.
+          minDistance={3}
+          maxDistance={600}
+          // Pan livre (atalho Shift+drag ou botão direito).
+          enablePan
+          zoomSpeed={1.1}
+          rotateSpeed={0.9}
         />
-        <GizmoHelper alignment="bottom-right" margin={[60, 60]}>
-          <GizmoViewport
-            axisColors={["#dd1c4a", "#22d3ee", "#10b981"]}
-            labelColor="white"
-          />
-        </GizmoHelper>
       </Canvas>
+
+      {/* Overlays HTML (fora do canvas) — omitidos no modo compacto */}
+      {!compact && (
+        <>
+          <LayerRail
+            layers={layers}
+            visible={visible}
+            isolated={isolated}
+            explode={explode}
+            onToggle={onToggle}
+            onIsolate={setIsolated}
+            onExplode={setExplode}
+          />
+
+          <HudStats shed={shed} />
+
+          {isolated && (
+            <LayerFocus
+              layer={isolated}
+              spec={layerMap[isolated]}
+              onClose={() => setIsolated(null)}
+            />
+          )}
+
+          <EnvControl
+            envMode={envMode}
+            envOpacity={envOpacity}
+            onMode={setEnvMode}
+            onOpacity={setEnvOpacity}
+          />
+
+          <ViewportBottomBar
+            preset={preset}
+            onPreset={setPreset}
+            xray={xray}
+            onXray={setXray}
+          />
+
+          <button
+            className="ai-fab"
+            title="Pergunte à GenIA sobre este galpão"
+            onClick={() => {
+              const ev = new CustomEvent("sfg:ai-fab");
+              window.dispatchEvent(ev);
+            }}
+          >
+            <span className="ai-fab-dot" />
+            Perguntar à GenIA
+          </button>
+        </>
+      )}
     </div>
   );
 }

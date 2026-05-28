@@ -11,7 +11,14 @@ import {
 } from "react-leaflet";
 import L from "leaflet";
 import type { LngLat } from "@/lib/geo";
-import { polygonAreaM2 } from "@/lib/geo";
+import {
+  polygonAreaM2,
+  polygonCenter,
+  MIN_TERRAIN_AREA_M2,
+  MAX_TERRAIN_AREA_M2,
+  MAX_MAP_ZOOM,
+  MIN_MAP_ZOOM,
+} from "@/lib/geo";
 
 // Ícone padrão dos vértices (Leaflet exige reset de paths em bundlers)
 const vertexIcon = L.divIcon({
@@ -28,7 +35,9 @@ interface Props {
   initialPolygon?: LngLat[]; // [lng, lat]
   initialCenter?: LngLat;
   editable?: boolean;
-  onChange?: (polygon: LngLat[], areaM2: number) => void;
+  onChange?: (polygon: LngLat[], areaM2: number, errors?: string[]) => void;
+  /** Recebe endereço quando o usuário busca ou quando a forma fecha (reverse-geocoding). */
+  onAddressResolved?: (address: string) => void;
 }
 
 function MapClickHandler({
@@ -52,7 +61,10 @@ function MapClickHandler({
 function FlyTo({ target }: { target: LngLat | null }) {
   const map = useMap();
   useEffect(() => {
-    if (target) map.flyTo([target[1], target[0]], 18, { duration: 0.8 });
+    if (target) {
+      const z = Math.min(18, MAX_MAP_ZOOM);
+      map.flyTo([target[1], target[0]], z, { duration: 0.8 });
+    }
   }, [target, map]);
   return null;
 }
@@ -62,6 +74,7 @@ export default function TerrainMapClient({
   initialCenter,
   editable = true,
   onChange,
+  onAddressResolved,
 }: Props) {
   const [polygon, setPolygon] = useState<LngLat[]>(initialPolygon);
   const [closed, setClosed] = useState(initialPolygon.length >= 3);
@@ -78,9 +91,47 @@ export default function TerrainMapClient({
 
   const area = useMemo(() => polygonAreaM2(polygon), [polygon]);
 
+  const areaErrors = useMemo<string[]>(() => {
+    const errs: string[] = [];
+    if (polygon.length >= 3) {
+      if (area < MIN_TERRAIN_AREA_M2) {
+        errs.push(
+          `Área muito pequena (${Math.round(area)} m²). Mínimo ${MIN_TERRAIN_AREA_M2} m².`
+        );
+      }
+      if (area > MAX_TERRAIN_AREA_M2) {
+        errs.push(
+          `Área muito grande (${(area / 10_000).toFixed(1)} ha). Máximo ${(
+            MAX_TERRAIN_AREA_M2 / 10_000
+          ).toFixed(0)} ha — selecione um lote, não uma região.`
+        );
+      }
+    }
+    return errs;
+  }, [polygon.length, area]);
+
   useEffect(() => {
-    if (closed) onChange?.(polygon, area);
-  }, [polygon, area, closed, onChange]);
+    onChange?.(polygon, area, areaErrors);
+  }, [polygon, area, areaErrors, onChange]);
+
+  // Reverse-geocoding ao fechar a forma (preenche endereço automaticamente).
+  useEffect(() => {
+    if (!closed || polygon.length < 3 || !onAddressResolved) return;
+    const [lng, lat] = polygonCenter(polygon);
+    const ctrl = new AbortController();
+    fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=json&zoom=18&addressdetails=1&lat=${lat}&lon=${lng}`,
+      { headers: { Accept: "application/json" }, signal: ctrl.signal }
+    )
+      .then((r) => r.json())
+      .then((data: { display_name?: string } | null) => {
+        if (data?.display_name) onAddressResolved(data.display_name);
+      })
+      .catch(() => {
+        /* offline ou bloqueado — ignora */
+      });
+    return () => ctrl.abort();
+  }, [closed, polygon, onAddressResolved]);
 
   const center: [number, number] = initialCenter
     ? [initialCenter[1], initialCenter[0]]
@@ -92,6 +143,7 @@ export default function TerrainMapClient({
 
   const closeShape = () => {
     if (polygon.length < 3) return;
+    if (area < MIN_TERRAIN_AREA_M2 || area > MAX_TERRAIN_AREA_M2) return;
     setClosed(true);
     setDrawing(false);
   };
@@ -124,9 +176,14 @@ export default function TerrainMapClient({
         `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(search)}`,
         { headers: { Accept: "application/json" } },
       );
-      const data = (await res.json()) as { lat: string; lon: string }[];
+      const data = (await res.json()) as {
+        lat: string;
+        lon: string;
+        display_name?: string;
+      }[];
       if (data[0]) {
         setSearchTarget([parseFloat(data[0].lon), parseFloat(data[0].lat)]);
+        if (data[0].display_name) onAddressResolved?.(data[0].display_name);
       }
     } finally {
       setSearching(false);
@@ -172,7 +229,7 @@ export default function TerrainMapClient({
                 <button
                   type="button"
                   onClick={closeShape}
-                  disabled={polygon.length < 3}
+                  disabled={polygon.length < 3 || areaErrors.length > 0}
                   className="rounded-md bg-brand-600 px-3 py-2 text-sm hover:bg-brand-500 disabled:opacity-40"
                 >
                   Fechar forma
@@ -196,17 +253,19 @@ export default function TerrainMapClient({
           zoom={initialPolygon.length ? 18 : 13}
           style={{ height: "60vh", width: "100%" }}
           scrollWheelZoom
+          minZoom={MIN_MAP_ZOOM}
+          maxZoom={MAX_MAP_ZOOM}
         >
           {baseLayer === "satellite" && (
             <>
               <TileLayer
                 attribution="Tiles &copy; Esri"
                 url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-                maxZoom={20}
+                maxZoom={MAX_MAP_ZOOM}
               />
               <TileLayer
                 url="https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}"
-                maxZoom={20}
+                maxZoom={MAX_MAP_ZOOM}
                 opacity={0.7}
               />
             </>
@@ -215,7 +274,7 @@ export default function TerrainMapClient({
             <TileLayer
               attribution="&copy; OpenStreetMap"
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              maxZoom={19}
+              maxZoom={MAX_MAP_ZOOM}
             />
           )}
           {baseLayer === "relief" && (
@@ -232,7 +291,7 @@ export default function TerrainMapClient({
             <TileLayer
               attribution="Hillshade &copy; Esri"
               url="https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/{z}/{y}/{x}"
-              maxZoom={19}
+              maxZoom={MAX_MAP_ZOOM}
               opacity={0.5}
             />
           )}
@@ -330,6 +389,13 @@ export default function TerrainMapClient({
             : "Clique no mapa para adicionar vértices · feche a forma para confirmar"
           : "Visualização"}
       </div>
+      {areaErrors.length > 0 && (
+        <div className="rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-200">
+          {areaErrors.map((e) => (
+            <div key={e}>⚠ {e}</div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

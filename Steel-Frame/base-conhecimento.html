@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Base de conhecimento · SteelFrame GenIA</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700;900&family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/app.css">
+<style>
+  .kb-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: var(--space-4); }
+  .kb-card { background: var(--color-surface); border:1px solid var(--color-stroke); border-radius: var(--radius-md); padding: var(--space-5); display:flex; flex-direction:column; gap: var(--space-3); transition: border-color .15s, transform .15s; text-decoration:none; color:inherit; }
+  .kb-card:hover { border-color: var(--color-primary-500); transform: translateY(-1px); }
+  .kb-card .kb-tag { font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--color-primary-500); text-transform: uppercase; letter-spacing: 0.08em; }
+  .kb-card h3 { font-family: var(--font-display); font-size: var(--fs-md); font-weight: var(--fw-semibold); line-height: 1.2; }
+  .kb-card p { font-size: var(--fs-sm); color: var(--color-text-secondary); line-height: 1.5; flex: 1; }
+  .kb-card .kb-foot { display:flex; justify-content:space-between; align-items:center; padding-top: var(--space-3); border-top: 1px solid var(--color-stroke); font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--color-text-secondary); }
+  .kb-card .kb-foot .ext { display:flex; align-items:center; gap: 6px; color: var(--color-text-primary); }
+  .kb-section-title { display:flex; align-items:center; gap: var(--space-3); margin: var(--space-8) 0 var(--space-4); }
+  .kb-section-title h2 { font-size: var(--fs-lg); font-weight: var(--fw-semibold); }
+  .kb-section-title .count { font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--color-text-secondary); padding: 2px 8px; background: var(--color-surface-elevated); border-radius: var(--radius-full); border:1px solid var(--color-stroke); }
+  .norm-table { width:100%; background: var(--color-surface); border:1px solid var(--color-stroke); border-radius: var(--radius-md); overflow:hidden; border-collapse: collapse; }
+  .norm-table th { text-align:left; font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.08em; padding: var(--space-3) var(--space-4); background: var(--color-surface-elevated); border-bottom: 1px solid var(--color-stroke); }
+  .norm-table td { padding: var(--space-3) var(--space-4); font-size: var(--fs-sm); border-bottom: 1px solid var(--color-stroke); }
+  .norm-table tr:last-child td { border-bottom: none; }
+  .norm-table tr:hover td { background: rgba(255,255,255,0.02); }
+  .norm-table .norm-code { font-family: var(--font-mono); font-weight: var(--fw-semibold); color: var(--color-primary-500); }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-mark">DT</div>
+      <div class="brand-text">
+        <span class="brand-name">SteelFrame GenIA</span>
+        <span class="brand-sub">Distrito Tecnológico</span>
+      </div>
+    </div>
+    <div class="sidebar-section">
+      <span class="sidebar-section-label">Operação</span>
+      <a class="nav-item" href="home.html"><svg class="icon-stroke nav-icon" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span>Meus terrenos</span><span class="nav-badge">12</span></a>
+      <a class="nav-item" href="cadastro-terreno.html"><svg class="icon-stroke nav-icon" viewBox="0 0 24 24"><path d="M12 21s-7-7.5-7-12a7 7 0 1 1 14 0c0 4.5-7 12-7 12z"/><circle cx="12" cy="9" r="2.5"/></svg><span>Novo terreno</span></a>
+    </div>
+    <div class="sidebar-section">
+      <span class="sidebar-section-label">Referências</span>
+      <a class="nav-item active" href="#"><svg class="icon-stroke nav-icon" viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg><span>Base de conhecimento</span></a>
+      <a class="nav-item" href="components.html"><svg class="icon-stroke nav-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="9"/></svg><span>Sistema de design</span></a>
+    </div>
+    <div class="sidebar-user">
+      <div class="avatar">RC</div>
+      <div class="user-meta">
+        <span class="user-name">Renata Couto</span>
+        <span class="user-role">Eng. Civil · SteelFrame BR</span>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="page-header">
+      <div class="stack-sm">
+        <nav class="breadcrumb"><a href="home.html">SteelFrame GenIA</a><span class="sep">/</span><span class="crumb-current">Base de conhecimento</span></nav>
+        <div class="page-title-row">
+          <h1>Fontes que alimentam o agente</h1>
+          <span class="pill pill-success"><span class="dot"></span>9 normas · 5 bases de dados</span>
+        </div>
+        <p class="text-sm muted" style="max-width: 72ch; margin-top: var(--space-2)">Todo número, faixa de custo, restrição legal e composição estrutural que o agente cita no Relatório de Viabilidade vem destas fontes. Página pública — você pode auditar qualquer estimativa rastreando-a até a norma ou base de dados de origem.</p>
+      </div>
+    </header>
+
+    <!-- Bases de dados -->
+    <div class="kb-section-title"><h2>Bases de dados & APIs</h2><span class="count">5 fontes</span></div>
+    <section class="kb-grid">
+      <a class="kb-card" href="https://sindusconsp.com.br/servicos/cub/" target="_blank" rel="noopener">
+        <span class="kb-tag">Custos · mensal</span>
+        <h3>CUB Sinduscon-SP</h3>
+        <p>Custo Unitário Básico por tipologia. Base do nosso custo por m² para galpão padrão CSL-8 e CAL-8, calibrado mês a mês conforme publicação.</p>
+        <div class="kb-foot"><span>Atualizado em mai/2026</span><span class="ext">sindusconsp.com.br ↗</span></div>
+      </a>
+      <a class="kb-card" href="#" >
+        <span class="kb-tag">Custos · trimestral</span>
+        <h3>SINAPI / Caixa</h3>
+        <p>Sistema Nacional de Pesquisa de Custos. Compõe as faixas das macroetapas do relatório (Projetos, Fundação, Estrutura SF, Fechamentos, Cobertura, Instalações, Acabamentos, Contingência).</p>
+        <div class="kb-foot"><span>Atualizado em abr/2026</span><span class="ext">caixa.gov.br ↗</span></div>
+      </a>
+      <a class="kb-card" href="https://opentopography.org/home" target="_blank" rel="noopener">
+        <span class="kb-tag">Geo · DEM</span>
+        <h3>OpenTopography</h3>
+        <p>SRTM 30 m e ALOS AW3D30. Origem do relevo sombreado, curvas de nível e perfil de elevação AA' usados no Cadastro de Terreno.</p>
+        <div class="kb-foot"><span>API · key institucional</span><span class="ext">opentopography.org ↗</span></div>
+      </a>
+      <a class="kb-card" href="https://geosampa.prefeitura.sp.gov.br/" target="_blank" rel="noopener">
+        <span class="kb-tag">Geo · zoneamento</span>
+        <h3>GeoSampa</h3>
+        <p>Camadas de zoneamento, ZEIS, APP, restrições aeroportuárias (cone de aproximação GRU) e operações urbanas. Usado para identificar bloqueios legais no terreno.</p>
+        <div class="kb-foot"><span>São Paulo · capital</span><span class="ext">geosampa.prefeitura.sp.gov.br ↗</span></div>
+      </a>
+      <a class="kb-card" href="https://www.abntcatalogo.com.br/" target="_blank" rel="noopener">
+        <span class="kb-tag">Normas · catálogo</span>
+        <h3>Catálogo ABNT</h3>
+        <p>Origem oficial das nove normas técnicas listadas abaixo. Acesso por assinatura institucional, citação automática em todo relatório.</p>
+        <div class="kb-foot"><span>ABNT NBR · texto integral</span><span class="ext">abntcatalogo.com.br ↗</span></div>
+      </a>
+    </section>
+
+    <!-- Normas -->
+    <div class="kb-section-title"><h2>Normas técnicas aplicáveis</h2><span class="count">9 NBR</span></div>
+    <section>
+      <table class="norm-table">
+        <thead><tr><th style="width:120px">NBR</th><th>Título</th><th style="width:280px">Aplicação no SteelFrame GenIA</th></tr></thead>
+        <tbody>
+          <tr><td class="norm-code">NBR 16970</td><td>Sistema construtivo Light Steel Framing</td><td>Núcleo do dimensionamento estrutural do agente.</td></tr>
+          <tr><td class="norm-code">NBR 8800</td><td>Projeto de estruturas de aço e mistas (perfis laminados/soldados)</td><td>Galpão pesado, pórticos principais, treliças.</td></tr>
+          <tr><td class="norm-code">NBR 14762</td><td>Perfis estruturais de aço formados a frio</td><td>Terças, longarinas, montantes do mezanino.</td></tr>
+          <tr><td class="norm-code">NBR 15575</td><td>Desempenho de edificações habitacionais</td><td>Usada em galpão híbrido com área administrativa habitada.</td></tr>
+          <tr><td class="norm-code">NBR 6120</td><td>Ações para o cálculo de estruturas de edificações</td><td>Sobrecargas de piso, ponte rolante, mezanino de estocagem.</td></tr>
+          <tr><td class="norm-code">NBR 6123</td><td>Forças devidas ao vento em edificações</td><td>Crítico em galpão: cobertura, fechamentos laterais, pé-direito alto.</td></tr>
+          <tr><td class="norm-code">NBR 5410</td><td>Instalações elétricas de baixa tensão</td><td>Iluminação de galpão, tomadas industriais, QGBT.</td></tr>
+          <tr><td class="norm-code">NBR 5626</td><td>Sistemas prediais de água fria e quente</td><td>Bloco administrativo, sanitários, copa.</td></tr>
+          <tr><td class="norm-code">NBR 9077</td><td>Saídas de emergência em edifícios</td><td>Rota de fuga, portas corta-fogo, escadas do mezanino.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <div class="kb-section-title"><h2>Como o agente cita</h2><span class="count">contrato</span></div>
+    <section>
+      <div class="card" style="background: var(--color-surface); border:1px solid var(--color-stroke); border-radius: var(--radius-md); padding: var(--space-5); display: flex; flex-direction: column; gap: var(--space-3)">
+        <p class="text-sm" style="line-height: 1.6">Toda estimativa de custo no Relatório de Viabilidade carrega o rótulo da fonte (ex. <span class="mono" style="color: var(--color-primary-500)">[CUB-SP mai/26]</span>) e toda restrição legal carrega o número da norma (ex. <span class="mono" style="color: var(--color-primary-500)">[NBR 6123]</span>). Clicar no rótulo abre o documento de origem em nova aba.</p>
+        <p class="text-sm muted" style="line-height: 1.5">Quando o agente não tem fonte para um valor, ele preenche um stub honesto (<span class="mono">— a confirmar</span>) ao invés de inventar. Custos sem fonte explícita nunca aparecem no consolidado da carteira.</p>
+      </div>
+    </section>
+  </main>
+</div>
+</body>
+</html>

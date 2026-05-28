@@ -17,6 +17,7 @@ export interface ShedViewerProps {
   shed: IndustrialShed;
   polygon?: LngLat[];
   height?: string;
+  compact?: boolean;
 }
 
 export default function ShedViewerEntry(props: ShedViewerProps) {

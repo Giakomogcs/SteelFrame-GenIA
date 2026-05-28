@@ -7,30 +7,125 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ============================================================
+// TERRENO — lote físico cadastrado no SteelFrame GenIA.
+// Campos ricos (zoneamento, restrições, sondagem, perfil de
+// elevação) são opcionais para permitir cadastro incremental.
+// ============================================================
 model Terrain {
   id          String     @id @default(cuid())
   name        String
   address     String?
-  // Polígono em GeoJSON: [[lng, lat], ...] (lista de vértices, em ordem)
+
+  // Endereço estruturado (opcional, alimentado pela busca/Nominatim).
+  addressStreet String?
+  addressNumber String?
+  district      String?
+  city          String?
+  state         String?
+  cep           String?
+
+  // Polígono em [[lng, lat], ...] (lista de vértices, em ordem).
   polygon     Json
-  // Centro (lng, lat) e área em m² (calculados no client e persistidos)
   centerLng   Float
   centerLat   Float
   areaM2      Float
+
+  // Zoneamento e restrições urbanísticas (opcional).
+  zoneamento     String?  // ex. "ZPI-1"
+  ca             Float?   // coeficiente de aproveitamento
+  to             Float?   // taxa de ocupação
+  restrictions   Json?    // array de strings: ["cone GRU", "sem APP", ...]
+
+  // Relevo (medido em campo ou OpenTopography).
+  slopePct        Float?
+  elevationMean   Float?
+  elevationDelta  Float?
+  elevationProfile Json?  // [{ d, h }, ...] — perfil AA'
+
+  // Status agregado: draft | viable | risky | blocked.
+  status      String   @default("draft")
+
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
+
   buildings   Building[]
+  briefings   Briefing[]
+  reports     Report[]
 }
 
+// ============================================================
+// BUILDING — galpão estudado dentro de um terreno.
+// `model` guarda o IndustrialShed completo.
+// ============================================================
 model Building {
   id          String   @id @default(cuid())
   terrainId   String
   terrain     Terrain  @relation(fields: [terrainId], references: [id], onDelete: Cascade)
+
   name        String
-  // Parâmetros do wizard (material, budget, pé direito, vãos, etc.) em JSON
   params      Json
-  // Modelo gerado (dimensões, colunas, treliças) em JSON
   model       Json
+  // Camadas construtivas L1–L6 com custo/quantidade (derivado).
+  layers      Json?
+  // Configuração do contexto (satélite/relevo/ruas/off + opacidade).
+  environment Json?
+
+  // draft | preview | viable | blocked.
+  status      String   @default("preview")
+
+  briefingId  String?  @unique
+  briefing    Briefing? @relation(fields: [briefingId], references: [id])
+
+  reports     Report[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ============================================================
+// BRIEFING — sessão conversacional do agente Pré-Projeto.
+// ============================================================
+model Briefing {
+  id          String   @id @default(cuid())
+  terrainId   String
+  terrain     Terrain  @relation(fields: [terrainId], references: [id], onDelete: Cascade)
+
+  title       String
+  // draft | active | paused | complete
+  status      String   @default("active")
+  progress    Int      @default(0)
+  total       Int      @default(5)
+
+  // [{ role, content, ts, chips? }]
+  messages    Json     @default("[]")
+  // Premissas auto-extraídas / confirmadas.
+  assumptions Json     @default("[]")
+
+  building    Building?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ============================================================
+// REPORT — relatório de viabilidade.
+// ============================================================
+model Report {
+  id          String   @id @default(cuid())
+  terrainId   String
+  terrain     Terrain  @relation(fields: [terrainId], references: [id], onDelete: Cascade)
+  buildingId  String?
+  building    Building? @relation(fields: [buildingId], references: [id], onDelete: SetNull)
+
+  code        String
+  version     Int      @default(1)
+  // draft | preview | issued | superseded
+  status      String   @default("draft")
+  verdict     String   @default("viable")
+
+  blocks      Json
+
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }

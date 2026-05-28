@@ -1,0 +1,1339 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Novo terreno · SteelFrame GenIA</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700;900&family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/app.css">
+<style>
+  /* Page-specific: map fullscreen + right panel */
+  .cadastro-shell {
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    gap: var(--space-4);
+    height: calc(100vh - var(--header-h) - var(--space-8));
+    min-height: 720px;
+  }
+  .map-stage { position: relative; border-radius: var(--radius-md); overflow: hidden; background: var(--color-surface); }
+  .map-stage .map-placeholder { height: 100%; }
+  .map-toolbar {
+    position: absolute; top: var(--space-4); left: var(--space-4);
+    display: flex; flex-direction: column; gap: var(--space-2);
+    background: var(--overlay-glass);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    padding: var(--space-2);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-stroke);
+    z-index: 4;
+  }
+  .map-toolbar .tool-btn {
+    width: 40px; height: 40px;
+    border-radius: var(--radius-sm);
+    display: grid; place-items: center;
+    color: var(--color-text-secondary);
+    transition: all 0.15s;
+  }
+  .map-toolbar .tool-btn:hover { background: rgba(255,255,255,0.06); color: var(--color-text-primary); }
+  .map-toolbar .tool-btn.active { background: var(--color-primary-soft); color: var(--color-primary-500); }
+  .map-toolbar .tool-btn .icon-stroke { width: 20px; height: 20px; }
+  .map-toolbar .tool-btn .kbd { position:absolute; bottom:2px; right:3px; font-family:var(--font-mono); font-size:9px; color:var(--color-text-muted); }
+  .map-toolbar .tool-btn { position: relative; }
+
+  /* Zoom dock — bottom-right, above readout */
+  .zoom-dock {
+    position: absolute; right: var(--space-4); bottom: 72px;
+    display: flex; flex-direction: column;
+    background: var(--overlay-glass);
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    border: 1px solid var(--color-stroke);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    z-index: 4;
+  }
+  .zoom-dock button {
+    width: 40px; height: 40px;
+    display:grid; place-items:center;
+    color: var(--color-text-secondary);
+    border-bottom: 1px solid var(--color-stroke);
+    transition: all 0.15s;
+  }
+  .zoom-dock button:last-child { border-bottom: 0; }
+  .zoom-dock button:hover { background: rgba(255,255,255,0.06); color: var(--color-text-primary); }
+  .zoom-dock .zoom-level { font-family: var(--font-mono); font-size: 10px; padding: 4px 0; color: var(--color-text-secondary); text-align:center; border-bottom: 1px solid var(--color-stroke); }
+
+  /* Polygon visuals — bigger, friendlier */
+  .map-polygon path.lot { fill: rgba(215,32,66,0.18); stroke: #D72042; stroke-width: 2.5; }
+  .map-polygon path.lot-open { fill: none; stroke: #D72042; stroke-width: 2; stroke-dasharray: 6 4; }
+  .map-polygon line.ghost { stroke: #D72042; stroke-width: 1.5; stroke-dasharray: 3 4; opacity: 0.55; pointer-events: none; }
+  .map-polygon circle.vertex {
+    fill: #fff; stroke: #D72042; stroke-width: 2.5;
+    cursor: grab;
+    transition: r 0.12s, fill 0.12s, stroke 0.12s;
+  }
+  .map-polygon circle.vertex:hover { fill: #D72042; r: 11; }
+  .map-polygon circle.vertex.active { fill: #FF7524; stroke: #fff; r: 12; }
+  .map-polygon circle.vertex.first-closeable { stroke: #17a34a; stroke-width: 3.5; }
+  .map-polygon circle.vertex.first-closeable:hover { fill: #17a34a; }
+  .map-polygon circle.vertex.dragging { cursor: grabbing; fill: #FF7524; r: 13; }
+  /* state badge floating at top-center */
+  .draw-state {
+    position: absolute; top: var(--space-4); left: 50%; transform: translateX(-50%);
+    display: flex; align-items: center; gap: var(--space-2);
+    padding: 8px 14px;
+    background: var(--overlay-glass);
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    border: 1px solid var(--color-primary-500);
+    border-radius: var(--radius-full);
+    color: var(--color-text-primary);
+    font-size: var(--fs-sm); font-weight: var(--fw-semibold);
+    z-index: 5;
+    box-shadow: 0 0 0 4px var(--color-primary-glow);
+  }
+  .draw-state .ds-step { font-family: var(--font-mono); font-size: 10px; color: var(--color-primary-500); letter-spacing: 0.08em; text-transform: uppercase; }
+  .draw-state.is-editing { border-color: var(--color-success); box-shadow: 0 0 0 4px rgba(23,163,74,0.18); }
+  .draw-state.is-editing .ds-step { color: var(--color-success); }
+  .draw-state .ds-actions { display:flex; gap: 6px; margin-left: 8px; padding-left: 10px; border-left: 1px solid var(--color-stroke); }
+  .draw-state .ds-actions button {
+    font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase;
+    padding: 4px 8px; border-radius: var(--radius-sm);
+    background: var(--color-background); color: var(--color-text-secondary);
+    border: 1px solid var(--color-stroke-input);
+    transition: all 0.12s;
+  }
+  .draw-state .ds-actions button:hover { color: var(--color-text-primary); border-color: var(--color-primary-500); }
+  .draw-state .ds-actions button.primary { background: var(--color-primary-600); color: #fff; border-color: var(--color-primary-600); }
+  .draw-state .ds-actions button.primary:hover { background: var(--color-primary-700); }
+  .draw-state .ds-actions button[disabled] { opacity: 0.35; cursor: not-allowed; }
+  /* empty-state hint over the map */
+  .map-empty-hint {
+    position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    text-align: center; pointer-events: none;
+    color: var(--color-text-secondary);
+    z-index: 2;
+  }
+  .map-empty-hint .crosshair {
+    width: 56px; height: 56px; margin: 0 auto 12px;
+    border: 2px dashed var(--color-primary-500); border-radius: 50%;
+    position: relative;
+    animation: pulse-ring 2.4s ease-out infinite;
+  }
+  .map-empty-hint .crosshair::before, .map-empty-hint .crosshair::after {
+    content: ''; position: absolute; background: var(--color-primary-500);
+  }
+  .map-empty-hint .crosshair::before { left: 50%; top: 8px; bottom: 8px; width: 1px; transform: translateX(-50%); }
+  .map-empty-hint .crosshair::after  { top: 50%; left: 8px; right: 8px; height: 1px; transform: translateY(-50%); }
+  @keyframes pulse-ring { 0% { box-shadow: 0 0 0 0 var(--color-primary-glow); } 70% { box-shadow: 0 0 0 18px rgba(215,32,66,0); } 100% { box-shadow: 0 0 0 0 rgba(215,32,66,0); } }
+  .map-empty-hint .et { font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--color-text-primary); margin-bottom: 4px; }
+  .map-empty-hint .eh { font-size: var(--fs-sm); }
+  .map-polygon .vertex-label {
+    font-family: var(--font-mono); font-size: 11px; font-weight: 600;
+    fill: #fff; pointer-events: none;
+    paint-order: stroke; stroke: rgba(0,0,0,0.6); stroke-width: 3;
+  }
+  /* Edge length chips — clickable to edit */
+  .edge-chip {
+    cursor: pointer;
+  }
+  .edge-chip rect {
+    fill: rgba(18,18,18,0.92); stroke: var(--color-stroke-input);
+    stroke-width: 1; rx: 4;
+    transition: stroke 0.12s, fill 0.12s;
+  }
+  .edge-chip:hover rect { stroke: var(--color-primary-500); fill: rgba(215,32,66,0.18); }
+  .edge-chip text {
+    fill: #fff; font-family: var(--font-mono); font-size: 11px; font-weight: 600;
+    pointer-events: none; text-anchor: middle; dominant-baseline: central;
+  }
+  .edge-chip .pencil { fill: var(--color-primary-500); pointer-events:none; }
+
+  /* Inline edge editor popover */
+  .edge-editor {
+    position: absolute; z-index: 6;
+    background: var(--color-surface-elevated);
+    border: 1px solid var(--color-primary-500);
+    border-radius: var(--radius-md);
+    padding: var(--space-3);
+    box-shadow: var(--shadow-md);
+    min-width: 220px;
+    display: none;
+  }
+  .edge-editor.open { display: block; }
+  .edge-editor .ee-title { font-size: var(--fs-xs); color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; font-family: var(--font-mono); }
+  .edge-editor .ee-row { display:flex; gap: var(--space-2); align-items: center; }
+  .edge-editor input {
+    flex: 1; background: var(--color-background); border: 1px solid var(--color-stroke-input);
+    color: var(--color-text-primary); border-radius: var(--radius-sm);
+    padding: 8px 10px; font-family: var(--font-mono); font-size: var(--fs-md); font-weight: 600;
+    outline: none;
+  }
+  .edge-editor input:focus { border-color: var(--color-primary-500); }
+  .edge-editor .ee-unit { font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--color-text-secondary); }
+  .edge-editor .ee-hint { font-size: 11px; color: var(--color-text-secondary); margin-top: 6px; }
+
+  /* Sides editor in panel */
+  .sides-list { display:flex; flex-direction:column; gap: 6px; }
+  .side-row {
+    display:grid; grid-template-columns: 28px 1fr 92px; gap: var(--space-2); align-items: center;
+    background: var(--color-surface-elevated); border: 1px solid var(--color-stroke);
+    border-radius: var(--radius-md); padding: 6px 10px;
+    transition: border-color 0.12s;
+  }
+  .side-row:hover { border-color: var(--color-stroke-input); }
+  .side-row.active { border-color: var(--color-primary-500); background: rgba(215,32,66,0.06); }
+  .side-row .side-tag {
+    display:grid; place-items:center; width: 28px; height: 22px; border-radius: 4px;
+    background: rgba(215,32,66,0.15); color: var(--color-primary-500);
+    font-family: var(--font-mono); font-size: 10px; font-weight: 700;
+  }
+  .side-row .side-name { font-size: var(--fs-sm); color: var(--color-text-secondary); font-family: var(--font-mono); }
+  .side-row .side-input { position: relative; }
+  .side-row input {
+    width: 100%; background: var(--color-background); border: 1px solid var(--color-stroke-input);
+    color: var(--color-text-primary); border-radius: var(--radius-sm);
+    padding: 6px 28px 6px 8px; font-family: var(--font-mono); font-size: var(--fs-body); font-weight: 600;
+    text-align: right; outline: none;
+  }
+  .side-row input:focus { border-color: var(--color-primary-500); }
+  .side-row .side-input::after { content: 'm'; position:absolute; right: 8px; top: 50%; transform: translateY(-50%); font-family: var(--font-mono); font-size: 11px; color: var(--color-text-secondary); pointer-events:none; }
+
+  /* Vertex coord editor */
+  .vertex-coords {
+    background: var(--color-surface-elevated); border:1px solid var(--color-stroke);
+    border-radius: var(--radius-md); padding: var(--space-3);
+    display:flex; flex-direction:column; gap: var(--space-2);
+  }
+  .vertex-coords .vc-head { display:flex; justify-content: space-between; align-items: center; }
+  .vertex-coords .vc-tabs { display:flex; gap: 4px; }
+  .vertex-coords .vc-tab {
+    width: 28px; height: 24px; border-radius: 4px; display:grid; place-items:center;
+    background: var(--color-background); color: var(--color-text-secondary);
+    font-family: var(--font-mono); font-size: 10px; font-weight: 700;
+    border: 1px solid var(--color-stroke);
+  }
+  .vertex-coords .vc-tab.active { background: var(--color-primary-soft); color: var(--color-primary-500); border-color: var(--color-primary-500); }
+  .vertex-coords .vc-row { display:grid; grid-template-columns: 60px 1fr; gap: var(--space-2); align-items:center; }
+  .vertex-coords .vc-row label { font-family: var(--font-mono); font-size: 10px; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.06em; }
+  .vertex-coords .vc-row input {
+    background: var(--color-background); border: 1px solid var(--color-stroke-input);
+    color: var(--color-text-primary); border-radius: var(--radius-sm);
+    padding: 6px 8px; font-family: var(--font-mono); font-size: 12px; outline: none;
+  }
+  .vertex-coords .vc-row input:focus { border-color: var(--color-primary-500); }
+
+  /* Help strip with shortcuts */
+  .help-strip {
+    position: absolute; bottom: var(--space-4); left: 50%; transform: translateX(-50%);
+    display:flex; align-items:center; gap: var(--space-3);
+    background: var(--overlay-glass); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    border: 1px solid var(--color-stroke);
+    border-radius: var(--radius-full);
+    padding: 6px 14px;
+    font-size: var(--fs-xs); color: var(--color-text-secondary);
+    z-index: 3;
+  }
+  .help-strip kbd {
+    font-family: var(--font-mono); font-size: 10px; font-weight: 600;
+    background: var(--color-background); border:1px solid var(--color-stroke-input);
+    border-radius: 3px; padding: 1px 5px; color: var(--color-text-primary);
+  }
+  .help-strip .sep { width: 1px; height: 12px; background: var(--color-stroke); }
+
+  .map-search {
+    position: absolute; top: var(--space-4); left: 80px; right: var(--space-4);
+    max-width: 520px;
+    z-index: 4;
+  }
+  .search-card {
+    background: var(--overlay-glass);
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    border: 1px solid var(--color-stroke);
+    border-radius: var(--radius-md);
+    padding: var(--space-2) var(--space-3);
+    display: flex; align-items: center; gap: var(--space-2);
+  }
+  .search-card .icon-stroke { color: var(--color-text-secondary); }
+  .search-card input {
+    flex: 1; background: transparent; border: 0; outline: none;
+    color: var(--color-text-primary); font-size: var(--fs-body);
+    padding: var(--space-2) 0;
+  }
+  .search-card input::placeholder { color: var(--color-text-secondary); }
+  .search-results {
+    margin-top: var(--space-2);
+    background: var(--color-surface-elevated);
+    border: 1px solid var(--color-stroke);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    box-shadow: var(--shadow-md);
+  }
+  .search-result {
+    display: flex; gap: var(--space-3); align-items: flex-start;
+    padding: var(--space-3); cursor: pointer;
+    border-bottom: 1px solid var(--color-stroke);
+  }
+  .search-result:last-child { border-bottom: 0; }
+  .search-result:hover { background: rgba(255,255,255,0.04); }
+  .search-result .res-name { font-weight: var(--fw-semibold); font-size: var(--fs-body); }
+  .search-result .res-addr { font-size: var(--fs-xs); color: var(--color-text-secondary); }
+  .search-result .icon-stroke { color: var(--color-primary-500); margin-top: 2px; }
+
+  /* Layer toggle pills bottom-left */
+  .layer-toggles {
+    position: absolute; bottom: var(--space-4); left: var(--space-4);
+    display: flex; gap: var(--space-2); z-index: 4;
+  }
+  .layer-toggle {
+    display: flex; align-items: center; gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    background: var(--overlay-glass);
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    border: 1px solid var(--color-stroke);
+    border-radius: var(--radius-full);
+    color: var(--color-text-secondary);
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-medium);
+    transition: all 0.15s;
+  }
+  .layer-toggle .icon-stroke { width: 16px; height: 16px; }
+  .layer-toggle:hover { color: var(--color-text-primary); }
+  .layer-toggle.active {
+    background: var(--color-primary-soft);
+    border-color: var(--color-primary-500);
+    color: var(--color-primary-500);
+  }
+
+  /* Scale + coordinate readout bottom-right */
+  .map-readout {
+    position: absolute; bottom: var(--space-4); right: var(--space-4);
+    display: flex; flex-direction: column; gap: var(--space-1); align-items: flex-end;
+    z-index: 4;
+    font-family: var(--font-mono);
+    font-size: var(--fs-xs);
+    color: var(--color-text-secondary);
+  }
+  .scale-bar {
+    display: flex; align-items: center; gap: var(--space-2);
+    background: var(--overlay-glass);
+    backdrop-filter: blur(8px);
+    padding: 4px var(--space-2);
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--color-stroke);
+  }
+  .scale-bar .bar { width: 60px; height: 2px; background: var(--color-text-primary); }
+
+  /* Right panel */
+  .terrain-panel {
+    background: var(--color-surface);
+    border: 1px solid var(--color-stroke);
+    border-radius: var(--radius-md);
+    padding: var(--space-5);
+    display: flex; flex-direction: column; gap: var(--space-5);
+    overflow-y: auto;
+  }
+  .terrain-panel-header h2 {
+    font-size: var(--fs-lg);
+    margin-bottom: 4px;
+  }
+  .terrain-panel-header .subtitle {
+    font-size: var(--fs-xs);
+    color: var(--color-text-secondary);
+  }
+
+  .metric-row {
+    display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3);
+  }
+  .metric {
+    background: var(--color-surface-elevated);
+    border: 1px solid var(--color-stroke);
+    border-radius: var(--radius-md);
+    padding: var(--space-3);
+  }
+  .metric .metric-label {
+    font-size: var(--fs-xs);
+    color: var(--color-text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 6px;
+  }
+  .metric .metric-value {
+    font-family: var(--font-mono);
+    font-size: var(--fs-xl);
+    font-weight: var(--fw-semibold);
+    line-height: 1;
+  }
+  .metric .metric-unit {
+    font-size: 12px; color: var(--color-text-secondary); margin-left: 4px;
+  }
+  .metric.highlight { border-color: var(--color-primary-500); }
+  .metric.highlight .metric-value { color: var(--color-primary-500); }
+
+  .slope-indicator {
+    background: var(--color-surface-elevated);
+    border: 1px solid var(--color-stroke);
+    border-radius: var(--radius-md);
+    padding: var(--space-3);
+  }
+  .slope-track {
+    position: relative;
+    height: 8px;
+    background: linear-gradient(90deg, var(--color-success), var(--color-warning), var(--color-danger));
+    border-radius: var(--radius-full);
+    margin: var(--space-3) 0 var(--space-2);
+  }
+  .slope-marker {
+    position: absolute; top: 50%; transform: translate(-50%, -50%);
+    width: 14px; height: 14px; border-radius: var(--radius-full);
+    background: var(--color-text-primary);
+    border: 2px solid var(--color-surface);
+    box-shadow: 0 0 0 1px var(--color-stroke-input);
+  }
+  .slope-legend { display: flex; justify-content: space-between; font-size: var(--fs-xs); color: var(--color-text-secondary); font-family: var(--font-mono); }
+
+  /* Layer accordion (in panel) */
+  .layers-list { display: flex; flex-direction: column; gap: var(--space-2); }
+  .layer-row {
+    display: flex; align-items: center; gap: var(--space-3);
+    padding: var(--space-2) var(--space-3);
+    background: var(--color-surface-elevated);
+    border: 1px solid var(--color-stroke);
+    border-radius: var(--radius-md);
+  }
+  .layer-row .layer-name { flex: 1; font-size: var(--fs-body); font-weight: var(--fw-medium); }
+  .layer-row .icon-stroke { color: var(--color-text-secondary); }
+  .switch {
+    width: 36px; height: 20px;
+    background: var(--color-stroke-input);
+    border-radius: var(--radius-full);
+    position: relative;
+    transition: background 0.2s;
+    flex: 0 0 36px;
+  }
+  .switch::after {
+    content: ''; position: absolute; top: 2px; left: 2px;
+    width: 16px; height: 16px; background: var(--color-text-primary);
+    border-radius: var(--radius-full);
+    transition: transform 0.2s;
+  }
+  .switch.on { background: var(--color-primary-600); }
+  .switch.on::after { transform: translateX(16px); }
+
+  /* Elevation profile chart */
+  .elevation-chart {
+    background: var(--color-surface-elevated);
+    border: 1px solid var(--color-stroke);
+    border-radius: var(--radius-md);
+    padding: var(--space-3);
+  }
+  .elevation-chart svg { width: 100%; height: 120px; }
+  .chart-axis-label { font-family: var(--font-mono); font-size: 10px; fill: var(--color-text-secondary); }
+
+  /* Footer action bar */
+  .footer-bar {
+    margin-top: auto;
+    display: flex; gap: var(--space-2);
+    padding-top: var(--space-4);
+    border-top: 1px solid var(--color-stroke);
+  }
+  .footer-bar .btn { flex: 1; justify-content: center; }
+  @media (max-width: 1100px) {
+    .cadastro-shell { grid-template-columns: 1fr; height: auto; }
+    .terrain-panel { max-height: none; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- ============ Sidebar ============ -->
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-mark">DT</div>
+      <div class="brand-text">
+        <span class="brand-name">SteelFrame GenIA</span>
+        <span class="brand-sub">Distrito Tecnológico</span>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <span class="sidebar-section-label">Operação</span>
+      <a class="nav-item" href="home.html">
+        <svg class="icon-stroke nav-icon" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+        <span>Meus terrenos</span>
+        <span class="nav-badge">12</span>
+      </a>
+      <a class="nav-item active" href="#">
+        <svg class="icon-stroke nav-icon" viewBox="0 0 24 24"><path d="M12 21s-7-7.5-7-12a7 7 0 1 1 14 0c0 4.5-7 12-7 12z"/><circle cx="12" cy="9" r="2.5"/></svg>
+        <span>Novo terreno</span>
+      </a>
+      <a class="nav-item" href="briefing.html">
+        <svg class="icon-stroke nav-icon" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 4.5-7.79L3 7"/><path d="M3 3v4h4"/></svg>
+        <span>Briefings ativos</span>
+        <span class="nav-badge">3</span>
+      </a>
+      <a class="nav-item" href="relatorio.html">
+        <svg class="icon-stroke nav-icon" viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="14 3 14 9 20 9"/></svg>
+        <span>Relatórios</span>
+      </a>
+    </div>
+
+    <div class="sidebar-section">
+      <span class="sidebar-section-label">Referências</span>
+      <a class="nav-item" href="base-conhecimento.html">
+        <svg class="icon-stroke nav-icon" viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+        <span>Base de conhecimento</span>
+      </a>
+      <a class="nav-item" href="components.html">
+        <svg class="icon-stroke nav-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <span>Sistema de design</span>
+      </a>
+    </div>
+
+    <div class="sidebar-user">
+      <div class="avatar">RC</div>
+      <div class="user-meta">
+        <span class="user-name">Renata Couto</span>
+        <span class="user-role">Eng. Civil · SteelFrame BR</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ============ Main ============ -->
+  <main class="main">
+    <header class="page-header">
+      <div class="stack-sm">
+        <nav class="breadcrumb">
+          <a href="home.html">Meus terrenos</a>
+          <span class="sep">/</span>
+          <span class="crumb-current">Novo terreno</span>
+        </nav>
+        <div class="page-title-row">
+          <h1>Busque o endereço e clique no mapa para desenhar o lote</h1>
+          <span class="pill pill-neutral"><span class="dot"></span>Rascunho · auto-salvo há 12s</span>
+          <span class="pill pill-success" id="pillAddress" style="display:none"><span class="dot"></span>Endereço vinculado</span>
+        </div>
+      </div>
+      <div class="row">
+        <button class="btn btn-ghost">Cancelar</button>
+        <button class="btn btn-secondary">Salvar rascunho</button>
+        <button class="btn btn-primary">
+          Continuar
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <div class="cadastro-shell">
+      <!-- ============ Map stage ============ -->
+      <div class="map-stage">
+        <div class="map-placeholder show-hillshade show-contours" style="height:100%">
+          <div class="map-grid-overlay"></div>
+          <div class="map-hillshade"></div>
+          <div class="map-contours"></div>
+
+          <!-- Polygon being drawn — dynamic N-gon, built/edited via JS -->
+          <svg class="map-polygon" id="polygonSvg" style="position:absolute; inset:0; width:100%; height:100%; cursor: crosshair;" viewBox="0 0 1000 700" preserveAspectRatio="none"></svg>
+
+          <!-- Empty-state hint while no vertices have been added yet -->
+          <div class="map-empty-hint" id="emptyHint">
+            <div class="crosshair"></div>
+            <div class="et">Clique no mapa para começar</div>
+            <div class="eh">Adicione 3 ou mais pontos · feche clicando no <span style="color:#17a34a;font-weight:700">primeiro vértice</span></div>
+          </div>
+
+          <!-- Inline edge editor popover (positioned by JS) -->
+          <div class="edge-editor" id="edgeEditor">
+            <div class="ee-title" id="eeTitle">Lado S1</div>
+            <div class="ee-row">
+              <input type="text" id="eeInput" value="" />
+              <span class="ee-unit">m</span>
+              <button class="btn btn-primary btn-sm" id="eeApply" style="padding: 6px 10px">Aplicar</button>
+            </div>
+            <div class="ee-hint">Enter aplica · Esc fecha · ajusta o vértice final do lado</div>
+          </div>
+
+          <!-- Draw-state badge (Passo 1/2/3) -->
+          <div class="draw-state" id="drawState">
+            <span class="ds-step" id="dsStep">Passo 2</span>
+            <span id="dsLabel">Clique no mapa para adicionar pontos</span>
+            <span class="ds-actions">
+              <button id="dsUndo" title="Desfazer último ponto (Ctrl+Z)" disabled>↶ Desfazer</button>
+              <button id="dsClose" class="primary" title="Fechar polígono (Enter)" disabled>Fechar lote</button>
+              <button id="dsReset" title="Recomeçar">Recomeçar</button>
+            </span>
+          </div>
+        </div>
+
+        <!-- Toolbar -->
+        <div class="map-toolbar">
+          <button class="tool-btn active" title="Desenhar polígono">
+            <svg class="icon-stroke" viewBox="0 0 24 24"><polygon points="3 12 7 4 17 4 21 12 16 20 8 20"/></svg>
+          </button>
+          <button class="tool-btn" title="Mover vértice">
+            <svg class="icon-stroke" viewBox="0 0 24 24"><path d="M5 9v6"/><path d="M19 9v6"/><path d="M9 5h6"/><path d="M9 19h6"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+          <button class="tool-btn" title="Régua / medir">
+            <svg class="icon-stroke" viewBox="0 0 24 24"><path d="M21 8 8 21l-5-5L16 3z"/><path d="m7 16 1.5 1.5"/><path d="m10 13 1.5 1.5"/><path d="m13 10 1.5 1.5"/><path d="m16 7 1.5 1.5"/></svg>
+          </button>
+          <button class="tool-btn" title="Corte topográfico AA'">
+            <svg class="icon-stroke" viewBox="0 0 24 24"><path d="M3 18 9 8l4 6 5-8 3 5"/><path d="M3 21h18"/></svg>
+          </button>
+          <div style="height:1px; background:var(--color-stroke); margin:4px 6px"></div>
+          <button class="tool-btn" title="Ajustar zoom ao polígono" id="btnFit">
+            <svg class="icon-stroke" viewBox="0 0 24 24"><path d="M4 9V5a1 1 0 0 1 1-1h4"/><path d="M20 9V5a1 1 0 0 0-1-1h-4"/><path d="M4 15v4a1 1 0 0 0 1 1h4"/><path d="M20 15v4a1 1 0 0 1-1 1h-4"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg>
+            <span class="kbd">F</span>
+          </button>
+          <button class="tool-btn" title="Centralizar">
+            <svg class="icon-stroke" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><line x1="12" y1="3" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="21"/><line x1="3" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="21" y2="12"/></svg>
+          </button>
+          <button class="tool-btn" title="Limpar">
+            <svg class="icon-stroke" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6 18 20a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+          </button>
+        </div>
+
+        <!-- Search -->
+        <div class="map-search">
+          <div class="search-card">
+            <svg class="icon-stroke" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" id="searchInput" value="" placeholder="Endereço, CEP (00000-000) ou coordenadas (lat, lng)" autocomplete="off" />
+            <span class="pill pill-neutral mono">SP</span>
+          </div>
+          <div class="search-results" id="searchResults" style="display:none">
+            <div class="search-result">
+              <svg class="icon-stroke" viewBox="0 0 24 24"><path d="M12 21s-7-7.5-7-12a7 7 0 1 1 14 0c0 4.5-7 12-7 12z"/><circle cx="12" cy="9" r="2.5"/></svg>
+              <div>
+                <div class="res-name">Av. Monteiro Lobato, 4.820</div>
+                <div class="res-addr">Cumbica · Guarulhos / SP · 07180-900 · ZPI-1</div>
+              </div>
+              <span class="pill pill-success" style="font-size:10px">vincular</span>
+            </div>
+            <div class="search-result">
+              <svg class="icon-stroke" viewBox="0 0 24 24"><path d="M12 21s-7-7.5-7-12a7 7 0 1 1 14 0c0 4.5-7 12-7 12z"/><circle cx="12" cy="9" r="2.5"/></svg>
+              <div>
+                <div class="res-name">Av. Monteiro Lobato, 4.860</div>
+                <div class="res-addr">Cumbica · Guarulhos / SP · 07180-900</div>
+              </div>
+            </div>
+            <div class="search-result">
+              <svg class="icon-stroke" viewBox="0 0 24 24"><path d="M12 21s-7-7.5-7-12a7 7 0 1 1 14 0c0 4.5-7 12-7 12z"/><circle cx="12" cy="9" r="2.5"/></svg>
+              <div>
+                <div class="res-name">Rod. Hélio Smidt, km 2,4</div>
+                <div class="res-addr">Cumbica · Guarulhos / SP · corredor GRU</div>
+              </div>
+            </div>
+          </div>
+          <div id="searchHint" style="padding: 8px 12px; font-family: var(--font-mono); font-size: 10px; color: var(--color-text-secondary); border-top: 1px solid var(--color-stroke); letter-spacing: 0.06em; text-transform: uppercase">
+            <span style="color: var(--color-primary-500)">→</span> selecione um resultado · depois clique no mapa para desenhar o lote
+          </div>
+        </div>
+
+        <!-- Layer toggles -->
+        <div class="layer-toggles">
+          <button class="layer-toggle active" data-layer="satellite">
+            <svg class="icon-stroke" viewBox="0 0 24 24"><path d="M5 12a7 7 0 1 0 14 0 7 7 0 1 0-14 0"/><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+            Satélite
+          </button>
+          <button class="layer-toggle" data-layer="streets">
+            <svg class="icon-stroke" viewBox="0 0 24 24"><path d="M9 3l-6 18"/><path d="M15 3l6 18"/><path d="M3 12h18"/></svg>
+            Ruas
+          </button>
+          <button class="layer-toggle active" data-layer="hillshade">
+            <svg class="icon-stroke" viewBox="0 0 24 24"><path d="M3 20l6-10 4 6 5-8 3 12z"/></svg>
+            Relevo sombreado
+          </button>
+          <button class="layer-toggle active" data-layer="contours">
+            <svg class="icon-stroke" viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="9" ry="5"/><ellipse cx="12" cy="12" rx="6" ry="3"/><ellipse cx="12" cy="12" rx="3" ry="1.5"/></svg>
+            Curvas de nível
+          </button>
+        </div>
+
+        <!-- Readout -->
+        <div class="map-readout">
+          <div>-23.5489 · -46.6857</div>
+          <div class="scale-bar"><span class="bar"></span><span>20 m</span></div>
+        </div>
+
+        <!-- Zoom dock -->
+        <div class="zoom-dock">
+          <button id="btnZoomIn" title="Aproximar (+)">
+            <svg class="icon-stroke" viewBox="0 0 24 24" style="width:18px;height:18px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </button>
+          <div class="zoom-level" id="zoomLevel">z 19</div>
+          <button id="btnZoomOut" title="Afastar (−)">
+            <svg class="icon-stroke" viewBox="0 0 24 24" style="width:18px;height:18px"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </button>
+        </div>
+
+        <!-- Help strip with keyboard shortcuts -->
+        <div class="help-strip">
+          <span><kbd>Click</kbd> no mapa &middot; adiciona ponto</span>
+          <span class="sep"></span>
+          <span><kbd>Drag</kbd> mover vértice</span>
+          <span class="sep"></span>
+          <span><kbd>Click</kbd> 1º vértice &middot; fecha</span>
+          <span class="sep"></span>
+          <span><kbd>Ctrl+Z</kbd> desfaz &middot; <kbd>Del</kbd> remove ponto &middot; <kbd>F</kbd> ajustar</span>
+        </div>
+      </div>
+
+      <!-- ============ Right panel ============ -->
+      <aside class="terrain-panel">
+        <div class="terrain-panel-header">
+          <h2>Parâmetros do terreno</h2>
+          <p class="subtitle">Endereço vinculado · 4 vértices fechados · área e relevo recalculados a cada clique no perímetro.</p>
+        </div>
+
+        <!-- Endereço vinculado (preenchido após selecionar resultado da busca) -->
+        <div id="addressCard" style="display:none; background: var(--color-surface-elevated); border:1px solid var(--color-stroke); border-radius: var(--radius-md); padding: var(--space-3); gap: var(--space-3); align-items: flex-start">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#17a34a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M20 6 9 17l-5-5"/></svg>
+          <div style="flex:1">
+            <div class="text-xs muted mono" style="text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 2px">Endereço vinculado</div>
+            <div class="text-sm" id="addrName" style="font-weight: var(--fw-semibold)">—</div>
+            <div class="text-xs muted" id="addrFull">—</div>
+            <div class="text-xs mono" id="addrCoords" style="color: var(--color-primary-500); margin-top: 4px">—</div>
+          </div>
+        </div>
+
+        <!-- Empty-state quando ainda não há endereço -->
+        <div id="addressEmpty" style="background: rgba(215,32,66,0.06); border:1px dashed var(--color-primary-500); border-radius: var(--radius-md); padding: var(--space-3); display:flex; gap: var(--space-3); align-items: flex-start">
+          <span style="width:20px;height:20px;border-radius:50%;background:var(--color-primary-500);color:#fff;font-family:var(--font-mono);font-size:11px;font-weight:700;display:grid;place-items:center;flex-shrink:0">1</span>
+          <div>
+            <div class="text-sm" style="font-weight: var(--fw-semibold)">Busque o endereço ou CEP</div>
+            <div class="text-xs muted" style="margin-top:2px">O mapa centraliza automaticamente. Depois clique para desenhar o lote ponto a ponto.</div>
+          </div>
+        </div>
+
+        <!-- Tipologia pretendida -->
+        <div>
+          <div class="row-between" style="margin-bottom: var(--space-2)">
+            <span class="text-sm" style="font-weight:600">Tipologia pretendida</span>
+            <span class="text-xs muted mono">para o briefing</span>
+          </div>
+          <div style="display:flex; flex-wrap: wrap; gap: 6px">
+            <button class="chip active">Logístico/CD</button>
+            <button class="chip">Industrial leve</button>
+            <button class="chip">Cross-docking</button>
+            <button class="chip">Híbrido + mez.</button>
+          </div>
+        </div>
+
+        <!-- Sides editor — dinâmico, gerado a partir dos vértices desenhados -->
+        <div id="sidesSection" style="display:none">
+          <div class="row-between" style="margin-bottom: var(--space-2)">
+            <span class="text-sm" style="font-weight:600">Medidas dos lados</span>
+            <span class="text-xs muted mono" id="sidesCount">0 lados</span>
+          </div>
+          <div class="sides-list" id="sidesList"></div>
+        </div>
+
+        <!-- Vertex coord editor — dinâmico -->
+        <div class="vertex-coords" id="vertexCoords" style="display:none">
+          <div class="vc-head">
+            <span class="text-sm" style="font-weight:600">Vértice selecionado</span>
+            <div class="vc-tabs" id="vcTabs"></div>
+          </div>
+          <div class="vc-row">
+            <label>Lat</label><input type="text" id="vLat" value="" />
+          </div>
+          <div class="vc-row">
+            <label>Lng</label><input type="text" id="vLng" value="" />
+          </div>
+          <div class="text-xs muted" style="margin-top:2px">Arraste no mapa ou digite. <span style="color:var(--color-primary-500); font-family:var(--font-mono)">Del</span> remove o vértice.</div>
+        </div>
+
+        <!-- Empty-state das medidas -->
+        <div id="polyEmpty" style="background: var(--color-surface-elevated); border:1px dashed var(--color-stroke-input); border-radius: var(--radius-md); padding: var(--space-3); display:flex; gap: var(--space-3); align-items: flex-start">
+          <span style="width:20px;height:20px;border-radius:50%;background:var(--color-stroke-input);color:#fff;font-family:var(--font-mono);font-size:11px;font-weight:700;display:grid;place-items:center;flex-shrink:0">2</span>
+          <div>
+            <div class="text-sm" style="font-weight: var(--fw-semibold)">Desenhe o polígono do lote</div>
+            <div class="text-xs muted" style="margin-top:2px">Clique no mapa para adicionar pontos na ordem do perímetro. Forma livre — pode ser triângulo, quadrilátero, polígono irregular com 5+ lados. Feche clicando no primeiro ponto (verde).</div>
+          </div>
+        </div>
+
+        <!-- Live metrics -->
+        <div class="metric-row">
+          <div class="metric highlight">
+            <div class="metric-label">Área</div>
+            <div class="metric-value" id="mArea">—<span class="metric-unit">m²</span></div>
+          </div>
+          <div class="metric">
+            <div class="metric-label">Perímetro</div>
+            <div class="metric-value" id="mPerim">—<span class="metric-unit">m</span></div>
+          </div>
+          <div class="metric">
+            <div class="metric-label">Vértices</div>
+            <div class="metric-value" id="mVerts">0<span class="metric-unit">pts</span></div>
+          </div>
+          <div class="metric">
+            <div class="metric-label">Cota média</div>
+            <div class="metric-value" id="mElev">—<span class="metric-unit">m</span></div>
+          </div>
+        </div>
+
+        <!-- Slope -->
+        <div class="slope-indicator">
+          <div class="row-between">
+            <span class="text-sm" style="font-weight:600">Inclinação média</span>
+            <span class="pill pill-success"><span class="dot"></span>Plano · 2,1%</span>
+          </div>
+          <div class="slope-track">
+            <div class="slope-marker" style="left:11%"></div>
+          </div>
+          <div class="slope-legend">
+            <span>Plano · 0–3%</span>
+            <span>Leve · 3–10%</span>
+            <span>Acentuado · 10%+</span>
+          </div>
+        </div>
+
+        <!-- Layers -->
+        <div>
+          <div class="row-between" style="margin-bottom:var(--space-3)">
+            <span class="text-sm" style="font-weight:600">Camadas</span>
+            <span class="text-xs muted mono">OpenTopography SRTM</span>
+          </div>
+          <div class="layers-list">
+            <div class="layer-row">
+              <svg class="icon-stroke" viewBox="0 0 24 24"><path d="M5 12a7 7 0 1 0 14 0 7 7 0 1 0-14 0"/></svg>
+              <span class="layer-name">Satélite (Esri)</span>
+              <div class="switch on"></div>
+            </div>
+            <div class="layer-row">
+              <svg class="icon-stroke" viewBox="0 0 24 24"><path d="M9 3l-6 18M15 3l6 18M3 12h18"/></svg>
+              <span class="layer-name">Ruas</span>
+              <div class="switch"></div>
+            </div>
+            <div class="layer-row">
+              <svg class="icon-stroke" viewBox="0 0 24 24"><path d="M3 20l6-10 4 6 5-8 3 12z"/></svg>
+              <span class="layer-name">Relevo sombreado</span>
+              <div class="switch on"></div>
+            </div>
+            <div class="layer-row">
+              <svg class="icon-stroke" viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="9" ry="5"/><ellipse cx="12" cy="12" rx="6" ry="3"/></svg>
+              <span class="layer-name">Curvas de nível · 1 m</span>
+              <div class="switch on"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Elevation profile -->
+        <div class="elevation-chart">
+          <div class="row-between" style="margin-bottom:var(--space-2)">
+            <span class="text-sm" style="font-weight:600">Perfil de elevação AA'</span>
+            <span class="text-xs muted mono">Δh 4,5 m</span>
+          </div>
+          <svg viewBox="0 0 320 120" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="profileGrad" x1="0" x2="0" y1="0" y2="1">
+                <stop offset="0%" stop-color="#FF7524" stop-opacity="0.45"/>
+                <stop offset="100%" stop-color="#FF7524" stop-opacity="0"/>
+              </linearGradient>
+            </defs>
+            <!-- Grid -->
+            <line x1="0" y1="30" x2="320" y2="30" stroke="#333" stroke-width="0.5"/>
+            <line x1="0" y1="60" x2="320" y2="60" stroke="#333" stroke-width="0.5"/>
+            <line x1="0" y1="90" x2="320" y2="90" stroke="#333" stroke-width="0.5"/>
+            <!-- Profile -->
+            <path d="M 0 78 Q 40 60 80 56 T 160 40 T 240 28 T 320 22 L 320 120 L 0 120 Z" fill="url(#profileGrad)"/>
+            <path d="M 0 78 Q 40 60 80 56 T 160 40 T 240 28 T 320 22" fill="none" stroke="#FF7524" stroke-width="2"/>
+            <!-- Endpoints -->
+            <circle cx="0" cy="78" r="3" fill="#FF7524"/>
+            <circle cx="320" cy="22" r="3" fill="#FF7524"/>
+            <text x="4" y="115" class="chart-axis-label">A · 740 m</text>
+            <text x="262" y="115" class="chart-axis-label">A' · 744,5 m</text>
+          </svg>
+        </div>
+
+        <!-- Footer actions -->
+        <div class="footer-bar">
+          <button class="btn btn-secondary btn-sm">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 14 4 9 9 4"/><path d="M20 20v-7a4 4 0 0 0-4-4H4"/></svg>
+            Voltar
+          </button>
+          <button class="btn btn-primary btn-sm">
+            Iniciar briefing
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+          </button>
+        </div>
+      </aside>
+    </div>
+  </main>
+</div>
+
+<script>
+  // ============================================================
+  // Cadastro de terreno — desenho dinâmico de polígono (N vértices)
+  // Fluxo: 1) Buscar endereço/CEP → 2) Clicar no mapa → 3) Editar arrastando
+  // ============================================================
+
+  // ----- Layer toggles -----
+  const stage = document.querySelector('.map-placeholder');
+  document.querySelectorAll('.layer-toggle').forEach(btn => {
+    btn.addEventListener('click', () => {
+      btn.classList.toggle('active');
+      const layer = btn.dataset.layer;
+      if (layer === 'hillshade') stage.classList.toggle('show-hillshade');
+      if (layer === 'contours')  stage.classList.toggle('show-contours');
+    });
+  });
+  document.querySelectorAll('.switch').forEach(s => s.addEventListener('click', () => s.classList.toggle('on')));
+  document.querySelectorAll('.tool-btn').forEach(b => {
+    b.addEventListener('click', () => {
+      document.querySelectorAll('.tool-btn').forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+    });
+  });
+
+  // ============================================================
+  // 1) Busca de endereço / CEP
+  // ============================================================
+  const SP_PRESETS = [
+    { name: 'Av. Monteiro Lobato, 4.820', sub: 'Cumbica · Guarulhos / SP · 07180-900 · ZPI-1', lat: -23.4356, lng: -46.4731, cep: '07180-900' },
+    { name: 'Rod. dos Bandeirantes, km 33', sub: 'Cajamar / SP · 07750-000 · ZPI-2', lat: -23.3517, lng: -46.8742, cep: '07750-000' },
+    { name: 'Rod. Anhanguera, km 18', sub: 'Perus · São Paulo / SP · 05205-000', lat: -23.4042, lng: -46.7553, cep: '05205-000' },
+    { name: 'Rod. Régis Bittencourt, km 279', sub: 'Embu das Artes / SP · 06806-000', lat: -23.6491, lng: -46.8521, cep: '06806-000' },
+    { name: 'Av. Fagundes de Oliveira, 538', sub: 'Diadema / SP · 09950-300', lat: -23.6837, lng: -46.6233, cep: '09950-300' }
+  ];
+  const searchInput = document.getElementById('searchInput');
+  const searchResults = document.getElementById('searchResults');
+  const searchHint = document.getElementById('searchHint');
+  const addressCard = document.getElementById('addressCard');
+  const addressEmpty = document.getElementById('addressEmpty');
+  const pillAddress = document.getElementById('pillAddress');
+
+  function isCep(q) { return /^\d{5}-?\d{3}$/.test(q.replace(/\s/g,'')); }
+  function isLatLng(q) { return /^-?\d+(?:\.\d+)?\s*,\s*-?\d+(?:\.\d+)?$/.test(q.trim()); }
+
+  function renderResults(query) {
+    if (!query) { searchResults.style.display = 'none'; return; }
+    const q = query.toLowerCase();
+    let list = SP_PRESETS;
+    if (isCep(query))      list = SP_PRESETS.filter(p => p.cep.replace('-','').startsWith(query.replace(/\D/g,'').slice(0,5)));
+    else if (isLatLng(query)) list = [];
+    else                   list = SP_PRESETS.filter(p => p.name.toLowerCase().includes(q) || p.sub.toLowerCase().includes(q));
+    searchResults.innerHTML = '';
+    if (isLatLng(query)) {
+      const [lat, lng] = query.split(',').map(s => parseFloat(s.trim()));
+      const r = document.createElement('div'); r.className = 'search-result';
+      r.innerHTML = `<svg class="icon-stroke" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="9"/></svg>
+        <div><div class="res-name">Coordenadas ${lat.toFixed(4)}, ${lng.toFixed(4)}</div><div class="res-addr">Centralizar mapa nesse ponto</div></div>
+        <span class="pill pill-success" style="font-size:10px">usar</span>`;
+      r.addEventListener('click', () => pickAddress({ name: `Coordenadas (${lat.toFixed(4)}, ${lng.toFixed(4)})`, sub: 'Ponto manual', lat, lng, cep: '' }));
+      searchResults.appendChild(r);
+    } else if (list.length === 0) {
+      searchResults.innerHTML = `<div class="search-result" style="color:var(--color-text-secondary);font-size:12px;cursor:default">Sem resultados para “${query}”</div>`;
+    } else {
+      list.forEach((p, i) => {
+        const r = document.createElement('div'); r.className = 'search-result';
+        r.innerHTML = `<svg class="icon-stroke" viewBox="0 0 24 24"><path d="M12 21s-7-7.5-7-12a7 7 0 1 1 14 0c0 4.5-7 12-7 12z"/><circle cx="12" cy="9" r="2.5"/></svg>
+          <div><div class="res-name">${p.name}</div><div class="res-addr">${p.sub}</div></div>
+          ${i===0?'<span class="pill pill-success" style="font-size:10px">vincular</span>':''}`;
+        r.addEventListener('click', () => pickAddress(p));
+        searchResults.appendChild(r);
+      });
+    }
+    searchResults.style.display = 'block';
+  }
+
+  function pickAddress(p) {
+    searchInput.value = p.name;
+    searchResults.style.display = 'none';
+    addressEmpty.style.display = 'none';
+    addressCard.style.display = 'flex';
+    document.getElementById('addrName').textContent = p.name;
+    document.getElementById('addrFull').textContent = p.sub;
+    document.getElementById('addrCoords').textContent = `− ${Math.abs(p.lat).toFixed(4)}, − ${Math.abs(p.lng).toFixed(4)}`;
+    pillAddress.style.display = 'inline-flex';
+    searchHint.innerHTML = '<span style="color: var(--color-success)">✓</span> ENDEREÇO VINCULADO · <span style="color: var(--color-primary-500)">→</span> agora clique no mapa para desenhar o lote';
+    setDrawState('drawing');
+  }
+
+  searchInput.addEventListener('input', e => renderResults(e.target.value.trim()));
+  searchInput.addEventListener('focus',  e => { if (e.target.value.trim()) renderResults(e.target.value.trim()); });
+  document.addEventListener('click', e => {
+    if (!e.target.closest('.map-search')) searchResults.style.display = 'none';
+  });
+
+  // ============================================================
+  // 2) Desenho dinâmico do polígono (N vértices)
+  // ============================================================
+  const svg = document.getElementById('polygonSvg');
+  const VB_W = 1000, VB_H = 700;
+  const M_PER_VU = 0.42; // viewBox-unit → metros (ajustado para áreas plausíveis)
+
+  /** @type {Array<{x:number,y:number,lat:number,lng:number}>} */
+  let vertices = [];
+  let drawState = 'idle';  // 'idle' (sem endereço) | 'drawing' | 'editing'
+  let selectedIdx = -1;
+  let draggingIdx = -1;
+  let history = [];
+
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+  function el(tag, attrs = {}, text) {
+    const e = document.createElementNS(SVG_NS, tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    if (text != null) e.textContent = text;
+    return e;
+  }
+
+  function snapshot() { history.push(JSON.stringify(vertices)); if (history.length > 50) history.shift(); }
+  function undo() { const s = history.pop(); if (s) { vertices = JSON.parse(s); render(); } }
+
+  // Mapeia ponto de clique (px no SVG) → coords do viewBox
+  function clientToViewBox(clientX, clientY) {
+    const r = svg.getBoundingClientRect();
+    return { x: (clientX - r.left) * (VB_W / r.width), y: (clientY - r.top) * (VB_H / r.height) };
+  }
+  // Aproximação de lat/lng a partir do ponto base do endereço + offset em metros
+  let baseLat = -23.4356, baseLng = -46.4731;
+  function pxToLatLng(x, y) {
+    const dxM = (x - VB_W/2) * M_PER_VU;
+    const dyM = (y - VB_H/2) * M_PER_VU;
+    const dLat = -dyM / 111320;
+    const dLng = dxM / (111320 * Math.cos(baseLat * Math.PI / 180));
+    return { lat: baseLat + dLat, lng: baseLng + dLng };
+  }
+
+  function polygonArea() {
+    if (vertices.length < 3) return 0;
+    let a = 0;
+    for (let i = 0; i < vertices.length; i++) {
+      const p = vertices[i], q = vertices[(i+1) % vertices.length];
+      a += p.x * q.y - q.x * p.y;
+    }
+    return Math.abs(a) / 2 * M_PER_VU * M_PER_VU;
+  }
+  function polygonPerimeter() {
+    if (vertices.length < 2) return 0;
+    let p = 0;
+    const n = drawState === 'editing' ? vertices.length : vertices.length - 1;
+    for (let i = 0; i < n; i++) {
+      const a = vertices[i], b = vertices[(i+1) % vertices.length];
+      p += Math.hypot(b.x - a.x, b.y - a.y);
+    }
+    return p * M_PER_VU;
+  }
+
+  // ----- Render -----
+  function render() {
+    svg.innerHTML = '';
+
+    // Hide empty hint as soon as user adds a point
+    document.getElementById('emptyHint').style.display = vertices.length === 0 ? 'block' : 'none';
+
+    if (vertices.length >= 2) {
+      const closed = drawState === 'editing' && vertices.length >= 3;
+      const d = vertices.map((v, i) => (i === 0 ? 'M' : 'L') + v.x + ' ' + v.y).join(' ') + (closed ? ' Z' : '');
+      svg.appendChild(el('path', { class: closed ? 'lot' : 'lot-open', d }));
+    }
+
+    // Edge length chips (when closed)
+    if (drawState === 'editing' && vertices.length >= 3) {
+      for (let i = 0; i < vertices.length; i++) {
+        const a = vertices[i], b = vertices[(i+1) % vertices.length];
+        const mx = (a.x + b.x)/2, my = (a.y + b.y)/2;
+        const len = Math.hypot(b.x - a.x, b.y - a.y) * M_PER_VU;
+        const g = el('g', { class: 'edge-chip', 'data-edge-i': i, transform: `translate(${mx} ${my})` });
+        g.appendChild(el('rect', { x: -34, y: -12, width: 68, height: 24 }));
+        g.appendChild(el('text', { x: -4, y: 1 }, len.toFixed(1).replace('.', ',') + ' m'));
+        const pencil = el('path', { class: 'pencil', transform: 'translate(18 -7)', d: 'M0 10 L7 3 L10 6 L3 13 L0 13 Z' });
+        g.appendChild(pencil);
+        g.addEventListener('click', (e) => {
+          e.stopPropagation();
+          openEditor(i, g.getBoundingClientRect());
+        });
+        svg.appendChild(g);
+      }
+    }
+
+    // Vertices
+    vertices.forEach((v, i) => {
+      const isFirst = i === 0 && drawState === 'drawing' && vertices.length >= 3;
+      const cls = 'vertex' + (i === selectedIdx ? ' active' : '') + (isFirst ? ' first-closeable' : '');
+      const c = el('circle', { class: cls, cx: v.x, cy: v.y, r: 9, 'data-idx': i });
+      svg.appendChild(c);
+      const tx = v.x + (v.x > VB_W/2 ? 14 : -22);
+      const ty = v.y + (v.y > VB_H/2 ? 22 : -10);
+      svg.appendChild(el('text', { class: 'vertex-label', x: tx, y: ty }, 'V' + (i+1)));
+    });
+
+    updatePanel();
+  }
+
+  // ----- Panel sync -----
+  function fmt1(n) { return n.toFixed(1).replace('.', ','); }
+  function fmtInt(n) { return Math.round(n).toLocaleString('pt-BR'); }
+
+  function updatePanel() {
+    const n = vertices.length;
+    document.getElementById('mVerts').innerHTML = n + '<span class="metric-unit">pts</span>';
+    const showSides = drawState === 'editing' && n >= 3;
+    document.getElementById('sidesSection').style.display = showSides ? 'block' : 'none';
+    document.getElementById('vertexCoords').style.display = n >= 1 ? 'block' : 'none';
+    document.getElementById('polyEmpty').style.display   = showSides ? 'none' : 'flex';
+
+    if (showSides) {
+      document.getElementById('mArea').innerHTML  = fmtInt(polygonArea()) + '<span class="metric-unit">m²</span>';
+      document.getElementById('mPerim').innerHTML = fmtInt(polygonPerimeter()) + '<span class="metric-unit">m</span>';
+      document.getElementById('mElev').innerHTML  = '748<span class="metric-unit">m</span>';
+    } else if (n >= 2) {
+      document.getElementById('mArea').innerHTML  = '—<span class="metric-unit">m²</span>';
+      document.getElementById('mPerim').innerHTML = fmtInt(polygonPerimeter()) + '<span class="metric-unit">m</span>';
+      document.getElementById('mElev').innerHTML  = '—<span class="metric-unit">m</span>';
+    } else {
+      document.getElementById('mArea').innerHTML  = '—<span class="metric-unit">m²</span>';
+      document.getElementById('mPerim').innerHTML = '—<span class="metric-unit">m</span>';
+      document.getElementById('mElev').innerHTML  = '—<span class="metric-unit">m</span>';
+    }
+
+    // Sides list (dynamic rows)
+    const sidesList = document.getElementById('sidesList');
+    sidesList.innerHTML = '';
+    if (showSides) {
+      document.getElementById('sidesCount').textContent = n + ' lados';
+      for (let i = 0; i < n; i++) {
+        const a = vertices[i], b = vertices[(i+1) % n];
+        const len = Math.hypot(b.x - a.x, b.y - a.y) * M_PER_VU;
+        const row = document.createElement('div');
+        row.className = 'side-row' + (i === selectedIdx ? ' active' : '');
+        row.dataset.idx = i;
+        row.innerHTML = `<span class="side-tag">S${i+1}</span>
+          <span class="side-name">V${i+1} → V${((i+1)%n)+1}</span>
+          <span class="side-input"><input type="text" value="${fmt1(len)}" data-side-i="${i}" /></span>`;
+        row.addEventListener('click', () => { selectedIdx = i; render(); });
+        sidesList.appendChild(row);
+      }
+      sidesList.querySelectorAll('input[data-side-i]').forEach(inp => {
+        inp.addEventListener('change', () => {
+          const i = +inp.dataset.sideI;
+          const newLen = parseFloat(inp.value.replace(',', '.'));
+          if (!isFinite(newLen) || newLen <= 0) return;
+          snapshot();
+          const a = vertices[i], b = vertices[(i+1) % n];
+          const dx = b.x - a.x, dy = b.y - a.y;
+          const curLen = Math.hypot(dx, dy) * M_PER_VU;
+          const k = newLen / curLen;
+          vertices[(i+1) % n] = { ...b, x: a.x + dx * k, y: a.y + dy * k };
+          render();
+        });
+        inp.addEventListener('click', e => e.stopPropagation());
+      });
+    }
+
+    // Vertex coords tabs
+    const vcTabs = document.getElementById('vcTabs');
+    vcTabs.innerHTML = '';
+    vertices.forEach((_, i) => {
+      const b = document.createElement('button');
+      b.className = 'vc-tab' + (i === selectedIdx ? ' active' : '');
+      b.textContent = 'V' + (i+1);
+      b.addEventListener('click', () => { selectedIdx = i; render(); });
+      vcTabs.appendChild(b);
+    });
+    if (selectedIdx >= 0 && vertices[selectedIdx]) {
+      const v = vertices[selectedIdx];
+      document.getElementById('vLat').value = v.lat.toFixed(5);
+      document.getElementById('vLng').value = v.lng.toFixed(5);
+    }
+
+    // Draw-state badge actions
+    document.getElementById('dsUndo').disabled  = history.length === 0;
+    document.getElementById('dsClose').disabled = !(drawState === 'drawing' && vertices.length >= 3);
+  }
+
+  // ----- Draw state -----
+  function setDrawState(s) {
+    drawState = s;
+    const badge = document.getElementById('drawState');
+    badge.classList.toggle('is-editing', s === 'editing');
+    const step  = document.getElementById('dsStep');
+    const label = document.getElementById('dsLabel');
+    if (s === 'idle')     { step.textContent = 'Passo 1'; label.textContent = 'Busque um endereço ou CEP para começar'; }
+    if (s === 'drawing')  { step.textContent = 'Passo 2'; label.textContent = vertices.length === 0 ? 'Clique no mapa para adicionar o 1º ponto' : (vertices.length < 3 ? `${vertices.length} ponto${vertices.length>1?'s':''} · adicione pelo menos ${3-vertices.length} para fechar` : `${vertices.length} pontos · clique no vértice verde para fechar`); }
+    if (s === 'editing')  { step.textContent = 'Passo 3'; label.textContent = `${vertices.length} vértices · arraste para ajustar · clique numa medida para editar`; }
+    svg.style.cursor = s === 'drawing' ? 'crosshair' : 'default';
+    render();
+  }
+
+  // ----- Map interactions -----
+  let didDrag = false;
+  svg.addEventListener('pointerdown', (e) => {
+    const target = e.target;
+    // Click on existing vertex → start drag (or close polygon if it's V1 during drawing)
+    if (target.tagName === 'circle' && target.classList.contains('vertex')) {
+      const i = +target.dataset.idx;
+      if (i === 0 && drawState === 'drawing' && vertices.length >= 3) {
+        snapshot(); setDrawState('editing'); selectedIdx = 0; return;
+      }
+      selectedIdx = i;
+      draggingIdx = i;
+      didDrag = false;
+      target.setPointerCapture(e.pointerId);
+      target.classList.add('dragging');
+      snapshot();
+      render();
+      return;
+    }
+    // Click on edge chip handled by its own listener
+    if (target.closest('.edge-chip')) return;
+    // Empty area click: add a vertex if drawing
+    if (drawState === 'drawing') {
+      const p = clientToViewBox(e.clientX, e.clientY);
+      const ll = pxToLatLng(p.x, p.y);
+      snapshot();
+      vertices.push({ x: p.x, y: p.y, lat: ll.lat, lng: ll.lng });
+      selectedIdx = vertices.length - 1;
+      setDrawState('drawing');
+    }
+  });
+  svg.addEventListener('pointermove', (e) => {
+    if (draggingIdx < 0) return;
+    didDrag = true;
+    const p = clientToViewBox(e.clientX, e.clientY);
+    p.x = Math.max(0, Math.min(VB_W, p.x));
+    p.y = Math.max(0, Math.min(VB_H, p.y));
+    const ll = pxToLatLng(p.x, p.y);
+    vertices[draggingIdx] = { x: p.x, y: p.y, lat: ll.lat, lng: ll.lng };
+    render();
+  });
+  svg.addEventListener('pointerup', (e) => {
+    if (draggingIdx >= 0) {
+      const node = svg.querySelector(`circle.vertex[data-idx="${draggingIdx}"]`);
+      if (node) node.classList.remove('dragging');
+      draggingIdx = -1;
+      if (!didDrag) history.pop(); // não foi um drag real — descarta snapshot
+    }
+  });
+  svg.addEventListener('contextmenu', (e) => {
+    if (e.target.tagName === 'circle' && e.target.classList.contains('vertex')) {
+      e.preventDefault();
+      const i = +e.target.dataset.idx;
+      removeVertex(i);
+    }
+  });
+
+  function removeVertex(i) {
+    if (i < 0 || i >= vertices.length) return;
+    snapshot();
+    vertices.splice(i, 1);
+    if (drawState === 'editing' && vertices.length < 3) setDrawState('drawing');
+    selectedIdx = Math.min(selectedIdx, vertices.length - 1);
+    render();
+  }
+
+  // ----- Draw-state buttons -----
+  document.getElementById('dsUndo').addEventListener('click', undo);
+  document.getElementById('dsClose').addEventListener('click', () => {
+    if (vertices.length >= 3) { snapshot(); setDrawState('editing'); }
+  });
+  document.getElementById('dsReset').addEventListener('click', () => {
+    if (vertices.length > 0 && !confirm('Apagar todos os pontos e recomeçar?')) return;
+    snapshot();
+    vertices = []; selectedIdx = -1;
+    setDrawState(addressCard.style.display === 'none' ? 'idle' : 'drawing');
+  });
+
+  // ----- Vertex coord editor -----
+  document.getElementById('vLat').addEventListener('change', e => {
+    if (selectedIdx < 0) return;
+    const v = parseFloat(e.target.value.replace(',', '.')); if (!isFinite(v)) return;
+    snapshot();
+    vertices[selectedIdx].lat = v;
+    render();
+  });
+  document.getElementById('vLng').addEventListener('change', e => {
+    if (selectedIdx < 0) return;
+    const v = parseFloat(e.target.value.replace(',', '.')); if (!isFinite(v)) return;
+    snapshot();
+    vertices[selectedIdx].lng = v;
+    render();
+  });
+
+  // ============================================================
+  // 3) Edge editor popover
+  // ============================================================
+  const editor = document.getElementById('edgeEditor');
+  const eeTitle = document.getElementById('eeTitle');
+  const eeInput = document.getElementById('eeInput');
+  const eeApply = document.getElementById('eeApply');
+  const stageEl = document.querySelector('.map-stage');
+  let editingEdge = -1;
+
+  function openEditor(i, anchorRect) {
+    editingEdge = i; selectedIdx = i;
+    const n = vertices.length;
+    const a = vertices[i], b = vertices[(i+1) % n];
+    const len = Math.hypot(b.x - a.x, b.y - a.y) * M_PER_VU;
+    eeTitle.textContent = `Lado S${i+1} · V${i+1} → V${((i+1)%n)+1}`;
+    eeInput.value = fmt1(len);
+    const stageBox = stageEl.getBoundingClientRect();
+    editor.style.left = (anchorRect.left - stageBox.left + anchorRect.width/2 - 110) + 'px';
+    editor.style.top  = (anchorRect.top  - stageBox.top  - 92) + 'px';
+    editor.classList.add('open');
+    setTimeout(() => { eeInput.focus(); eeInput.select(); }, 30);
+    render();
+  }
+  function closeEditor() { editor.classList.remove('open'); editingEdge = -1; }
+  function applyEditor() {
+    if (editingEdge < 0) return closeEditor();
+    const newLen = parseFloat(eeInput.value.replace(',', '.'));
+    if (!isFinite(newLen) || newLen <= 0) return closeEditor();
+    const n = vertices.length;
+    const a = vertices[editingEdge], b = vertices[(editingEdge+1) % n];
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const curLen = Math.hypot(dx, dy) * M_PER_VU;
+    const k = newLen / curLen;
+    snapshot();
+    vertices[(editingEdge+1) % n] = { ...b, x: a.x + dx * k, y: a.y + dy * k };
+    closeEditor();
+    render();
+  }
+  eeApply.addEventListener('click', applyEditor);
+  eeInput.addEventListener('keydown', e => { if (e.key === 'Enter') applyEditor(); if (e.key === 'Escape') closeEditor(); });
+  document.addEventListener('click', (e) => {
+    if (!editor.contains(e.target) && !e.target.closest('.edge-chip')) closeEditor();
+  });
+
+  // ============================================================
+  // Zoom dock + keyboard
+  // ============================================================
+  let zoom = 19;
+  const zoomLevel = document.getElementById('zoomLevel');
+  function setZoom(z) {
+    zoom = Math.max(14, Math.min(22, z));
+    zoomLevel.textContent = 'z ' + zoom;
+    const scale = 1 + (zoom - 19) * 0.08;
+    stage.style.transform = `scale(${scale})`;
+    stage.style.transformOrigin = 'center';
+  }
+  document.getElementById('btnZoomIn').addEventListener('click',  () => setZoom(zoom + 1));
+  document.getElementById('btnZoomOut').addEventListener('click', () => setZoom(zoom - 1));
+  document.getElementById('btnFit').addEventListener('click',     () => setZoom(19));
+
+  document.addEventListener('keydown', (e) => {
+    if (e.target.matches('input, textarea')) {
+      if (e.key === 'Escape' && document.activeElement === searchInput) searchResults.style.display = 'none';
+      return;
+    }
+    if (e.key === '+' || e.key === '=') setZoom(zoom + 1);
+    if (e.key === '-' || e.key === '_') setZoom(zoom - 1);
+    if (e.key === 'f' || e.key === 'F') setZoom(19);
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(); }
+    if (e.key === 'Delete' || e.key === 'Backspace') {
+      if (selectedIdx >= 0) { removeVertex(selectedIdx); }
+    }
+    if (e.key === 'Enter' && drawState === 'drawing' && vertices.length >= 3) {
+      snapshot(); setDrawState('editing');
+    }
+  });
+
+  // ============================================================
+  // Bootstrap
+  // ============================================================
+  setDrawState('idle');
+</script>
+</body>
+</html>

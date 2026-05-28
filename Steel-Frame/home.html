@@ -1,0 +1,386 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Meus terrenos · SteelFrame GenIA</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700;900&family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/app.css">
+<style>
+  /* Filter rail */
+  .filter-rail {
+    display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap;
+    padding: var(--space-3); background: var(--color-surface);
+    border: 1px solid var(--color-stroke); border-radius: var(--radius-md);
+  }
+  .filter-rail .filter-group { display: flex; align-items: center; gap: var(--space-2); }
+  .filter-rail .filter-label { font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: 0.06em; color: var(--color-text-secondary); font-family: var(--font-mono); margin-right: var(--space-1); }
+  .filter-rail .search {
+    flex: 1; min-width: 220px; max-width: 320px;
+    background: var(--color-surface-elevated);
+    border: 1px solid var(--color-stroke-input);
+    border-radius: var(--radius-md);
+    height: 36px; padding: 0 var(--space-3) 0 36px;
+    color: var(--color-text-primary); font-size: var(--fs-sm);
+    position: relative;
+  }
+  .filter-rail .search-wrap { position: relative; flex: 1; min-width: 220px; max-width: 320px; }
+  .filter-rail .search-wrap svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--color-text-secondary); }
+  .filter-rail .view-toggle { display: flex; background: var(--color-surface-elevated); border-radius: var(--radius-md); padding: 2px; border: 1px solid var(--color-stroke-input); }
+  .view-toggle button { width: 32px; height: 28px; border-radius: var(--radius-sm); display: grid; place-items: center; color: var(--color-text-secondary); }
+  .view-toggle button.active { background: var(--color-primary-600); color: var(--color-text-primary); }
+
+  /* Summary KPIs */
+  .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-3); }
+  @media (max-width: 920px) { .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
+  .kpi {
+    background: var(--color-surface);
+    border: 1px solid var(--color-stroke);
+    border-radius: var(--radius-md);
+    padding: var(--space-4);
+  }
+  .kpi .kpi-label { font-size: var(--fs-xs); color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: var(--space-2); font-family: var(--font-mono); }
+  .kpi .kpi-value { font-family: var(--font-display); font-size: var(--fs-xl); font-weight: var(--fw-bold); line-height: 1; }
+  .kpi .kpi-value .unit { font-size: 13px; color: var(--color-text-secondary); margin-left: 4px; font-family: var(--font-mono); }
+  .kpi .kpi-delta { font-size: var(--fs-xs); color: var(--color-success); margin-top: var(--space-2); font-family: var(--font-mono); }
+  .kpi.accent { border-color: var(--color-primary-500); }
+  .kpi.accent .kpi-value { color: var(--color-primary-500); }
+
+  /* Terrain card grid */
+  .terrain-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: var(--space-4);
+  }
+  .terrain-card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-stroke);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    display: flex; flex-direction: column;
+    transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
+  }
+  .terrain-card:hover {
+    transform: translateY(-2px);
+    border-color: var(--color-primary-500);
+    box-shadow: var(--shadow-md);
+  }
+  .terrain-thumb {
+    position: relative;
+    aspect-ratio: 16/9;
+    overflow: hidden;
+  }
+  .terrain-thumb .map-placeholder { position: absolute; inset: 0; border-radius: 0; height:100%; }
+  .terrain-thumb-overlay {
+    position: absolute; top: var(--space-3); left: var(--space-3); right: var(--space-3);
+    display: flex; justify-content: space-between; gap: var(--space-2);
+  }
+  .terrain-thumb-meta {
+    position: absolute; bottom: var(--space-3); left: var(--space-3);
+    font-family: var(--font-mono);
+    font-size: var(--fs-xs);
+    background: var(--overlay-glass);
+    padding: 4px var(--space-2);
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--color-stroke);
+    color: var(--color-text-primary);
+    backdrop-filter: blur(10px);
+  }
+  .terrain-body {
+    padding: var(--space-4);
+    display: flex; flex-direction: column;
+    gap: var(--space-3);
+    flex: 1;
+  }
+  .terrain-body .addr { font-size: var(--fs-md); font-weight: var(--fw-semibold); }
+  .terrain-body .addr-sub { font-size: var(--fs-xs); color: var(--color-text-secondary); font-family: var(--font-mono); }
+  .terrain-stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--space-2); padding: var(--space-3) 0; border-top: 1px solid var(--color-stroke); border-bottom: 1px solid var(--color-stroke); }
+  .terrain-stats .stat { display: flex; flex-direction: column; gap: 2px; }
+  .terrain-stats .stat .lbl { font-size: 10px; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.06em; font-family: var(--font-mono); }
+  .terrain-stats .stat .val { font-family: var(--font-mono); font-weight: var(--fw-semibold); font-size: var(--fs-sm); color: var(--color-text-primary); }
+  .terrain-footer { display: flex; justify-content: space-between; align-items: center; }
+  .terrain-footer .obras { font-size: var(--fs-xs); color: var(--color-text-secondary); }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-mark">DT</div>
+      <div class="brand-text">
+        <span class="brand-name">SteelFrame GenIA</span>
+        <span class="brand-sub">Distrito Tecnológico</span>
+      </div>
+    </div>
+    <div class="sidebar-section">
+      <span class="sidebar-section-label">Operação</span>
+      <a class="nav-item active" href="#"><svg class="icon-stroke nav-icon" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span>Meus terrenos</span><span class="nav-badge">12</span></a>
+      <a class="nav-item" href="cadastro-terreno.html"><svg class="icon-stroke nav-icon" viewBox="0 0 24 24"><path d="M12 21s-7-7.5-7-12a7 7 0 1 1 14 0c0 4.5-7 12-7 12z"/><circle cx="12" cy="9" r="2.5"/></svg><span>Novo terreno</span></a>
+      <a class="nav-item" href="briefing.html"><svg class="icon-stroke nav-icon" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 4.5-7.79L3 7"/><path d="M3 3v4h4"/></svg><span>Briefings ativos</span><span class="nav-badge">3</span></a>
+      <a class="nav-item" href="relatorio.html"><svg class="icon-stroke nav-icon" viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="14 3 14 9 20 9"/></svg><span>Relatórios</span></a>
+    </div>
+    <div class="sidebar-section">
+      <span class="sidebar-section-label">Referências</span>
+      <a class="nav-item" href="base-conhecimento.html"><svg class="icon-stroke nav-icon" viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg><span>Base de conhecimento</span></a>
+      <a class="nav-item" href="components.html"><svg class="icon-stroke nav-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="9"/></svg><span>Sistema de design</span></a>
+    </div>
+    <div class="sidebar-user">
+      <div class="avatar">RC</div>
+      <div class="user-meta">
+        <span class="user-name">Renata Couto</span>
+        <span class="user-role">Eng. Civil · SteelFrame BR</span>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="page-header">
+      <div class="stack-sm">
+        <nav class="breadcrumb"><span class="crumb-current">Meus terrenos</span></nav>
+        <div class="page-title-row">
+          <h1>8 terrenos em estudo</h1>
+          <span class="pill pill-success"><span class="dot"></span>3 viáveis</span>
+          <span class="pill pill-warning"><span class="dot"></span>4 em briefing</span>
+          <span class="pill pill-danger"><span class="dot"></span>1 com bloqueio legal</span>
+        </div>
+        <p class="text-sm muted" style="margin-top:var(--space-2); max-width: 64ch">Carteira focada em galpões steel frame para uso logístico e industrial — corredor Anhanguera, Bandeirantes, Régis Bittencourt e Cumbica/GRU.</p>
+      </div>
+      <div class="row">
+        <button class="btn btn-secondary">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Exportar carteira
+        </button>
+        <a class="btn btn-primary" href="cadastro-terreno.html">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Novo terreno
+        </a>
+      </div>
+    </header>
+
+    <!-- KPI summary -->
+    <section class="kpi-grid">
+      <div class="kpi"><div class="kpi-label">Área total dos terrenos</div><div class="kpi-value">32.840<span class="unit">m²</span></div><div class="kpi-delta">+ 5.480 m² esta semana</div></div>
+      <div class="kpi accent"><div class="kpi-label">Custo estimado consolidado</div><div class="kpi-value">R$ 31,2<span class="unit">M</span></div><div class="kpi-delta">−22% vs. pré-moldado de concreto</div></div>
+      <div class="kpi"><div class="kpi-label">Custo médio / m² galpão</div><div class="kpi-value">R$ 1,82<span class="unit">k</span></div><div class="kpi-delta">faixa P10–P90: 1,5–2,3</div></div>
+      <div class="kpi"><div class="kpi-label">Galpões em pipeline</div><div class="kpi-value">11<span class="unit">galpões</span></div><div class="kpi-delta">em 8 terrenos · 3 prontos p/ obra</div></div>
+    </section>
+
+    <!-- Filters -->
+    <section class="filter-rail">
+      <div class="search-wrap">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input class="search" placeholder="Buscar por endereço, bairro, ID…" />
+      </div>
+      <div class="filter-group">
+        <span class="filter-label">Corredor</span>
+        <button class="chip active">Todos</button>
+        <button class="chip">Cumbica/GRU (3)</button>
+        <button class="chip">Bandeirantes (2)</button>
+        <button class="chip">Anhanguera (2)</button>
+        <button class="chip">Régis Bittencourt (1)</button>
+      </div>
+      <div class="filter-group">
+        <span class="filter-label">Tipologia</span>
+        <button class="chip active">Todos</button>
+        <button class="chip">Logístico/CD</button>
+        <button class="chip">Industrial leve</button>
+        <button class="chip">Cross-docking</button>
+        <button class="chip">Híbrido + mez.</button>
+      </div>
+      <div class="filter-group">
+        <span class="filter-label">Status</span>
+        <button class="chip active">Todos</button>
+        <button class="chip">Viável</button>
+        <button class="chip">Em briefing</button>
+        <button class="chip">Bloqueado</button>
+      </div>
+      <div style="flex:1"></div>
+      <div class="view-toggle">
+        <button class="active" title="Grade"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg></button>
+        <button title="Lista"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></button>
+      </div>
+    </section>
+
+    <!-- Terrain cards -->
+    <section class="terrain-grid">
+      <a class="terrain-card" href="terreno.html">
+        <div class="terrain-thumb">
+          <div class="map-placeholder">
+            <div class="map-grid-overlay"></div>
+            <svg class="map-polygon" style="position:absolute; inset:0;width:100%;height:100%" viewBox="0 0 400 250"><path d="M 60 50 L 340 55 L 350 200 L 50 195 Z"/></svg>
+          </div>
+          <div class="terrain-thumb-overlay">
+            <span class="pill pill-success"><span class="dot"></span>Viável</span>
+            <span class="pill pill-neutral mono">#SF-2402</span>
+          </div>
+          <div class="terrain-thumb-meta">Sat · 02 mai/26 · plano 2,1%</div>
+        </div>
+        <div class="terrain-body">
+          <div>
+            <div class="addr">Av. Monteiro Lobato, 4.820</div>
+            <div class="addr-sub">CUMBICA · GUARULHOS / SP · ZPI-1</div>
+          </div>
+          <div class="terrain-stats">
+            <div class="stat"><span class="lbl">Área</span><span class="val">5.480 m²</span></div>
+            <div class="stat"><span class="lbl">Tipologia</span><span class="val">Logístico/CD</span></div>
+            <div class="stat"><span class="lbl">Custo est.</span><span class="val">R$ 4,8M</span></div>
+          </div>
+          <div class="terrain-footer">
+            <span class="obras">3 galpões · 2 relatórios · 3 briefings</span>
+            <span class="text-xs muted mono">há 12 min</span>
+          </div>
+        </div>
+      </a>
+
+      <a class="terrain-card" href="terreno.html">
+        <div class="terrain-thumb">
+          <div class="map-placeholder show-hillshade">
+            <div class="map-grid-overlay"></div><div class="map-hillshade"></div>
+            <svg class="map-polygon" style="position:absolute; inset:0;width:100%;height:100%" viewBox="0 0 400 250"><path d="M 50 60 L 350 50 L 360 200 L 60 210 Z"/></svg>
+          </div>
+          <div class="terrain-thumb-overlay">
+            <span class="pill pill-warning"><span class="dot"></span>Em briefing · 18/26</span>
+            <span class="pill pill-neutral mono">#SF-2407</span>
+          </div>
+          <div class="terrain-thumb-meta">Sat · 12 mai/26 · leve 4,3%</div>
+        </div>
+        <div class="terrain-body">
+          <div>
+            <div class="addr">Rod. dos Bandeirantes, km 33</div>
+            <div class="addr-sub">JORDANÉSIA · CAJAMAR / SP · ZUPI</div>
+          </div>
+          <div class="terrain-stats">
+            <div class="stat"><span class="lbl">Área</span><span class="val">8.200 m²</span></div>
+            <div class="stat"><span class="lbl">Tipologia</span><span class="val">Cross-docking</span></div>
+            <div class="stat"><span class="lbl">Custo est.</span><span class="val">— prévia</span></div>
+          </div>
+          <div class="terrain-footer">
+            <span class="obras">2 galpões · 14 docas planejadas</span>
+            <span class="text-xs muted mono">há 1 h</span>
+          </div>
+        </div>
+      </a>
+
+      <a class="terrain-card" href="terreno.html">
+        <div class="terrain-thumb">
+          <div class="map-placeholder show-hillshade show-contours">
+            <div class="map-grid-overlay"></div><div class="map-hillshade"></div><div class="map-contours"></div>
+            <svg class="map-polygon" style="position:absolute; inset:0;width:100%;height:100%" viewBox="0 0 400 250"><path d="M 80 80 L 320 60 L 340 180 L 90 210 Z"/></svg>
+          </div>
+          <div class="terrain-thumb-overlay">
+            <span class="pill pill-success"><span class="dot"></span>Viável</span>
+            <span class="pill pill-neutral mono">#SF-2408</span>
+          </div>
+          <div class="terrain-thumb-meta">Sat · 08 mai/26 · acentuado 11,8%</div>
+        </div>
+        <div class="terrain-body">
+          <div>
+            <div class="addr">Rod. Anhanguera, km 28</div>
+            <div class="addr-sub">PERUS · SÃO PAULO / SP · ZPI-2</div>
+          </div>
+          <div class="terrain-stats">
+            <div class="stat"><span class="lbl">Área</span><span class="val">4.150 m²</span></div>
+            <div class="stat"><span class="lbl">Tipologia</span><span class="val">Industrial leve</span></div>
+            <div class="stat"><span class="lbl">Custo est.</span><span class="val">R$ 5,9M</span></div>
+          </div>
+          <div class="terrain-footer">
+            <span class="obras">1 galpão · platô + corte/aterro</span>
+            <span class="text-xs muted mono">há 2 h</span>
+          </div>
+        </div>
+      </a>
+
+      <a class="terrain-card" href="terreno.html">
+        <div class="terrain-thumb">
+          <div class="map-placeholder">
+            <div class="map-grid-overlay"></div>
+            <svg class="map-polygon" style="position:absolute; inset:0;width:100%;height:100%" viewBox="0 0 400 250"><path d="M 70 70 L 330 60 L 340 200 L 60 210 Z"/></svg>
+          </div>
+          <div class="terrain-thumb-overlay">
+            <span class="pill pill-danger"><span class="dot"></span>Bloqueio · cone GRU</span>
+            <span class="pill pill-neutral mono">#SF-2409</span>
+          </div>
+          <div class="terrain-thumb-meta">Sat · 02 mai/26 · alt. máx 9 m</div>
+        </div>
+        <div class="terrain-body">
+          <div>
+            <div class="addr">Av. Otávio Braga de Mesquita, 2.110</div>
+            <div class="addr-sub">VILA AUGUSTA · GUARULHOS / SP</div>
+          </div>
+          <div class="terrain-stats">
+            <div class="stat"><span class="lbl">Área</span><span class="val">3.620 m²</span></div>
+            <div class="stat"><span class="lbl">Tipologia</span><span class="val">Logístico/CD</span></div>
+            <div class="stat"><span class="lbl">Custo est.</span><span class="val">—</span></div>
+          </div>
+          <div class="terrain-footer">
+            <span class="obras">Cone aproximação · pé-direito travado em 9 m</span>
+            <span class="text-xs muted mono">há 1 dia</span>
+          </div>
+        </div>
+      </a>
+
+      <a class="terrain-card" href="terreno.html">
+        <div class="terrain-thumb">
+          <div class="map-placeholder show-hillshade">
+            <div class="map-grid-overlay"></div><div class="map-hillshade"></div>
+            <svg class="map-polygon" style="position:absolute; inset:0;width:100%;height:100%" viewBox="0 0 400 250"><path d="M 80 60 L 320 70 L 330 200 L 70 200 Z"/></svg>
+          </div>
+          <div class="terrain-thumb-overlay">
+            <span class="pill pill-warning"><span class="dot"></span>Em briefing · 4/26</span>
+            <span class="pill pill-neutral mono">#SF-2410</span>
+          </div>
+          <div class="terrain-thumb-meta">Sat · 28 abr/26</div>
+        </div>
+        <div class="terrain-body">
+          <div>
+            <div class="addr">Rod. Régis Bittencourt, km 273</div>
+            <div class="addr-sub">EMBU DAS ARTES · EMBU / SP</div>
+          </div>
+          <div class="terrain-stats">
+            <div class="stat"><span class="lbl">Área</span><span class="val">6.890 m²</span></div>
+            <div class="stat"><span class="lbl">Tipologia</span><span class="val">Híbrido + mez.</span></div>
+            <div class="stat"><span class="lbl">Custo est.</span><span class="val">— prévia</span></div>
+          </div>
+          <div class="terrain-footer">
+            <span class="obras">Armazém + showroom 480 m² + mez. adm.</span>
+            <span class="text-xs muted mono">ontem</span>
+          </div>
+        </div>
+      </a>
+
+      <a class="terrain-card" href="terreno.html">
+        <div class="terrain-thumb">
+          <div class="map-placeholder">
+            <div class="map-grid-overlay"></div>
+            <svg class="map-polygon" style="position:absolute; inset:0;width:100%;height:100%" viewBox="0 0 400 250"><path d="M 50 60 L 350 60 L 350 200 L 50 200 Z"/></svg>
+          </div>
+          <div class="terrain-thumb-overlay">
+            <span class="pill pill-success"><span class="dot"></span>Viável</span>
+            <span class="pill pill-neutral mono">#SF-2411</span>
+          </div>
+          <div class="terrain-thumb-meta">Sat · 22 abr/26 · plano 1,4%</div>
+        </div>
+        <div class="terrain-body">
+          <div>
+            <div class="addr">Av. Brig. Faria Lima, 2.230 · Distrito Industrial</div>
+            <div class="addr-sub">PIRAPORINHA · DIADEMA / SP · ZUPI</div>
+          </div>
+          <div class="terrain-stats">
+            <div class="stat"><span class="lbl">Área</span><span class="val">4.500 m²</span></div>
+            <div class="stat"><span class="lbl">Tipologia</span><span class="val">Industrial leve</span></div>
+            <div class="stat"><span class="lbl">Custo est.</span><span class="val">R$ 6,4M</span></div>
+          </div>
+          <div class="terrain-footer">
+            <span class="obras">2 galpões · ponte rolante 10 t</span>
+            <span class="text-xs muted mono">3 dias atrás</span>
+          </div>
+        </div>
+      </a>
+    </section>
+  </main>
+</div>
+</body>
+</html>

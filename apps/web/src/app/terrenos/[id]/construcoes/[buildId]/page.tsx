@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@sfg/db";
 import SteelFrameViewer from "@/components/SteelFrameViewer";
 import ShedViewer from "@/components/ShedViewer";
+import { Breadcrumb } from "@/components/Breadcrumb";
 import type { SteelFrameModel } from "@/lib/steelframe";
 import { isIndustrialShed, type IndustrialShed } from "@/lib/shedSchema";
 import type { LngLat } from "@/lib/geo";
@@ -22,138 +23,294 @@ export default async function BuildingPage({
 
   const polygon = building.terrain.polygon as unknown as LngLat[];
   const raw = building.model as unknown;
+  const shortId = building.id.slice(-6).toUpperCase();
 
-  // Novo: galpão paramétrico industrial gerado pela IA
+  // Modelo paramétrico industrial novo
   if (isIndustrialShed(raw)) {
     const shed = raw as IndustrialShed;
     return (
-      <div className="space-y-5">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <Link
-              href={`/terrenos/${building.terrainId}`}
-              className="text-xs text-[#ff3d6a] hover:underline"
-            >
-              ← Voltar para {building.terrain.name}
-            </Link>
-            <h1 className="text-2xl font-bold uppercase tracking-tight text-white">
-              {building.name}
-            </h1>
-            <p className="text-sm text-white/60">
-              {shed.footprint.width.toFixed(1)} ×{" "}
-              {shed.footprint.depth.toFixed(1)} m ·{" "}
-              {shed.estimate.coveredAreaM2.toLocaleString("pt-BR")} m² ·{" "}
-              {shed.structure.bayCount} pórticos · pé-direito{" "}
-              {shed.structure.clearHeight} m
+      <>
+        <header className="page-header">
+          <div className="stack-sm">
+            <Breadcrumb
+              items={[
+                { label: "Meus terrenos", href: "/" },
+                {
+                  label: building.terrain.name,
+                  href: `/terrenos/${building.terrainId}`,
+                },
+                {
+                  label: `${building.name}`,
+                  href: `/terrenos/${building.terrainId}/construcoes/${building.id}`,
+                },
+                { label: "Visualizador 3D" },
+              ]}
+            />
+            <div className="page-title-row">
+              <h1>{building.name} · Visualizador 3D</h1>
+              <span className="pill pill-success">
+                <span className="dot" />
+                {shed.use} · {shed.standard}
+              </span>
+              <span className="pill pill-neutral mono">#R-{shortId}</span>
+            </div>
+            <p className="text-sm muted">
+              {shed.footprint.width.toFixed(1)} × {shed.footprint.depth.toFixed(1)} m ·{" "}
+              {shed.estimate.coveredAreaM2.toLocaleString("pt-BR")} m² cobertos ·{" "}
+              {shed.structure.bayCount} pórticos · pé-direito {shed.structure.clearHeight} m
             </p>
           </div>
-          <div className="rounded-xl border border-white/10 bg-[#1f1c23] px-4 py-3 text-right text-sm">
-            <div className="text-white/60">Custo estimado</div>
-            <div className="text-lg font-bold text-[#ff3d6a]">
-              R$ {shed.estimate.totalCost.toLocaleString("pt-BR")}
+          <div className="row">
+            <Link href={`/terrenos/${building.terrainId}`} className="btn btn-ghost">
+              ← Terreno
+            </Link>
+            <Link
+              href={`/terrenos/${building.terrainId}/briefing`}
+              className="btn btn-secondary"
+            >
+              Re-rodar com IA
+            </Link>
+          </div>
+        </header>
+
+        <section className="viewer-shell">
+          <ShedViewer shed={shed} polygon={polygon} height="100%" />
+
+          <aside className="params-pane">
+            <div className="params-section">
+              <div className="ps-title">Identificação</div>
+              <div className="param-row">
+                <span className="pr-label">Uso</span>
+                <span className="pr-value">{shed.use}</span>
+              </div>
+              <div className="param-row">
+                <span className="pr-label">Padrão</span>
+                <span className="pr-value">{shed.standard}</span>
+              </div>
+              <div className="param-row">
+                <span className="pr-label">Confiança IA</span>
+                <span className="pr-value">{(shed.confidence * 100).toFixed(0)}%</span>
+              </div>
             </div>
-            <div className="text-xs text-white/50">
-              R$ {shed.estimate.costPerM2.toLocaleString("pt-BR")} /m² ·{" "}
-              {shed.estimate.steelKg.toLocaleString("pt-BR")} kg aço
+
+            <div className="params-section">
+              <div className="ps-title">Geometria</div>
+              <div className="param-row">
+                <span className="pr-label">Footprint</span>
+                <span className="pr-value">
+                  {shed.footprint.width}×{shed.footprint.depth} m
+                </span>
+              </div>
+              <div className="param-row">
+                <span className="pr-label">Vão livre</span>
+                <span className="pr-value">{shed.structure.freeSpan} m</span>
+              </div>
+              <div className="param-row">
+                <span className="pr-label">Pé-direito</span>
+                <span className="pr-value">{shed.structure.clearHeight} m</span>
+              </div>
+              <div className="param-row">
+                <span className="pr-label">Pórticos</span>
+                <span className="pr-value">
+                  {shed.structure.bayCount} · {shed.structure.baySpacing} m
+                </span>
+              </div>
+            </div>
+
+            <div className="params-section">
+              <div className="ps-title">Sistemas</div>
+              <div className="param-row">
+                <span className="pr-label">Estrutura</span>
+                <span className="pr-value">
+                  {shed.structure.system.replace(/_/g, " ")}
+                </span>
+              </div>
+              <div className="param-row">
+                <span className="pr-label">Cobertura</span>
+                <span className="pr-value">
+                  {shed.roof.type} · {shed.roof.slopePct}%
+                </span>
+              </div>
+              <div className="param-row">
+                <span className="pr-label">Fechamento</span>
+                <span className="pr-value">
+                  {shed.envelope.walls.replace(/_/g, " ")}
+                </span>
+              </div>
+              <div className="param-row">
+                <span className="pr-label">Piso</span>
+                <span className="pr-value">
+                  {shed.floor.type.replace(/_/g, " ")} · {shed.floor.load_kN_m2} kN/m²
+                </span>
+              </div>
+            </div>
+
+            <div className="params-section">
+              <div className="ps-title">Operação</div>
+              <div className="param-row">
+                <span className="pr-label">Docas</span>
+                <span className="pr-value">{shed.docks.length}</span>
+              </div>
+              <div className="param-row">
+                <span className="pr-label">Aberturas</span>
+                <span className="pr-value">{shed.openings.length}</span>
+              </div>
+              <div className="param-row">
+                <span className="pr-label">Mezanino</span>
+                <span className="pr-value">{shed.mezzanine ? "Sim" : "Não"}</span>
+              </div>
+              <div className="param-row">
+                <span className="pr-label">AVCB</span>
+                <span className="pr-value">
+                  {shed.safety.avcbRequired ? "Obrigatório" : "Dispensado"}
+                </span>
+              </div>
+            </div>
+
+            <div className="params-section">
+              <div className="ps-title">Saídas</div>
+              <div className="param-row">
+                <span className="pr-label">Custo total</span>
+                <span className="pr-value">
+                  R${" "}
+                  {(shed.estimate.totalCost / 1_000_000).toLocaleString("pt-BR", {
+                    maximumFractionDigits: 2,
+                  })}{" "}
+                  M
+                </span>
+              </div>
+              <div className="param-row">
+                <span className="pr-label">Custo /m²</span>
+                <span className="pr-value">
+                  R$ {shed.estimate.costPerM2.toLocaleString("pt-BR")}
+                </span>
+              </div>
+              <div className="param-row">
+                <span className="pr-label">Aço estrutural</span>
+                <span className="pr-value">
+                  {(shed.estimate.steelKg / 1000).toFixed(1)} t
+                </span>
+              </div>
+              <div className="param-row">
+                <span className="pr-label">Área coberta</span>
+                <span className="pr-value">
+                  {shed.estimate.coveredAreaM2.toLocaleString("pt-BR")} m²
+                </span>
+              </div>
+            </div>
+
+            {shed.assumptions.length > 0 && (
+              <div className="params-section">
+                <div className="ps-title">
+                  Premissas ({shed.assumptions.length})
+                </div>
+                <ul
+                  style={{
+                    margin: 0,
+                    paddingLeft: 18,
+                    color: "var(--color-text-secondary)",
+                    fontSize: 12,
+                  }}
+                >
+                  {shed.assumptions.map((a, i) => (
+                    <li key={i} style={{ marginBottom: 4 }}>
+                      {a}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </aside>
+        </section>
+
+        <div className="toast toast-warning" style={{ maxWidth: "none" }}>
+          <div>
+            <div className="toast-title">⚠️ Aviso técnico obrigatório</div>
+            <div className="toast-desc">
+              Estimativa preliminar baseada em SINAPI/CUB e NBR{" "}
+              {shed.compliance.norms.join(" · ")}. Não substitui projeto executivo,
+              ART/RRT, sondagem geotécnica, levantamento topográfico ou aprovação legal
+              junto à prefeitura/Corpo de Bombeiros.
             </div>
           </div>
         </div>
-
-        <ShedViewer shed={shed} polygon={polygon} />
-
-        <section className="grid gap-3 text-xs text-white/70 sm:grid-cols-2 lg:grid-cols-4">
-          <Block title="Uso">{shed.use}</Block>
-          <Block title="Padrão">{shed.standard}</Block>
-          <Block title="Cobertura">
-            {shed.roof.type} · {shed.roof.cover.replace(/_/g, " ")}
-          </Block>
-          <Block title="Fechamento">
-            {shed.envelope.walls.replace(/_/g, " ")} · isolamento{" "}
-            {shed.envelope.insulation}
-          </Block>
-          <Block title="Docas">{shed.docks.length}</Block>
-          <Block title="Mezanino">{shed.mezzanine ? "Sim" : "Não"}</Block>
-          <Block title="Aberturas">{shed.openings.length}</Block>
-          <Block title="AVCB">
-            {shed.safety.avcbRequired ? "Obrigatório" : "Dispensado"}
-          </Block>
-        </section>
-
-        {shed.assumptions.length > 0 && (
-          <details className="rounded-md border border-white/10 bg-white/5 p-3 text-xs text-white/70">
-            <summary className="cursor-pointer font-semibold text-white/80">
-              Premissas adotadas pelo agente ({shed.assumptions.length})
-            </summary>
-            <ul className="mt-2 ml-4 list-disc space-y-1">
-              {shed.assumptions.map((a, i) => (
-                <li key={i}>{a}</li>
-              ))}
-            </ul>
-          </details>
-        )}
-
-        <p className="rounded-md border border-white/10 bg-white/5 p-3 text-[11px] text-white/60">
-          ⚠️ Estimativa preliminar (SINAPI/CUB · NBR{" "}
-          {shed.compliance.norms.join(" · ")}). Não substitui projeto executivo,
-          ART/RRT, sondagem, levantamento topográfico ou aprovação legal.
-        </p>
-      </div>
+      </>
     );
   }
 
-  // Compatibilidade: modelos antigos (steel-frame heurístico)
+  // Compatibilidade: modelos heurísticos legados
   const model = raw as SteelFrameModel;
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <Link
-            href={`/terrenos/${building.terrainId}`}
-            className="text-xs text-[#ff3d6a] hover:underline"
-          >
-            ← Voltar para {building.terrain.name}
-          </Link>
-          <h1 className="text-2xl font-semibold">{building.name}</h1>
-          <p className="text-sm text-slate-400">
-            {model.footprint.width.toFixed(1)} ×{" "}
-            {model.footprint.depth.toFixed(1)} m ·{" "}
-            {model.footprint.areaM2.toLocaleString("pt-BR")} m² · {model.bays}{" "}
-            pórticos
+    <>
+      <header className="page-header">
+        <div className="stack-sm">
+          <Breadcrumb
+            items={[
+              { label: "Meus terrenos", href: "/" },
+              {
+                label: building.terrain.name,
+                href: `/terrenos/${building.terrainId}`,
+              },
+              { label: building.name },
+            ]}
+          />
+          <div className="page-title-row">
+            <h1>{building.name}</h1>
+            <span className="pill pill-warning">
+              <span className="dot" />
+              Modelo legado
+            </span>
+          </div>
+          <p className="text-sm muted">
+            {model.footprint.width.toFixed(1)} × {model.footprint.depth.toFixed(1)} m ·{" "}
+            {model.footprint.areaM2.toLocaleString("pt-BR")} m² · {model.bays} pórticos
           </p>
         </div>
-        <div className="rounded-xl border border-white/10 bg-slate-900/60 px-4 py-3 text-right text-sm">
-          <div className="text-slate-400">Custo estimado</div>
-          <div className="text-lg font-semibold text-emerald-400">
-            R$ {model.estimatedCost.toLocaleString("pt-BR")}
+        <div className="row">
+          <Link href={`/terrenos/${building.terrainId}`} className="btn btn-ghost">
+            ← Voltar
+          </Link>
+        </div>
+      </header>
+
+      <section className="kpi-grid">
+        <div className="kpi accent">
+          <div className="kpi-label">Custo estimado</div>
+          <div className="kpi-value">
+            R$ {(model.estimatedCost / 1_000_000).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}
+            <span className="unit">M</span>
           </div>
-          <div className="text-xs text-slate-500">
+          <div className="kpi-delta">
             ~{model.estimatedSteelKg.toLocaleString("pt-BR")} kg de aço
           </div>
         </div>
-      </div>
+      </section>
 
-      <SteelFrameViewer model={model} polygon={polygon} />
+      <section className="card" style={{ padding: 0, overflow: "hidden" }}>
+        <SteelFrameViewer model={model} polygon={polygon} />
+      </section>
 
-      <div className="text-xs text-slate-500">
+      <p className="text-xs muted">
         Use o mouse para orbitar, scroll para zoom e botão direito para pan.
-      </div>
-    </div>
+      </p>
+    </>
   );
 }
 
-function Block({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
+function Block({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-md border border-white/10 bg-[#1f1c23] p-3">
-      <div className="text-[10px] uppercase tracking-wide text-white/50">
+    <div
+      style={{
+        padding: "var(--space-3)",
+        background: "var(--color-surface-elevated)",
+        border: "1px solid var(--color-stroke)",
+        borderRadius: "var(--radius-md)",
+      }}
+    >
+      <div className="text-xs muted mono" style={{ textTransform: "uppercase", letterSpacing: "0.06em" }}>
         {title}
       </div>
-      <div className="mt-1 text-sm font-semibold text-white">{children}</div>
+      <div style={{ marginTop: 4, fontWeight: 600, fontSize: 13 }}>{children}</div>
     </div>
   );
 }

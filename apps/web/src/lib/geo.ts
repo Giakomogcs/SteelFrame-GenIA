@@ -1,7 +1,13 @@
-// Utilidades geográficas para polígonos em (lng, lat)
+﻿// Utilidades geográficas para polígonos em (lng, lat)
 export type LngLat = [number, number]; // [lng, lat]
 
 const EARTH_RADIUS = 6378137; // metros
+
+/** Limites operacionais para a área de um terreno cadastrável. */
+export const MIN_TERRAIN_AREA_M2 = 200; // 200 m² (10 × 20 m)
+export const MAX_TERRAIN_AREA_M2 = 500_000; // 50 ha — recusa "cidade inteira"
+export const MAX_MAP_ZOOM = 19; // Esri/OSM perdem detalhe acima disso
+export const MIN_MAP_ZOOM = 5;
 
 const toRad = (deg: number) => (deg * Math.PI) / 180;
 
@@ -69,5 +75,113 @@ export function localBBox(localPts: { x: number; y: number }[]) {
     maxY,
     width: maxX - minX,
     depth: maxY - minY,
+  };
+}
+// ============================================================
+// Relevo / inclinacao
+// ============================================================
+
+export interface ElevationSample {
+  /** distancia acumulada do primeiro ponto, em metros */
+  d: number;
+  /** altitude no ponto, em metros */
+  h: number;
+  lat: number;
+  lng: number;
+}
+
+export interface SlopeAnalysis {
+  /** inclinacao media (%) = desnivel / extensao do perfil */
+  slopePct: number;
+  /** maior diferenca de altura entre quaisquer dois pontos amostrados (m) */
+  elevationDelta: number;
+  /** altitude media (m) */
+  elevationMean: number;
+  /** perfil para grafico AA' */
+  profile: { d: number; h: number }[];
+  /** classificacao textual */
+  classification: "plano" | "suave" | "moderado" | "acentuado";
+  /** se vale a pena terraplenar antes do galpao */
+  needsLeveling: boolean;
+  /** estimativa de volume de corte/aterro (m3) */
+  earthworksM3: number;
+}
+
+/**
+ * Gera N pontos amostrais ao longo da diagonal do polygon (extremos do bbox).
+ */
+export function diagonalSamples(polygon: LngLat[], n = 8): LngLat[] {
+  if (polygon.length < 3) return [];
+  let minLng = Infinity, maxLng = -Infinity, minLat = Infinity, maxLat = -Infinity;
+  for (const [lng, lat] of polygon) {
+    if (lng < minLng) minLng = lng;
+    if (lng > maxLng) maxLng = lng;
+    if (lat < minLat) minLat = lat;
+    if (lat > maxLat) maxLat = lat;
+  }
+  const out: LngLat[] = [];
+  for (let i = 0; i < n; i++) {
+    const t = i / (n - 1);
+    out.push([minLng + (maxLng - minLng) * t, minLat + (maxLat - minLat) * t]);
+  }
+  return out;
+}
+
+/** Distancia em metros entre dois pontos lat/lng (Haversine). */
+export function haversineM(a: LngLat, b: LngLat): number {
+  const [lng1, lat1] = a;
+  const [lng2, lat2] = b;
+  const phi1 = toRad(lat1);
+  const phi2 = toRad(lat2);
+  const dphi = toRad(lat2 - lat1);
+  const dlam = toRad(lng2 - lng1);
+  const s =
+    Math.sin(dphi / 2) ** 2 +
+    Math.cos(phi1) * Math.cos(phi2) * Math.sin(dlam / 2) ** 2;
+  return 2 * EARTH_RADIUS * Math.asin(Math.sqrt(s));
+}
+
+/**
+ * Computa a analise de slope dado um array de samples com altitude.
+ */
+export function computeSlopeAnalysis(
+  samples: ElevationSample[],
+  areaM2: number,
+): SlopeAnalysis {
+  if (samples.length < 2) {
+    return {
+      slopePct: 0,
+      elevationDelta: 0,
+      elevationMean: samples[0]?.h ?? 0,
+      profile: samples.map((s) => ({ d: s.d, h: s.h })),
+      classification: "plano",
+      needsLeveling: false,
+      earthworksM3: 0,
+    };
+  }
+  const hs = samples.map((s) => s.h);
+  const hMin = Math.min(...hs);
+  const hMax = Math.max(...hs);
+  const elevationDelta = hMax - hMin;
+  const elevationMean = hs.reduce((s, h) => s + h, 0) / hs.length;
+  const totalDist = samples[samples.length - 1].d - samples[0].d;
+  const slopePct = totalDist > 0 ? (elevationDelta / totalDist) * 100 : 0;
+  const classification: SlopeAnalysis["classification"] =
+    slopePct < 2 ? "plano"
+    : slopePct < 5 ? "suave"
+    : slopePct < 10 ? "moderado"
+    : "acentuado";
+  const needsLeveling = slopePct > 3 || elevationDelta > 1.5;
+  const earthworksM3 = needsLeveling
+    ? Math.round((elevationDelta / 2) * areaM2)
+    : 0;
+  return {
+    slopePct: Number(slopePct.toFixed(2)),
+    elevationDelta: Number(elevationDelta.toFixed(2)),
+    elevationMean: Number(elevationMean.toFixed(1)),
+    profile: samples.map((s) => ({ d: Math.round(s.d), h: Number(s.h.toFixed(2)) })),
+    classification,
+    needsLeveling,
+    earthworksM3,
   };
 }

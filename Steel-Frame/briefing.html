@@ -1,0 +1,667 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Briefing · Agente Pré-Projeto · SteelFrame GenIA</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700;900&family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/app.css">
+<style>
+  .briefing-shell {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-4);
+    height: calc(100vh - 140px);
+    min-height: 720px;
+  }
+  @media (max-width: 1100px) {
+    .briefing-shell { grid-template-columns: 1fr; height: auto; }
+  }
+
+  /* ========= Left: chat ========= */
+  .chat-pane {
+    background: var(--color-surface);
+    border: 1px solid var(--color-stroke);
+    border-radius: var(--radius-md);
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+  .chat-head {
+    padding: var(--space-4) var(--space-5);
+    border-bottom: 1px solid var(--color-stroke);
+    display: flex; align-items: center; justify-content: space-between; gap: var(--space-3);
+  }
+  .chat-head .agent {
+    display: flex; align-items: center; gap: var(--space-3);
+  }
+  .agent-avatar {
+    width: 36px; height: 36px; border-radius: var(--radius-full);
+    background: linear-gradient(135deg, var(--color-primary-600), var(--color-borgonha));
+    display: grid; place-items: center;
+    color: var(--color-text-primary); font-weight: var(--fw-bold); font-size: 13px;
+    box-shadow: var(--shadow-glow);
+  }
+  .agent-name { font-size: var(--fs-body); font-weight: var(--fw-semibold); }
+  .agent-sub { font-size: var(--fs-xs); color: var(--color-text-secondary); }
+
+  .chat-progress {
+    display: flex; flex-direction: column; gap: 4px;
+    min-width: 180px;
+  }
+  .progress-row { display: flex; justify-content: space-between; font-size: var(--fs-xs); color: var(--color-text-secondary); }
+  .progress-track { height: 4px; background: var(--color-surface-elevated); border-radius: var(--radius-full); overflow: hidden; }
+  .progress-fill { width: 60%; height: 100%; background: var(--color-success); border-radius: var(--radius-full); }
+
+  /* prefilled assumption banner */
+  .prefill-banner {
+    margin: var(--space-4) var(--space-5) 0;
+    padding: var(--space-3) var(--space-4);
+    background: rgba(23,163,74,0.08);
+    border: 1px solid rgba(23,163,74,0.30);
+    border-left: 3px solid var(--color-success);
+    border-radius: var(--radius-sm);
+    display: flex; gap: var(--space-3); align-items: flex-start;
+    font-size: var(--fs-sm); color: var(--color-text-secondary); line-height: 1.55;
+  }
+  .prefill-banner strong { color: var(--color-text-primary); font-weight: var(--fw-semibold); }
+  .prefill-banner .pf-icon { color: var(--color-success); flex-shrink: 0; margin-top: 2px; }
+
+  /* essential step indicator */
+  .essentials-dots { display: flex; gap: 6px; align-items: center; }
+  .essentials-dots .dot-step {
+    width: 22px; height: 4px; border-radius: 2px; background: var(--color-stroke);
+  }
+  .essentials-dots .dot-step.done { background: var(--color-success); }
+  .essentials-dots .dot-step.current { background: var(--color-primary-500); box-shadow: 0 0 8px var(--color-primary-glow); }
+
+  .chat-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--space-5);
+    display: flex; flex-direction: column;
+    gap: var(--space-5);
+  }
+  .chat-section-divider {
+    display: flex; align-items: center; gap: var(--space-3);
+    color: var(--color-text-secondary);
+    font-family: var(--font-mono);
+    font-size: var(--fs-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+  .chat-section-divider::before, .chat-section-divider::after {
+    content:''; flex:1; height:1px; background: var(--color-stroke);
+  }
+  .msg { display: flex; gap: var(--space-3); max-width: 90%; }
+  .msg.agent { align-self: flex-start; }
+  .msg.user { align-self: flex-end; flex-direction: row-reverse; }
+  .msg .bubble {
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-lg);
+    line-height: 1.55;
+    font-size: var(--fs-body);
+  }
+  .msg.agent .bubble {
+    background: var(--color-surface-elevated);
+    border: 1px solid var(--color-stroke);
+    border-top-left-radius: var(--radius-sm);
+  }
+  .msg.user .bubble {
+    background: var(--color-primary-600);
+    color: var(--color-text-primary);
+    border-top-right-radius: var(--radius-sm);
+    font-weight: var(--fw-medium);
+  }
+  .msg .av {
+    width: 32px; height: 32px; border-radius: var(--radius-full); flex: 0 0 32px;
+    display: grid; place-items: center;
+    font-size: 12px; font-weight: var(--fw-semibold);
+  }
+  .msg.agent .av { background: linear-gradient(135deg, var(--color-primary-600), var(--color-borgonha)); }
+  .msg.user .av { background: var(--color-surface-raised); color: var(--color-text-primary); }
+  .msg .ts { font-size: 10px; color: var(--color-text-muted); margin-top: 4px; font-family: var(--font-mono); }
+
+  .quickchips {
+    display: flex; flex-wrap: wrap; gap: var(--space-2);
+    margin-top: var(--space-2); margin-left: 44px;
+  }
+
+  .typing { display: inline-flex; gap: 4px; align-items: center; padding: var(--space-3) var(--space-4); }
+  .typing .d {
+    width: 6px; height: 6px; background: var(--color-text-secondary); border-radius: var(--radius-full);
+    animation: blink 1.4s infinite;
+  }
+  .typing .d:nth-child(2) { animation-delay: 0.2s; }
+  .typing .d:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes blink { 0%, 60%, 100% { opacity: 0.3; } 30% { opacity: 1; } }
+
+  .chat-input-bar {
+    border-top: 1px solid var(--color-stroke);
+    padding: var(--space-3) var(--space-4);
+    display: flex; align-items: center; gap: var(--space-3);
+    background: var(--color-surface);
+  }
+  .chat-input-bar input {
+    flex: 1;
+    height: 40px;
+    background: var(--color-surface-elevated);
+    border: 1px solid var(--color-stroke-input);
+    border-radius: var(--radius-md);
+    color: var(--color-text-primary);
+    padding: 0 var(--space-4);
+    outline: none;
+    font-size: var(--fs-body);
+  }
+  .chat-input-bar input:focus { border-color: var(--color-primary-500); }
+  .chat-input-bar .send {
+    width: 40px; height: 40px;
+    background: var(--color-primary-600);
+    border-radius: var(--radius-md);
+    display: grid; place-items: center;
+    color: var(--color-text-primary);
+  }
+  .chat-input-bar .send:hover { background: var(--color-primary-700); }
+
+  /* ========= Right: live preview pane ========= */
+  .preview-pane {
+    background: var(--color-surface);
+    border: 1px solid var(--color-stroke);
+    border-radius: var(--radius-md);
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+  .preview-head {
+    padding: var(--space-4) var(--space-5);
+    border-bottom: 1px solid var(--color-stroke);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .preview-tabs { display: flex; gap: 0; }
+  .preview-tab {
+    padding: var(--space-2) var(--space-4);
+    font-size: var(--fs-sm); font-weight: var(--fw-medium);
+    color: var(--color-text-secondary);
+    border-bottom: 2px solid transparent;
+  }
+  .preview-tab.active { color: var(--color-primary-500); border-bottom-color: var(--color-primary-500); }
+
+  .preview-stage {
+    flex: 1;
+    position: relative;
+    display: grid;
+    grid-template-rows: 1.2fr 1fr;
+    gap: 1px;
+    background: var(--color-stroke);
+  }
+
+  /* Top stage: map */
+  .stage-map {
+    position: relative;
+    background: var(--color-background);
+    overflow: hidden;
+  }
+  .stage-map .map-placeholder {
+    position: absolute; inset: 0;
+    border-radius: 0;
+  }
+  .stage-label {
+    position: absolute; top: var(--space-3); left: var(--space-3);
+    background: var(--overlay-glass);
+    backdrop-filter: blur(10px);
+    padding: 4px var(--space-2);
+    border-radius: var(--radius-sm);
+    font-family: var(--font-mono);
+    font-size: var(--fs-xs);
+    color: var(--color-text-primary);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    border: 1px solid var(--color-stroke);
+  }
+  .stage-label .pulse {
+    display: inline-block;
+    width: 6px; height: 6px;
+    border-radius: var(--radius-full);
+    background: var(--color-primary-500);
+    margin-right: 6px;
+    animation: pulseGlow 1.6s infinite;
+  }
+  @keyframes pulseGlow {
+    0% { box-shadow: 0 0 0 0 var(--color-primary-glow); }
+    70% { box-shadow: 0 0 0 8px transparent; }
+    100% { box-shadow: 0 0 0 0 transparent; }
+  }
+
+  /* Bottom stage: 3D volume preview */
+  .stage-3d {
+    position: relative;
+    background:
+      radial-gradient(ellipse at 50% 100%, rgba(215, 32, 66, 0.10), transparent 60%),
+      var(--color-background);
+    overflow: hidden;
+    display: grid;
+    place-items: center;
+  }
+  .iso-scene {
+    position: relative;
+    width: 320px; height: 220px;
+  }
+  .iso-ground {
+    position: absolute; left: 50%; bottom: 30px;
+    transform: translateX(-50%);
+    width: 280px; height: 140px;
+    background:
+      repeating-linear-gradient(0deg, rgba(255,255,255,0.04) 0 1px, transparent 1px 20px),
+      repeating-linear-gradient(90deg, rgba(255,255,255,0.04) 0 1px, transparent 1px 20px),
+      linear-gradient(135deg, #2a2520, #1a1a1a);
+    transform: translateX(-50%) rotateX(60deg) rotateZ(-20deg);
+    transform-origin: 50% 100%;
+    border: 1px solid var(--color-primary-500);
+    box-shadow: 0 0 24px var(--color-primary-glow);
+  }
+  .iso-volume {
+    position: absolute;
+    left: 50%; bottom: 100px;
+    transform: translateX(-50%) rotateX(60deg) rotateZ(-20deg);
+    transform-origin: 50% 100%;
+    width: 180px; height: 90px;
+    background: linear-gradient(135deg, #4a3a35, #2d2723);
+    border: 1px solid var(--color-text-primary);
+  }
+  .iso-volume::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(90deg, rgba(255,255,255,0.08) 0 1px, transparent 1px 30px),
+      linear-gradient(0deg, rgba(255,255,255,0.08) 0 1px, transparent 1px 30px);
+  }
+
+  .stage-3d .hud {
+    position: absolute;
+    top: var(--space-3);
+    right: var(--space-3);
+    display: flex; flex-direction: column; gap: var(--space-1);
+    background: var(--overlay-glass);
+    backdrop-filter: blur(10px);
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-stroke);
+    font-family: var(--font-mono);
+    font-size: var(--fs-xs);
+    min-width: 160px;
+  }
+  .hud-row { display:flex; justify-content: space-between; gap: var(--space-3); color: var(--color-text-secondary); }
+  .hud-row strong { color: var(--color-text-primary); font-weight: var(--fw-semibold); }
+  .hud-row.highlight strong { color: var(--color-primary-500); }
+
+  /* Assumptions panel on right side */
+  .assumptions-pane {
+    border-top: 1px solid var(--color-stroke);
+    padding: var(--space-4) var(--space-5);
+    background: var(--color-surface);
+    max-height: 280px;
+    overflow-y: auto;
+  }
+  .assumptions-pane h3 {
+    font-size: var(--fs-sm);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--color-text-secondary);
+    font-weight: var(--fw-semibold);
+    margin-bottom: var(--space-3);
+  }
+  .assumption-list { display: flex; flex-direction: column; gap: var(--space-2); }
+  .assumption {
+    display: grid;
+    grid-template-columns: 24px 1fr auto;
+    gap: var(--space-3);
+    align-items: center;
+    padding: var(--space-2) var(--space-3);
+    background: var(--color-surface-elevated);
+    border: 1px solid var(--color-stroke);
+    border-radius: var(--radius-md);
+    font-size: var(--fs-sm);
+  }
+  .assumption .check {
+    width: 20px; height: 20px; border-radius: var(--radius-full);
+    background: var(--color-success-soft);
+    color: var(--color-success);
+    display: grid; place-items: center;
+  }
+  .assumption.pending .check { background: var(--color-surface-raised); color: var(--color-text-muted); }
+  .assumption.live .check {
+    background: var(--color-primary-soft);
+    color: var(--color-primary-500);
+    box-shadow: 0 0 0 3px var(--color-primary-glow);
+    animation: pulseGlow 1.6s infinite;
+  }
+  .assumption .label { color: var(--color-text-secondary); }
+  .assumption .value { color: var(--color-text-primary); font-weight: var(--fw-semibold); font-family: var(--font-mono); font-size: var(--fs-xs); }
+  .assumption.pending .value { color: var(--color-text-muted); }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-mark">DT</div>
+      <div class="brand-text">
+        <span class="brand-name">SteelFrame GenIA</span>
+        <span class="brand-sub">Distrito Tecnológico</span>
+      </div>
+    </div>
+    <div class="sidebar-section">
+      <span class="sidebar-section-label">Operação</span>
+      <a class="nav-item" href="home.html">
+        <svg class="icon-stroke nav-icon" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+        <span>Meus terrenos</span>
+      </a>
+      <a class="nav-item" href="cadastro-terreno.html">
+        <svg class="icon-stroke nav-icon" viewBox="0 0 24 24"><path d="M12 21s-7-7.5-7-12a7 7 0 1 1 14 0c0 4.5-7 12-7 12z"/><circle cx="12" cy="9" r="2.5"/></svg>
+        <span>Novo terreno</span>
+      </a>
+      <a class="nav-item active" href="#">
+        <svg class="icon-stroke nav-icon" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 4.5-7.79L3 7"/><path d="M3 3v4h4"/></svg>
+        <span>Briefings ativos</span>
+        <span class="nav-badge">3</span>
+      </a>
+      <a class="nav-item" href="relatorio.html">
+        <svg class="icon-stroke nav-icon" viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="14 3 14 9 20 9"/></svg>
+        <span>Relatórios</span>
+      </a>
+    </div>
+    <div class="sidebar-section">
+      <span class="sidebar-section-label">Referências</span>
+      <a class="nav-item" href="base-conhecimento.html">
+        <svg class="icon-stroke nav-icon" viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+        <span>Base de conhecimento</span>
+      </a>
+      <a class="nav-item" href="components.html">
+        <svg class="icon-stroke nav-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="9"/></svg>
+        <span>Sistema de design</span>
+      </a>
+    </div>
+    <div class="sidebar-user">
+      <div class="avatar">RC</div>
+      <div class="user-meta">
+        <span class="user-name">Renata Couto</span>
+        <span class="user-role">Eng. Civil · SteelFrame BR</span>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="page-header">
+      <div class="stack-sm">
+        <nav class="breadcrumb">
+          <a href="home.html">Meus terrenos</a>
+          <span class="sep">/</span>
+          <a href="terreno.html">Cumbica · 5.480 m²</a>
+          <span class="sep">/</span>
+          <span class="crumb-current">Briefing · Galpão industrial leve</span>
+        </nav>
+        <div class="page-title-row">
+          <h1>Agente Pré-Projeto · galpão</h1>
+          <span class="pill pill-primary"><span class="dot"></span>Conversação ativa</span>
+          <span class="pill pill-success mono"><span class="dot"></span>3 de 5 essenciais</span>
+        </div>
+      </div>
+      <div class="row">
+        <button class="btn btn-ghost">Salvar e sair</button>
+        <button class="btn btn-primary">
+          Gerar relatório agora
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="14 3 14 9 20 9"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <div class="briefing-shell">
+      <!-- ========= Chat ========= -->
+      <section class="chat-pane">
+        <header class="chat-head">
+          <div class="agent">
+            <div class="agent-avatar">AI</div>
+            <div>
+              <div class="agent-name">Agente Pré-Projeto · GenIA</div>
+              <div class="agent-sub">Tom didático · modo enxuto · 17 premissas pré-extraídas</div>
+            </div>
+          </div>
+          <div class="chat-progress">
+            <div class="progress-row">
+              <span>Essenciais</span>
+              <div class="essentials-dots">
+                <span class="dot-step done"></span>
+                <span class="dot-step done"></span>
+                <span class="dot-step done"></span>
+                <span class="dot-step current"></span>
+                <span class="dot-step"></span>
+              </div>
+            </div>
+            <div class="progress-track"><div class="progress-fill"></div></div>
+            <div class="progress-row"><span>Falta</span><span>Prazo + orçamento-teto · 2 perguntas</span></div>
+          </div>
+        </header>
+
+        <div class="prefill-banner">
+          <svg class="pf-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+          <div>
+            Já preenchi <strong>17 premissas</strong> a partir do terreno (Cumbica · 5.480 m² · ZPI-1 · CA 2,0 · TO 70% · cone GRU classe 9 · SPT pendente · CUB-SP mai/26). Vou te perguntar só o <strong>essencial</strong> — 5 decisões que mudam o galpão. O resto eu monto sozinho.
+          </div>
+        </div>
+
+        <div class="chat-body">
+          <div class="chat-section-divider">1 de 5 · Tipologia</div>
+
+          <div class="msg agent">
+            <div class="av">AI</div>
+            <div>
+              <div class="bubble">
+                Pelo lote em Cumbica (próximo a Dutra + GRU, ZPI-1), <strong>logístico/CD</strong> é o padrão da região. Confirma ou prefere outro?
+              </div>
+              <div class="ts">há 2 min</div>
+            </div>
+          </div>
+          <div class="quickchips">
+            <button class="chip active">🚚 Logístico / CD</button>
+            <button class="chip">🏭 Industrial leve</button>
+            <button class="chip">📦 Cross-docking</button>
+            <button class="chip">🏢 Híbrido + escritório</button>
+          </div>
+
+          <div class="msg user">
+            <div class="av">RC</div>
+            <div><div class="bubble">Logístico mesmo. Pra operação 3PL.</div><div class="ts">há 2 min</div></div>
+          </div>
+
+          <div class="chat-section-divider">2 de 5 · Escala</div>
+
+          <div class="msg agent">
+            <div class="av">AI</div>
+            <div>
+              <div class="bubble">
+                Com TO 70% sobram <strong>3.836 m²</strong> construíveis. Pra 3PL o ponto-doce costuma ser 2.500–3.000 m² (sobra pátio de manobra). Qual escala?
+              </div>
+              <div class="ts">há 1 min</div>
+            </div>
+          </div>
+          <div class="quickchips">
+            <button class="chip">≈ 2.000 m² · enxuto</button>
+            <button class="chip active">≈ 2.800 m² · recomendado</button>
+            <button class="chip">≈ 3.500 m² · máximo</button>
+            <button class="chip">Me sugira</button>
+          </div>
+
+          <div class="msg user">
+            <div class="av">RC</div>
+            <div><div class="bubble">2.800 funciona.</div><div class="ts">há 1 min</div></div>
+          </div>
+
+          <div class="chat-section-divider">3 de 5 · Operação</div>
+
+          <div class="msg agent">
+            <div class="av">AI</div>
+            <div>
+              <div class="bubble">
+                Pra 3PL com 2.800 m², a referência é <strong>vão livre 25 m · pé-direito útil 12 m · 8 docas niveladoras</strong>. Bate com a sua operação?
+              </div>
+              <div class="ts">agora</div>
+            </div>
+          </div>
+          <div class="quickchips">
+            <button class="chip active">✓ Bate, segue assim</button>
+            <button class="chip">+ Mezanino escritório</button>
+            <button class="chip">↑ Pé-direito 14 m (porta-paletes 6 níveis)</button>
+            <button class="chip">↓ Menos docas (4–6)</button>
+          </div>
+
+          <div class="chat-section-divider pending">4 de 5 · Prazo · 5 de 5 · Orçamento-teto</div>
+
+          <div class="msg agent">
+            <div class="av">AI</div>
+            <div class="bubble typing">
+              <span class="d"></span><span class="d"></span><span class="d"></span>
+            </div>
+          </div>
+        </div>
+
+        <footer class="chat-input-bar">
+          <input type="text" placeholder="Toque um chip ou escreva livre — eu interpreto…" />
+          <button class="btn btn-icon btn-ghost" title="Anexar documento">
+            <svg class="icon-stroke" viewBox="0 0 24 24"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+          </button>
+          <button class="send" title="Enviar">
+            <svg class="icon-stroke" viewBox="0 0 24 24" style="color:white"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4z"/></svg>
+          </button>
+        </footer>
+      </section>
+
+      <!-- ========= Live preview ========= -->
+      <section class="preview-pane">
+        <header class="preview-head">
+          <div class="preview-tabs">
+            <button class="preview-tab active">Mapa &amp; relevo</button>
+            <button class="preview-tab">Volume 3D</button>
+            <button class="preview-tab">Premissas (17 auto)</button>
+          </div>
+          <span class="pill pill-success"><span class="dot"></span>Atualizando ao vivo</span>
+        </header>
+
+        <div class="preview-stage">
+          <!-- Map -->
+          <div class="stage-map">
+            <div class="map-placeholder show-hillshade show-contours">
+              <div class="map-grid-overlay"></div>
+              <div class="map-hillshade"></div>
+              <div class="map-contours"></div>
+              <svg class="map-polygon" style="position:absolute; inset:0; width:100%; height:100%;" viewBox="0 0 1000 700" preserveAspectRatio="none">
+                <path d="M 380 220 L 620 215 L 640 470 L 360 480 Z"/>
+                <circle cx="380" cy="220" r="6"/><circle cx="620" cy="215" r="6"/>
+                <circle cx="640" cy="470" r="6"/><circle cx="360" cy="480" r="6"/>
+                <!-- footprint of recommended galpão (2.800 m²) -->
+                <path d="M 430 270 L 600 265 L 605 430 L 435 435 Z" fill="rgba(215, 32, 66, 0.18)" stroke="#D72042" stroke-width="2" stroke-dasharray="4 3"/>
+                <text x="450" y="360" fill="#D72042" font-family="JetBrains Mono" font-size="11" font-weight="600">GALPÃO 2.800 m²</text>
+              </svg>
+            </div>
+            <div class="stage-label"><span class="pulse"></span>Lote · Cumbica · 5.480 m² · ZPI-1</div>
+          </div>
+
+          <!-- 3D volume -->
+          <div class="stage-3d">
+            <div class="iso-scene">
+              <div class="iso-ground"></div>
+              <div class="iso-volume"></div>
+            </div>
+            <div class="stage-label" style="top:var(--space-3); left:var(--space-3);"><span class="pulse"></span>Volume estimado</div>
+            <div class="hud">
+              <div class="hud-row highlight"><span>Área constr.</span><strong>2.800 m²</strong></div>
+              <div class="hud-row"><span>Vão livre</span><strong>25 m</strong></div>
+              <div class="hud-row"><span>Pé-direito</span><strong>12 m</strong></div>
+              <div class="hud-row"><span>Docas</span><strong>8 niveladoras</strong></div>
+              <div class="hud-row"><span>Peso aço</span><strong>~142 t</strong></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Assumptions ledger -->
+        <aside class="assumptions-pane">
+          <h3>Premissas · 17 auto · 3 confirmadas · 2 a pedir</h3>
+          <div class="assumption-list">
+            <div class="assumption">
+              <div class="check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>
+              <span class="label">Tipologia</span>
+              <span class="value">Logístico / 3PL</span>
+            </div>
+            <div class="assumption">
+              <div class="check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>
+              <span class="label">Área construída</span>
+              <span class="value">2.800 m²</span>
+            </div>
+            <div class="assumption live">
+              <div class="check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><circle cx="12" cy="12" r="5"/></svg></div>
+              <span class="label">Vão · pé-direito · docas</span>
+              <span class="value">25 m · 12 m · 8</span>
+            </div>
+            <div class="assumption" style="opacity:.75">
+              <div class="check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>
+              <span class="label">Fundação (auto)</span>
+              <span class="value">Sapatas + baldrames</span>
+            </div>
+            <div class="assumption" style="opacity:.75">
+              <div class="check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>
+              <span class="label">Cobertura (auto)</span>
+              <span class="value">Sandwich PIR 50 mm</span>
+            </div>
+            <div class="assumption" style="opacity:.75">
+              <div class="check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>
+              <span class="label">Fechamento (auto)</span>
+              <span class="value">Aço trapezoidal + isol.</span>
+            </div>
+            <div class="assumption" style="opacity:.75">
+              <div class="check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>
+              <span class="label">Piso industrial (auto)</span>
+              <span class="value">Concreto polido 20 cm</span>
+            </div>
+            <div class="assumption" style="opacity:.75">
+              <div class="check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>
+              <span class="label">BDI (auto · CUB-SP)</span>
+              <span class="value">26%</span>
+            </div>
+            <div class="assumption pending">
+              <div class="check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M12 8v4l3 2"/><circle cx="12" cy="12" r="9"/></svg></div>
+              <span class="label">Prazo desejado</span>
+              <span class="value">— a perguntar</span>
+            </div>
+            <div class="assumption pending">
+              <div class="check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M12 8v4l3 2"/><circle cx="12" cy="12" r="9"/></svg></div>
+              <span class="label">Orçamento-teto</span>
+              <span class="value">— a perguntar</span>
+            </div>
+          </div>
+        </aside>
+      </section>
+    </div>
+  </main>
+</div>
+
+<script>
+  // chip selection (within group)
+  document.querySelectorAll('.quickchips').forEach(group => {
+    group.querySelectorAll('.chip').forEach(c => {
+      c.addEventListener('click', () => {
+        group.querySelectorAll('.chip').forEach(x => x.classList.remove('active'));
+        c.classList.add('active');
+      });
+    });
+  });
+  // tab switch
+  document.querySelectorAll('.preview-tab').forEach(t => {
+    t.addEventListener('click', () => {
+      document.querySelectorAll('.preview-tab').forEach(x => x.classList.remove('active'));
+      t.classList.add('active');
+    });
+  });
+</script>
+</body>
+</html>

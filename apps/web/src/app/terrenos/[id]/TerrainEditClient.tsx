@@ -36,7 +36,7 @@ export function TerrainEditClient({ id, initialPolygon, initialCenter }: Props) 
   }
 
   return (
-    <div className="space-y-3">
+    <div>
       <TerrainMap
         initialPolygon={initialPolygon}
         initialCenter={initialCenter}
@@ -47,11 +47,19 @@ export function TerrainEditClient({ id, initialPolygon, initialCenter }: Props) 
         }}
       />
       {dirty && (
-        <div className="flex justify-end">
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "flex-end",
+            padding: "var(--space-3) var(--space-4)",
+            borderTop: "1px solid var(--color-stroke)",
+            background: "var(--color-surface)",
+          }}
+        >
           <button
             onClick={save}
             disabled={saving}
-            className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium hover:bg-brand-500 disabled:opacity-50"
+            className="btn btn-primary btn-sm"
           >
             {saving ? "Salvando…" : "Salvar alterações"}
           </button>

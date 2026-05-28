@@ -1,0 +1,372 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Sistema de design · Componentes · SteelFrame GenIA</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700;900&family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/app.css">
+<style>
+  .lib-shell { display: grid; grid-template-columns: 240px 1fr; min-height: 100vh; gap: 0; padding: 0; }
+  @media (max-width: 920px) { .lib-shell { grid-template-columns: 1fr; } }
+  .lib-nav {
+    background: var(--color-surface);
+    border-right: 1px solid var(--color-stroke);
+    padding: var(--space-5);
+    position: sticky; top: 0; height: 100vh; overflow-y: auto;
+  }
+  .lib-nav .lib-brand { font-family: var(--font-display); font-weight: var(--fw-bold); font-size: var(--fs-md); margin-bottom: var(--space-2); }
+  .lib-nav .lib-version { font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--color-text-secondary); margin-bottom: var(--space-6); }
+  .lib-nav .lib-section-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--color-text-secondary);
+    text-transform: uppercase; letter-spacing: 0.1em;
+    margin: var(--space-5) 0 var(--space-2);
+  }
+  .lib-nav a {
+    display: block;
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-sm);
+    color: var(--color-text-secondary);
+    font-size: var(--fs-sm);
+    transition: all 0.15s;
+  }
+  .lib-nav a:hover { background: var(--color-surface-elevated); color: var(--color-text-primary); }
+  .lib-nav a.active { background: var(--color-primary-soft); color: var(--color-primary-500); font-weight: var(--fw-semibold); }
+  .lib-back { display: inline-flex; gap: 4px; font-size: var(--fs-xs); color: var(--color-text-secondary); margin-bottom: var(--space-4); }
+
+  .lib-main { padding: var(--space-8) var(--space-8) var(--space-12); max-width: 1100px; }
+  .lib-h1 { font-size: var(--fs-2xl); margin-bottom: var(--space-3); }
+  .lib-intro { color: var(--color-text-secondary); max-width: 60ch; margin-bottom: var(--space-8); font-size: var(--fs-md); }
+
+  .comp-block { margin-bottom: var(--space-12); scroll-margin-top: var(--space-4); }
+  .comp-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: var(--space-4); padding-bottom: var(--space-3); border-bottom: 1px solid var(--color-stroke); }
+  .comp-head h2 { font-size: var(--fs-lg); }
+  .comp-head .comp-meta { font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--color-text-secondary); }
+  .comp-stage {
+    background: var(--color-surface);
+    border: 1px solid var(--color-stroke);
+    border-radius: var(--radius-md);
+    padding: var(--space-6);
+    margin-bottom: var(--space-3);
+    background-image:
+      linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+    background-size: 16px 16px;
+  }
+  .stage-row { display: flex; flex-wrap: wrap; gap: var(--space-4); align-items: flex-start; }
+  .stage-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-4); }
+  .comp-snippet {
+    background: #0c0c0e;
+    border: 1px solid var(--color-stroke);
+    border-radius: var(--radius-md);
+    padding: var(--space-3) var(--space-4);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: #c2c2c2;
+    overflow-x: auto;
+    line-height: 1.6;
+  }
+  .comp-snippet .tg { color: #f9b8c4; }
+  .comp-snippet .at { color: var(--color-orange); }
+  .comp-snippet .vl { color: #17a34a; }
+
+  /* Demo bar chart inside relatorio */
+  .demo-bar { width: 240px; height: 22px; background: var(--color-surface-elevated); border-radius: var(--radius-sm); position: relative; overflow: hidden; }
+  .demo-bar .range { position: absolute; left: 18%; right: 72%; top: 0; bottom: 0; background: var(--color-primary-soft); border-inline: 2px solid var(--color-primary-500); }
+  .demo-bar .fill { position: absolute; left: 0; top: 0; bottom: 0; width: 25%; background: linear-gradient(90deg, var(--color-borgonha), var(--color-primary-500)); }
+</style>
+</head>
+<body>
+<div class="lib-shell">
+  <aside class="lib-nav">
+    <a class="lib-back" href="index.html">← Índice</a>
+    <div class="lib-brand">Componentes</div>
+    <div class="lib-version">v1.0 · 28/mai/2026</div>
+
+    <div class="lib-section-label">Ação</div>
+    <a href="#buttons">Button</a>
+    <a href="#fab">FAB Sugerir IA</a>
+
+    <div class="lib-section-label">Forma</div>
+    <a href="#inputs">Inputs</a>
+    <a href="#tabs">Tabs</a>
+    <a href="#stepper">Stepper</a>
+    <a href="#chip">Chip</a>
+
+    <div class="lib-section-label">Dado</div>
+    <a href="#pill">Pill / Status</a>
+    <a href="#card">Card</a>
+    <a href="#chartbar">ChartBar (macroetapas)</a>
+    <a href="#table">Table</a>
+
+    <div class="lib-section-label">Mapa &amp; 3D</div>
+    <a href="#map-toolbar">Map Toolbar</a>
+    <a href="#hud">3D HUD</a>
+    <a href="#layer-toggle">Layer toggle</a>
+
+    <div class="lib-section-label">Feedback</div>
+    <a href="#toast">Toast</a>
+    <a href="#empty">Empty state</a>
+    <a href="#drawer">Drawer (preview)</a>
+  </aside>
+
+  <main class="lib-main">
+    <h1 class="lib-h1">Biblioteca navegável</h1>
+    <p class="lib-intro">Cada componente abaixo está pronto pra colar como JSX/HTML + classes do <code class="mono">css/app.css</code>. Tokens já bindados — basta importar <code class="mono">css/tokens.css</code> no <code class="mono">app/globals.css</code>.</p>
+
+    <!-- BUTTON -->
+    <section id="buttons" class="comp-block">
+      <header class="comp-head"><h2>Button</h2><span class="comp-meta">primary · secondary · ghost · danger · sizes</span></header>
+      <div class="comp-stage">
+        <div class="stage-row">
+          <button class="btn btn-primary">Iniciar briefing</button>
+          <button class="btn btn-primary"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Novo terreno</button>
+          <button class="btn btn-secondary">Salvar rascunho</button>
+          <button class="btn btn-ghost">Cancelar</button>
+          <button class="btn btn-danger">Excluir</button>
+        </div>
+        <div class="stage-row" style="margin-top: var(--space-4)">
+          <button class="btn btn-primary btn-lg">Gerar relatório</button>
+          <button class="btn btn-primary btn-sm">Próximo</button>
+          <button class="btn btn-secondary btn-sm">Ver detalhes</button>
+        </div>
+      </div>
+      <pre class="comp-snippet"><span class="tg">&lt;button</span> <span class="at">className</span>=<span class="vl">"btn btn-primary"</span><span class="tg">&gt;</span>Iniciar briefing<span class="tg">&lt;/button&gt;</span>
+<span class="tg">&lt;button</span> <span class="at">className</span>=<span class="vl">"btn btn-secondary btn-sm"</span><span class="tg">&gt;</span>Ver detalhes<span class="tg">&lt;/button&gt;</span></pre>
+    </section>
+
+    <!-- FAB -->
+    <section id="fab" class="comp-block">
+      <header class="comp-head"><h2>FAB · Sugerir com IA</h2><span class="comp-meta">flutuante · gradient borgonha→primary</span></header>
+      <div class="comp-stage" style="height: 140px; position: relative">
+        <button style="position: absolute; bottom: 16px; right: 16px; display: inline-flex; align-items:center; gap: 8px; padding: 12px 20px; background: linear-gradient(135deg, var(--color-primary-600), var(--color-borgonha)); border-radius: var(--radius-full); color: white; font-weight: 600; box-shadow: var(--shadow-glow); border:0">
+          ✨ Sugerir com IA
+        </button>
+      </div>
+    </section>
+
+    <!-- INPUTS -->
+    <section id="inputs" class="comp-block">
+      <header class="comp-head"><h2>Inputs</h2><span class="comp-meta">text · select · textarea · with-icon · focus</span></header>
+      <div class="comp-stage stage-grid">
+        <div class="field">
+          <label>Endereço <span class="req">*</span></label>
+          <div class="field-with-icon">
+            <svg class="icon-stroke field-icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input class="input" value="Rua Aspicuelta, 200" />
+          </div>
+          <span class="hint">Autocomplete via Nominatim.</span>
+        </div>
+        <div class="field">
+          <label>Tipo de obra</label>
+          <select class="select"><option>Residencial</option><option>Comercial</option><option>Galpão</option></select>
+        </div>
+        <div class="field">
+          <label>Observações</label>
+          <textarea class="textarea" placeholder="Notas livres do projetista…"></textarea>
+        </div>
+      </div>
+    </section>
+
+    <!-- TABS -->
+    <section id="tabs" class="comp-block">
+      <header class="comp-head"><h2>Tabs</h2><span class="comp-meta">underline · primary acento</span></header>
+      <div class="comp-stage">
+        <div class="tabs">
+          <button class="tab active">Mapa &amp; relevo</button>
+          <button class="tab">Volume 3D</button>
+          <button class="tab">Premissas (12)</button>
+          <button class="tab">Histórico</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- STEPPER -->
+    <section id="stepper" class="comp-block">
+      <header class="comp-head"><h2>Stepper · Wizard de construção</h2><span class="comp-meta">done · active · pending</span></header>
+      <div class="comp-stage">
+        <div class="stepper">
+          <div class="step done"><div class="step-num">✓</div><span>Identificação</span></div>
+          <div class="step-divider"></div>
+          <div class="step active"><div class="step-num">2</div><span>Material / Orçamento</span></div>
+          <div class="step-divider"></div>
+          <div class="step"><div class="step-num">3</div><span>Geometria</span></div>
+          <div class="step-divider"></div>
+          <div class="step"><div class="step-num">4</div><span>Revisão</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CHIP -->
+    <section id="chip" class="comp-block">
+      <header class="comp-head"><h2>Chip · resposta rápida no briefing</h2><span class="comp-meta">selecionável · agrupado</span></header>
+      <div class="comp-stage">
+        <div class="stage-row">
+          <button class="chip">🏗️ Terreno limpo</button>
+          <button class="chip active">🏚️ Com demolição parcial</button>
+          <button class="chip">📐 Ampliação sobre alvenaria</button>
+          <button class="chip">🏠 Residencial</button>
+          <button class="chip">🏢 Comercial</button>
+          <button class="chip">≈ 100 m²</button>
+          <button class="chip">≈ 130 m²</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- PILL -->
+    <section id="pill" class="comp-block">
+      <header class="comp-head"><h2>Pill · Status</h2><span class="comp-meta">success · warning · danger · info · primary · neutral</span></header>
+      <div class="comp-stage">
+        <div class="stage-row">
+          <span class="pill pill-success"><span class="dot"></span>Viável</span>
+          <span class="pill pill-warning"><span class="dot"></span>Em briefing · 12/26</span>
+          <span class="pill pill-danger"><span class="dot"></span>Bloqueio legal</span>
+          <span class="pill pill-info"><span class="dot"></span>Atualizando</span>
+          <span class="pill pill-primary"><span class="dot"></span>Premissa confirmada</span>
+          <span class="pill pill-neutral"><span class="dot"></span>Rascunho</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- CARD -->
+    <section id="card" class="comp-block">
+      <header class="comp-head"><h2>Card</h2><span class="comp-meta">base · accent · KPI</span></header>
+      <div class="comp-stage stage-grid">
+        <div class="card">
+          <div class="card-row"><div><div class="card-title">Cenário com demolição</div><div class="card-subtitle">Hipótese B · recomendado</div></div><span class="pill pill-primary"><span class="dot"></span>R$ 487k</span></div>
+          <p class="muted text-sm">Inclui demolição de 40 m² do anexo + caçamba.</p>
+        </div>
+        <div class="card" style="border-color: var(--color-primary-500)">
+          <span class="text-xs muted mono" style="text-transform: uppercase; letter-spacing: 0.06em">CUSTO / M²</span>
+          <div style="font-family: var(--font-display); font-size: 32px; font-weight: 700; margin-top: 4px; color: var(--color-primary-500)">R$ 3,75k</div>
+          <span class="text-xs" style="color: var(--color-success)">−18% vs. alvenaria</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- CHARTBAR -->
+    <section id="chartbar" class="comp-block">
+      <header class="comp-head"><h2>ChartBar · Macroetapas SINAPI</h2><span class="comp-meta">bar com range + fill</span></header>
+      <div class="comp-stage">
+        <div style="display: grid; grid-template-columns: 140px 1fr 80px; gap: var(--space-4); align-items: center">
+          <div><div style="font-weight: 600">Estrutura SF</div><div class="text-xs muted mono">18–28% faixa</div></div>
+          <div class="demo-bar"><div class="range"></div><div class="fill" style="width: 23%"></div></div>
+          <div class="mono" style="text-align: right; font-weight: 600">23,0%</div>
+        </div>
+        <div style="display: grid; grid-template-columns: 140px 1fr 80px; gap: var(--space-4); align-items: center; margin-top: var(--space-3)">
+          <div><div style="font-weight: 600">Fundação</div><div class="text-xs muted mono">8–15% faixa</div></div>
+          <div class="demo-bar"><div class="range" style="left: 8%; right: 85%"></div><div class="fill" style="width: 11%"></div></div>
+          <div class="mono" style="text-align: right; font-weight: 600">11,0%</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TABLE -->
+    <section id="table" class="comp-block">
+      <header class="comp-head"><h2>Table</h2><span class="comp-meta">data dense · row hover</span></header>
+      <div class="comp-stage">
+        <table class="ds-table">
+          <thead><tr><th>Terreno</th><th>Bairro</th><th class="num-col">Área</th><th class="num-col">R$ est.</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr><td>#SF-2401 · R. Aspicuelta 200</td><td>Vila Madalena</td><td class="num-col">312 m²</td><td class="num-col">R$ 487k</td><td><span class="pill pill-success"><span class="dot"></span>Viável</span></td></tr>
+            <tr><td>#SF-2402 · Av. Salim Maluf 1250</td><td>Tatuapé</td><td class="num-col">548 m²</td><td class="num-col">— prévia</td><td><span class="pill pill-warning"><span class="dot"></span>Briefing</span></td></tr>
+            <tr><td>#SF-2403 · R. Padre Lebret 88</td><td>Santo Amaro</td><td class="num-col">418 m²</td><td class="num-col">R$ 612k</td><td><span class="pill pill-success"><span class="dot"></span>Viável</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- MAP TOOLBAR -->
+    <section id="map-toolbar" class="comp-block">
+      <header class="comp-head"><h2>Map Toolbar</h2><span class="comp-meta">glass · vertical · 6 tools</span></header>
+      <div class="comp-stage" style="height: 220px; position: relative">
+        <div style="position: absolute; top: 16px; left: 16px; display: flex; flex-direction: column; gap: 8px; background: var(--overlay-glass); backdrop-filter: blur(10px); padding: 8px; border-radius: var(--radius-md); border: 1px solid var(--color-stroke)">
+          <button style="width: 36px; height: 36px; border-radius: 4px; background: var(--color-primary-soft); color: var(--color-primary-500); display: grid; place-items:center"><svg class="icon-stroke" viewBox="0 0 24 24"><polygon points="3 12 7 4 17 4 21 12 16 20 8 20"/></svg></button>
+          <button style="width: 36px; height: 36px; border-radius: 4px; color: var(--color-text-secondary); display: grid; place-items:center"><svg class="icon-stroke" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 4v3M12 17v3M4 12h3M17 12h3"/></svg></button>
+          <button style="width: 36px; height: 36px; border-radius: 4px; color: var(--color-text-secondary); display: grid; place-items:center"><svg class="icon-stroke" viewBox="0 0 24 24"><path d="M21 8 8 21l-5-5L16 3z"/></svg></button>
+        </div>
+      </div>
+    </section>
+
+    <!-- HUD -->
+    <section id="hud" class="comp-block">
+      <header class="comp-head"><h2>3D HUD</h2><span class="comp-meta">label uppercase mono · value mono semibold</span></header>
+      <div class="comp-stage stage-row">
+        <div style="background: var(--overlay-glass); backdrop-filter: blur(12px); border: 1px solid var(--color-primary-500); box-shadow: 0 0 0 1px var(--color-primary-glow); border-radius: var(--radius-md); padding: 12px; min-width: 200px">
+          <div style="font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--color-text-secondary); font-family: var(--font-mono); margin-bottom: 2px">Peso aço galvanizado</div>
+          <div style="font-family: var(--font-mono); font-size: 20px; font-weight: 600; color: var(--color-primary-500); line-height: 1">3,2 t</div>
+        </div>
+        <div style="background: var(--overlay-glass); backdrop-filter: blur(12px); border: 1px solid var(--color-stroke); border-radius: var(--radius-md); padding: 12px; min-width: 200px">
+          <div style="font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--color-text-secondary); font-family: var(--font-mono); margin-bottom: 2px">Área construída</div>
+          <div style="font-family: var(--font-mono); font-size: 20px; font-weight: 600; line-height: 1">130 m²</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- LAYER TOGGLE -->
+    <section id="layer-toggle" class="comp-block">
+      <header class="comp-head"><h2>Layer toggle</h2><span class="comp-meta">glass pill · ativo = primary</span></header>
+      <div class="comp-stage stage-row">
+        <button style="display: inline-flex; align-items:center; gap:8px; padding: 8px 12px; background: var(--color-primary-soft); border: 1px solid var(--color-primary-500); border-radius: 999px; color: var(--color-primary-500); font-weight: 600; font-size: 13px"><svg class="icon-stroke" viewBox="0 0 24 24" style="width:14px;height:14px"><path d="M3 20l6-10 4 6 5-8 3 12z"/></svg> Relevo sombreado</button>
+        <button style="display: inline-flex; align-items:center; gap:8px; padding: 8px 12px; background: var(--overlay-glass); border: 1px solid var(--color-stroke); border-radius: 999px; color: var(--color-text-secondary); font-size: 13px"><svg class="icon-stroke" viewBox="0 0 24 24" style="width:14px;height:14px"><ellipse cx="12" cy="12" rx="9" ry="5"/><ellipse cx="12" cy="12" rx="5" ry="3"/></svg> Curvas de nível</button>
+      </div>
+    </section>
+
+    <!-- TOAST -->
+    <section id="toast" class="comp-block">
+      <header class="comp-head"><h2>Toast</h2><span class="comp-meta">success · warning · primary</span></header>
+      <div class="comp-stage" style="display: flex; flex-direction: column; gap: var(--space-3)">
+        <div class="toast toast-success">
+          <svg class="icon-stroke" style="color: var(--color-success); width: 20px; height: 20px" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+          <div><div class="toast-title">Relatório gerado</div><div class="toast-desc">SF-2401 v3 pronto. PDF disponível para download.</div></div>
+        </div>
+        <div class="toast">
+          <svg class="icon-stroke" style="color: var(--color-primary-500); width: 20px; height: 20px" viewBox="0 0 24 24"><path d="M12 2v4"/><circle cx="12" cy="14" r="8"/></svg>
+          <div><div class="toast-title">Agente respondeu</div><div class="toast-desc">2 novas premissas extraídas do seu briefing.</div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- EMPTY -->
+    <section id="empty" class="comp-block">
+      <header class="comp-head"><h2>Empty state</h2><span class="comp-meta">centered · ilustração lo-fi + CTA</span></header>
+      <div class="comp-stage">
+        <div class="empty">
+          <svg class="icon-stroke empty-icon" viewBox="0 0 24 24" style="width:48px; height:48px; color: var(--color-text-muted)"><path d="M12 21s-7-7.5-7-12a7 7 0 1 1 14 0c0 4.5-7 12-7 12z"/><circle cx="12" cy="9" r="2.5"/></svg>
+          <div class="empty-title">Nenhum terreno cadastrado</div>
+          <div class="empty-desc">Comece desenhando um polígono no mapa ou buscando um endereço.</div>
+          <a class="btn btn-primary btn-sm" href="cadastro-terreno.html">+ Novo terreno</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- DRAWER preview -->
+    <section id="drawer" class="comp-block">
+      <header class="comp-head"><h2>Drawer (preview)</h2><span class="comp-meta">overlay direito · usado em premissas detalhadas</span></header>
+      <div class="comp-stage" style="height: 280px; position: relative; overflow: hidden">
+        <div style="position: absolute; inset: 0; background: rgba(0,0,0,0.4)"></div>
+        <aside style="position: absolute; top: 0; right: 0; bottom: 0; width: 320px; background: var(--color-surface); border-left: 1px solid var(--color-stroke); padding: var(--space-5); display: flex; flex-direction: column; gap: var(--space-3); box-shadow: var(--shadow-lg)">
+          <div class="row-between">
+            <h3 style="font-size: var(--fs-md)">Premissa · Área construída</h3>
+            <button class="btn btn-ghost btn-sm">✕</button>
+          </div>
+          <p class="text-sm muted">Sugerida pelo agente com base no programa (3 dorm + 1 suíte + mez. 28 m²) e no CA 1,0 do zoneamento ZER-2.</p>
+          <div class="card" style="background: var(--color-surface-elevated)">
+            <div class="text-xs muted mono">VALOR SUGERIDO</div>
+            <div style="font-size: var(--fs-xl); font-weight: 700; margin: 4px 0">130 m²</div>
+            <span class="text-xs muted">Faixa: 95–165 m²</span>
+          </div>
+          <button class="btn btn-primary btn-sm" style="width: 100%; justify-content: center">Aceitar premissa</button>
+        </aside>
+      </div>
+    </section>
+
+  </main>
+</div>
+</body>
+</html>

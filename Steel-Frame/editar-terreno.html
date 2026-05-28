@@ -1,0 +1,750 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Editar terreno · Cumbica · SteelFrame GenIA</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700;900&family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/app.css">
+<style>
+  /* ============ Edit terrain — quiet, focused on shape ============ */
+  .edit-shell {
+    display: grid;
+    grid-template-columns: 1fr 360px;
+    gap: var(--space-4);
+    height: calc(100vh - var(--header-h) - var(--space-8));
+    min-height: 700px;
+  }
+
+  /* Map stage --------------------------------------------- */
+  .stage {
+    position: relative;
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    background: var(--color-surface);
+    border: 1px solid var(--color-stroke);
+  }
+  .stage .map-placeholder { height: 100%; }
+
+  /* Single compact toolbar — top-left, horizontal */
+  .stage-toolbar {
+    position: absolute; top: var(--space-3); left: var(--space-3);
+    display: flex; gap: 2px;
+    background: var(--overlay-glass);
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    padding: 4px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-stroke);
+    z-index: 5;
+  }
+  .stage-toolbar button {
+    height: 32px; padding: 0 10px;
+    display: inline-flex; align-items: center; gap: 6px;
+    border-radius: 5px;
+    color: var(--color-text-secondary);
+    font-size: var(--fs-xs); font-weight: var(--fw-medium);
+    transition: background .12s, color .12s;
+  }
+  .stage-toolbar button:hover { background: rgba(255,255,255,0.05); color: var(--color-text-primary); }
+  .stage-toolbar button.active { background: var(--color-primary-soft); color: var(--color-primary-500); }
+  .stage-toolbar button svg { width: 14px; height: 14px; }
+  .stage-toolbar .sep { width: 1px; background: var(--color-stroke); margin: 4px 4px; }
+
+  /* Layer pills — bottom-left, very compact */
+  .stage-layers {
+    position: absolute; bottom: var(--space-3); left: var(--space-3);
+    display: flex; gap: 4px; z-index: 4;
+    background: var(--overlay-glass);
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    padding: 4px;
+    border-radius: var(--radius-full);
+    border: 1px solid var(--color-stroke);
+  }
+  .stage-layers button {
+    height: 28px; padding: 0 12px;
+    border-radius: var(--radius-full);
+    font-size: var(--fs-xs); font-weight: var(--fw-medium);
+    color: var(--color-text-secondary);
+    transition: background .12s, color .12s;
+  }
+  .stage-layers button:hover { color: var(--color-text-primary); }
+  .stage-layers button.active { background: var(--color-primary-500); color: #fff; }
+
+  /* Zoom dock — bottom-right vertical */
+  .stage-zoom {
+    position: absolute; right: var(--space-3); bottom: var(--space-3);
+    display: flex; flex-direction: column;
+    background: var(--overlay-glass);
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    border: 1px solid var(--color-stroke);
+    border-radius: var(--radius-md);
+    z-index: 4;
+  }
+  .stage-zoom button {
+    width: 32px; height: 32px;
+    display: grid; place-items: center;
+    color: var(--color-text-secondary);
+    transition: background .12s, color .12s;
+  }
+  .stage-zoom button:hover { background: rgba(255,255,255,0.05); color: var(--color-text-primary); }
+  .stage-zoom .lvl {
+    font-family: var(--font-mono); font-size: 10px;
+    text-align: center; padding: 2px 0;
+    color: var(--color-text-secondary);
+    border-top: 1px solid var(--color-stroke);
+    border-bottom: 1px solid var(--color-stroke);
+  }
+
+  /* Scale readout — bottom-right above zoom */
+  .stage-scale {
+    position: absolute; bottom: var(--space-3); right: 60px;
+    display: flex; align-items: center; gap: 6px;
+    font-family: var(--font-mono); font-size: 10px;
+    color: var(--color-text-secondary);
+    background: var(--overlay-glass);
+    backdrop-filter: blur(8px);
+    padding: 6px 10px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--color-stroke);
+    z-index: 4;
+  }
+  .stage-scale .bar { width: 50px; height: 2px; background: var(--color-text-primary); }
+
+  /* Hint chip — small, top-right, dismissible feel */
+  .stage-hint {
+    position: absolute; top: var(--space-3); right: var(--space-3);
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--overlay-glass);
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    border: 1px solid var(--color-stroke);
+    border-radius: var(--radius-full);
+    padding: 6px 12px;
+    font-size: var(--fs-xs);
+    color: var(--color-text-secondary);
+    z-index: 4;
+  }
+  .stage-hint kbd {
+    font-family: var(--font-mono); font-size: 10px;
+    background: var(--color-background);
+    border: 1px solid var(--color-stroke-input);
+    border-radius: 3px; padding: 1px 5px;
+    color: var(--color-text-primary);
+  }
+
+  /* Polygon — slightly more confident than the new flow */
+  .poly { fill: rgba(215,32,66,0.16); stroke: #D72042; stroke-width: 2.5; }
+  .vertex {
+    fill: #fff; stroke: #D72042; stroke-width: 2.5;
+    cursor: grab;
+    transition: r .12s, fill .12s;
+  }
+  .vertex:hover { fill: #D72042; r: 10; }
+  .vertex.active { fill: #FF7524; stroke: #fff; r: 11; }
+  .vlabel {
+    font-family: var(--font-mono); font-size: 10px; font-weight: 700;
+    fill: #fff; pointer-events: none;
+    paint-order: stroke; stroke: rgba(0,0,0,0.65); stroke-width: 3;
+  }
+  .edge-chip { cursor: pointer; }
+  .edge-chip rect {
+    fill: rgba(18,18,18,0.92); stroke: var(--color-stroke-input);
+    stroke-width: 1; rx: 4;
+    transition: stroke .12s, fill .12s;
+  }
+  .edge-chip:hover rect { stroke: var(--color-primary-500); fill: rgba(215,32,66,0.16); }
+  .edge-chip text {
+    fill: #fff; font-family: var(--font-mono); font-size: 10px; font-weight: 600;
+    pointer-events: none; text-anchor: middle; dominant-baseline: central;
+  }
+
+  /* Inline edge editor popover */
+  .edge-pop {
+    position: absolute; z-index: 6;
+    background: var(--color-surface-elevated);
+    border: 1px solid var(--color-primary-500);
+    border-radius: var(--radius-md);
+    padding: 10px 12px;
+    box-shadow: var(--shadow-md);
+    min-width: 230px;
+    display: none;
+  }
+  .edge-pop.open { display: block; }
+  .edge-pop .ep-title {
+    font-family: var(--font-mono); font-size: 10px;
+    color: var(--color-text-secondary);
+    text-transform: uppercase; letter-spacing: 0.06em;
+    margin-bottom: 6px;
+  }
+  .edge-pop .ep-row { display: flex; gap: 8px; align-items: center; }
+  .edge-pop input {
+    flex: 1; background: var(--color-background);
+    border: 1px solid var(--color-stroke-input);
+    color: var(--color-text-primary); border-radius: var(--radius-sm);
+    padding: 7px 10px;
+    font-family: var(--font-mono); font-size: var(--fs-body); font-weight: 600;
+    outline: none;
+  }
+  .edge-pop input:focus { border-color: var(--color-primary-500); }
+  .edge-pop .ep-unit { font-family: var(--font-mono); font-size: 12px; color: var(--color-text-secondary); }
+
+  /* ============ Right panel ============ */
+  .panel {
+    background: var(--color-surface);
+    border: 1px solid var(--color-stroke);
+    border-radius: var(--radius-md);
+    padding: var(--space-5);
+    display: flex; flex-direction: column;
+    gap: var(--space-5);
+    overflow-y: auto;
+  }
+  .panel-head h2 { font-size: var(--fs-lg); margin: 0 0 4px; }
+  .panel-head .sub { font-size: var(--fs-xs); color: var(--color-text-secondary); }
+  .panel-section { display: flex; flex-direction: column; gap: 8px; }
+  .panel-section .label-row {
+    display: flex; justify-content: space-between; align-items: baseline;
+  }
+  .panel-section .label-row .lbl { font-size: var(--fs-sm); font-weight: var(--fw-semibold); }
+  .panel-section .label-row .meta { font-family: var(--font-mono); font-size: 10px; color: var(--color-text-secondary); }
+
+  /* Sides list — cleaner than the cadastro version */
+  .sides { display: flex; flex-direction: column; gap: 4px; }
+  .side {
+    display: grid;
+    grid-template-columns: 26px 1fr 86px;
+    gap: 10px; align-items: center;
+    background: var(--color-surface-elevated);
+    border: 1px solid var(--color-stroke);
+    border-radius: var(--radius-md);
+    padding: 8px 10px;
+    transition: border-color .12s, background .12s;
+  }
+  .side:hover { border-color: var(--color-stroke-input); }
+  .side.active {
+    border-color: var(--color-primary-500);
+    background: rgba(215,32,66,0.05);
+  }
+  .side .tag {
+    display: grid; place-items: center;
+    width: 26px; height: 22px; border-radius: 4px;
+    background: rgba(215,32,66,0.15); color: var(--color-primary-500);
+    font-family: var(--font-mono); font-size: 10px; font-weight: 700;
+  }
+  .side .name {
+    font-family: var(--font-mono); font-size: 11px;
+    color: var(--color-text-secondary);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .side .inp { position: relative; }
+  .side .inp input {
+    width: 100%; background: var(--color-background);
+    border: 1px solid var(--color-stroke-input);
+    color: var(--color-text-primary); border-radius: var(--radius-sm);
+    padding: 6px 24px 6px 8px;
+    font-family: var(--font-mono); font-size: var(--fs-body); font-weight: 600;
+    text-align: right; outline: none;
+  }
+  .side .inp input:focus { border-color: var(--color-primary-500); }
+  .side .inp::after {
+    content: 'm'; position: absolute;
+    right: 8px; top: 50%; transform: translateY(-50%);
+    font-family: var(--font-mono); font-size: 10px;
+    color: var(--color-text-secondary);
+    pointer-events: none;
+  }
+
+  /* Live metrics — single row, compact */
+  .metrics {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+  }
+  .m {
+    background: var(--color-surface-elevated);
+    border: 1px solid var(--color-stroke);
+    border-radius: var(--radius-md);
+    padding: 10px 12px;
+  }
+  .m .lab {
+    font-family: var(--font-mono); font-size: 9px;
+    color: var(--color-text-secondary);
+    text-transform: uppercase; letter-spacing: 0.06em;
+    margin-bottom: 4px;
+  }
+  .m .val {
+    font-family: var(--font-mono); font-size: var(--fs-md);
+    font-weight: var(--fw-semibold); line-height: 1;
+  }
+  .m .val small { font-size: 10px; color: var(--color-text-secondary); font-weight: 500; margin-left: 2px; }
+  .m.highlight { border-color: var(--color-primary-500); }
+  .m.highlight .val { color: var(--color-primary-500); }
+
+  /* Vertex card */
+  .vcard {
+    background: var(--color-surface-elevated);
+    border: 1px solid var(--color-stroke);
+    border-radius: var(--radius-md);
+    padding: 12px;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .vcard .vh { display: flex; justify-content: space-between; align-items: center; }
+  .vcard .vh .lbl { font-size: var(--fs-sm); font-weight: var(--fw-semibold); }
+  .vtabs { display: flex; gap: 4px; }
+  .vtab {
+    width: 28px; height: 24px; border-radius: 4px;
+    display: grid; place-items: center;
+    background: var(--color-background);
+    color: var(--color-text-secondary);
+    font-family: var(--font-mono); font-size: 10px; font-weight: 700;
+    border: 1px solid var(--color-stroke);
+  }
+  .vtab.active {
+    background: var(--color-primary-soft);
+    color: var(--color-primary-500);
+    border-color: var(--color-primary-500);
+  }
+  .vcoord { display: grid; grid-template-columns: 50px 1fr; gap: 8px; align-items: center; }
+  .vcoord label {
+    font-family: var(--font-mono); font-size: 10px;
+    color: var(--color-text-secondary);
+    text-transform: uppercase; letter-spacing: 0.06em;
+  }
+  .vcoord input {
+    background: var(--color-background);
+    border: 1px solid var(--color-stroke-input);
+    color: var(--color-text-primary); border-radius: var(--radius-sm);
+    padding: 6px 8px;
+    font-family: var(--font-mono); font-size: 12px;
+    outline: none;
+  }
+  .vcoord input:focus { border-color: var(--color-primary-500); }
+  .vcard .vfoot {
+    display: flex; justify-content: space-between;
+    font-family: var(--font-mono); font-size: 10px;
+    color: var(--color-text-secondary);
+    padding-top: 8px; border-top: 1px dashed var(--color-stroke);
+  }
+  .vcard .vfoot kbd {
+    font-family: var(--font-mono); font-size: 10px;
+    background: var(--color-background);
+    border: 1px solid var(--color-stroke-input);
+    border-radius: 3px; padding: 1px 5px;
+    color: var(--color-text-primary);
+  }
+
+  /* Footer action bar */
+  .actions {
+    margin-top: auto;
+    display: flex; gap: 8px;
+    padding-top: var(--space-4);
+    border-top: 1px solid var(--color-stroke);
+  }
+  .actions .btn { flex: 1; justify-content: center; }
+
+  /* Inline change badge in header */
+  .changed-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-family: var(--font-mono); font-size: 10px;
+    color: var(--color-warning);
+    background: var(--color-warning-soft);
+    border: 1px solid rgba(234,179,8,0.3);
+    border-radius: var(--radius-full);
+    padding: 3px 10px;
+  }
+  .changed-pill .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--color-warning); }
+
+  @media (max-width: 1100px) {
+    .edit-shell { grid-template-columns: 1fr; height: auto; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- ============ Sidebar ============ -->
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-mark">DT</div>
+      <div class="brand-text">
+        <span class="brand-name">SteelFrame GenIA</span>
+        <span class="brand-sub">Distrito Tecnológico</span>
+      </div>
+    </div>
+    <div class="sidebar-section">
+      <span class="sidebar-section-label">Operação</span>
+      <a class="nav-item" href="home.html">
+        <svg class="icon-stroke nav-icon" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+        <span>Meus terrenos</span>
+        <span class="nav-badge">12</span>
+      </a>
+      <a class="nav-item active" href="terreno.html">
+        <svg class="icon-stroke nav-icon" viewBox="0 0 24 24"><path d="M12 21s-7-7.5-7-12a7 7 0 1 1 14 0c0 4.5-7 12-7 12z"/><circle cx="12" cy="9" r="2.5"/></svg>
+        <span>Terreno atual</span>
+      </a>
+      <a class="nav-item" href="cadastro-terreno.html">
+        <svg class="icon-stroke nav-icon" viewBox="0 0 24 24"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+        <span>Novo terreno</span>
+      </a>
+      <a class="nav-item" href="briefing.html">
+        <svg class="icon-stroke nav-icon" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 4.5-7.79L3 7"/><path d="M3 3v4h4"/></svg>
+        <span>Briefings ativos</span>
+        <span class="nav-badge">3</span>
+      </a>
+      <a class="nav-item" href="relatorio.html">
+        <svg class="icon-stroke nav-icon" viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="14 3 14 9 20 9"/></svg>
+        <span>Relatórios</span>
+      </a>
+    </div>
+    <div class="sidebar-section">
+      <span class="sidebar-section-label">Referências</span>
+      <a class="nav-item" href="base-conhecimento.html">
+        <svg class="icon-stroke nav-icon" viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+        <span>Base de conhecimento</span>
+      </a>
+      <a class="nav-item" href="components.html">
+        <svg class="icon-stroke nav-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <span>Sistema de design</span>
+      </a>
+    </div>
+    <div class="sidebar-user">
+      <div class="avatar">RC</div>
+      <div class="user-meta">
+        <span class="user-name">Renata Couto</span>
+        <span class="user-role">Eng. Civil · SteelFrame BR</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ============ Main ============ -->
+  <main class="main">
+    <header class="page-header">
+      <div class="stack-sm">
+        <nav class="breadcrumb">
+          <a href="home.html">Meus terrenos</a>
+          <span class="sep">/</span>
+          <a href="terreno.html">Cumbica · 5.480 m²</a>
+          <span class="sep">/</span>
+          <span class="crumb-current">Editar polígono</span>
+        </nav>
+        <div class="page-title-row">
+          <h1>Editar polígono e medidas</h1>
+          <span class="changed-pill" id="changedPill" style="display:none"><span class="dot"></span>Alterações não salvas</span>
+        </div>
+        <p class="text-sm muted" style="margin-top: 4px">
+          Av. Monteiro Lobato, 4.820 · Cumbica · Guarulhos / SP · ZPI-1
+        </p>
+      </div>
+      <div class="row">
+        <a class="btn btn-ghost" href="terreno.html">Descartar</a>
+        <button class="btn btn-primary" id="btnSave">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+          Salvar alterações
+        </button>
+      </div>
+    </header>
+
+    <div class="edit-shell">
+      <!-- ============ Map stage ============ -->
+      <div class="stage">
+        <div class="map-placeholder show-hillshade show-contours" style="height:100%">
+          <div class="map-grid-overlay"></div>
+          <div class="map-hillshade"></div>
+          <div class="map-contours"></div>
+
+          <svg id="polySvg" style="position:absolute; inset:0; width:100%; height:100%;" viewBox="0 0 1000 700" preserveAspectRatio="none">
+            <!-- Lot polygon -->
+            <path class="poly" d="M 380 220 L 620 215 L 640 470 L 360 480 Z" />
+
+            <!-- Edge chips -->
+            <g class="edge-chip" data-edge="S1" transform="translate(500 196)">
+              <rect x="-30" y="-11" width="60" height="22"/>
+              <text x="0" y="0">68,0 m</text>
+            </g>
+            <g class="edge-chip" data-edge="S2" transform="translate(656 342)">
+              <rect x="-30" y="-11" width="60" height="22"/>
+              <text x="0" y="0">80,5 m</text>
+            </g>
+            <g class="edge-chip" data-edge="S3" transform="translate(500 504)">
+              <rect x="-30" y="-11" width="60" height="22"/>
+              <text x="0" y="0">68,4 m</text>
+            </g>
+            <g class="edge-chip" data-edge="S4" transform="translate(346 350)">
+              <rect x="-30" y="-11" width="60" height="22"/>
+              <text x="0" y="0">81,1 m</text>
+            </g>
+
+            <!-- Vertices -->
+            <g><circle class="vertex active" data-vertex="V1" cx="380" cy="220" r="9"/><text class="vlabel" x="360" y="208">V1</text></g>
+            <g><circle class="vertex" data-vertex="V2" cx="620" cy="215" r="8"/><text class="vlabel" x="628" y="208">V2</text></g>
+            <g><circle class="vertex" data-vertex="V3" cx="640" cy="470" r="8"/><text class="vlabel" x="648" y="492">V3</text></g>
+            <g><circle class="vertex" data-vertex="V4" cx="360" cy="480" r="8"/><text class="vlabel" x="328" y="492">V4</text></g>
+          </svg>
+
+          <div class="edge-pop" id="edgePop">
+            <div class="ep-title" id="epTitle">Lado S1 · V1 → V2</div>
+            <div class="ep-row">
+              <input type="text" id="epInput" value="68,0" />
+              <span class="ep-unit">m</span>
+              <button class="btn btn-primary btn-sm" id="epApply" style="padding: 5px 10px">Aplicar</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Single horizontal toolbar -->
+        <div class="stage-toolbar">
+          <button class="active" data-tool="move"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9v6"/><path d="M19 9v6"/><path d="M9 5h6"/><path d="M9 19h6"/><circle cx="12" cy="12" r="2.5"/></svg>Mover</button>
+          <button data-tool="add"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v8"/><path d="M8 12h8"/></svg>Add vértice</button>
+          <button data-tool="cut"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18 9 8l4 6 5-8 3 5"/><path d="M3 21h18"/></svg>Corte AA'</button>
+          <div class="sep"></div>
+          <button id="btnFit" title="Ajustar (F)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V5a1 1 0 0 1 1-1h4"/><path d="M20 9V5a1 1 0 0 0-1-1h-4"/><path d="M4 15v4a1 1 0 0 0 1 1h4"/><path d="M20 15v4a1 1 0 0 1-1 1h-4"/></svg>Ajustar</button>
+        </div>
+
+        <!-- Hint -->
+        <div class="stage-hint">
+          <span>Arraste vértices · <kbd>F</kbd> ajusta · <kbd>Del</kbd> remove</span>
+        </div>
+
+        <!-- Layers -->
+        <div class="stage-layers">
+          <button class="active" data-layer="satellite">Satélite</button>
+          <button data-layer="streets">Ruas</button>
+          <button class="active" data-layer="hillshade">Relevo</button>
+          <button class="active" data-layer="contours">Curvas</button>
+        </div>
+
+        <!-- Scale -->
+        <div class="stage-scale">
+          <span class="bar"></span><span>20 m</span>
+        </div>
+
+        <!-- Zoom -->
+        <div class="stage-zoom">
+          <button id="btnZin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+          <div class="lvl" id="zlvl">z 19</div>
+          <button id="btnZout"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px"><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+        </div>
+      </div>
+
+      <!-- ============ Right panel ============ -->
+      <aside class="panel">
+        <div class="panel-head">
+          <h2>Geometria do lote</h2>
+          <p class="sub">Edite as medidas dos lados ou as coordenadas dos vértices. Área e perímetro recalculam em tempo real.</p>
+        </div>
+
+        <!-- Live metrics — at top, gives confidence to edit -->
+        <div class="metrics">
+          <div class="m highlight">
+            <div class="lab">Área</div>
+            <div class="val" id="mArea">5.480 <small>m²</small></div>
+          </div>
+          <div class="m">
+            <div class="lab">Perímetro</div>
+            <div class="val" id="mPer">298 <small>m</small></div>
+          </div>
+          <div class="m">
+            <div class="lab">Frente</div>
+            <div class="val" id="mFront">68,0 <small>m</small></div>
+          </div>
+        </div>
+
+        <!-- Sides editor -->
+        <div class="panel-section">
+          <div class="label-row">
+            <span class="lbl">Medidas dos lados</span>
+            <span class="meta">clique também no mapa</span>
+          </div>
+          <div class="sides" id="sides">
+            <div class="side active" data-edge="S1">
+              <span class="tag">S1</span>
+              <span class="name">V1 → V2 · frente</span>
+              <span class="inp"><input type="text" value="68,0" data-edge-input="S1" /></span>
+            </div>
+            <div class="side" data-edge="S2">
+              <span class="tag">S2</span>
+              <span class="name">V2 → V3 · direita</span>
+              <span class="inp"><input type="text" value="80,5" data-edge-input="S2" /></span>
+            </div>
+            <div class="side" data-edge="S3">
+              <span class="tag">S3</span>
+              <span class="name">V3 → V4 · fundo</span>
+              <span class="inp"><input type="text" value="68,4" data-edge-input="S3" /></span>
+            </div>
+            <div class="side" data-edge="S4">
+              <span class="tag">S4</span>
+              <span class="name">V4 → V1 · esquerda</span>
+              <span class="inp"><input type="text" value="81,1" data-edge-input="S4" /></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Vertex coords -->
+        <div class="panel-section">
+          <div class="label-row">
+            <span class="lbl">Vértice selecionado</span>
+            <span class="meta">ajuste fino GPS</span>
+          </div>
+          <div class="vcard">
+            <div class="vh">
+              <span class="lbl" id="vTitle">V1 · frente esquerda</span>
+              <div class="vtabs" id="vtabs">
+                <button class="vtab active" data-vertex="V1">V1</button>
+                <button class="vtab" data-vertex="V2">V2</button>
+                <button class="vtab" data-vertex="V3">V3</button>
+                <button class="vtab" data-vertex="V4">V4</button>
+              </div>
+            </div>
+            <div class="vcoord"><label>Lat</label><input type="text" value="−23.43562" id="vLat" /></div>
+            <div class="vcoord"><label>Lng</label><input type="text" value="−46.47318" id="vLng" /></div>
+            <div class="vfoot">
+              <span><kbd>Del</kbd> remove</span>
+              <span><kbd>A</kbd> alinhar paralelas</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="actions">
+          <a class="btn btn-secondary btn-sm" href="terreno.html">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 14 4 9 9 4"/><path d="M20 20v-7a4 4 0 0 0-4-4H4"/></svg>
+            Cancelar
+          </a>
+          <button class="btn btn-primary btn-sm" id="btnSave2">
+            Salvar alterações
+          </button>
+        </div>
+      </aside>
+    </div>
+  </main>
+</div>
+
+<script>
+  // Layer pills
+  const stage = document.querySelector('.map-placeholder');
+  document.querySelectorAll('.stage-layers button').forEach(b => {
+    b.addEventListener('click', () => {
+      b.classList.toggle('active');
+      const l = b.dataset.layer;
+      if (l === 'hillshade') stage.classList.toggle('show-hillshade');
+      if (l === 'contours') stage.classList.toggle('show-contours');
+    });
+  });
+  // Tool tabs
+  document.querySelectorAll('.stage-toolbar button[data-tool]').forEach(b => {
+    b.addEventListener('click', () => {
+      document.querySelectorAll('.stage-toolbar button[data-tool]').forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+    });
+  });
+
+  // Dirty indicator
+  const changedPill = document.getElementById('changedPill');
+  function markDirty() { changedPill.style.display = 'inline-flex'; }
+
+  // Edge editing
+  const pop = document.getElementById('edgePop');
+  const epTitle = document.getElementById('epTitle');
+  const epInput = document.getElementById('epInput');
+  const epApply = document.getElementById('epApply');
+  const stageEl = document.querySelector('.stage');
+  const edgeNames = { S1: 'V1 → V2 · frente', S2: 'V2 → V3 · direita', S3: 'V3 → V4 · fundo', S4: 'V4 → V1 · esquerda' };
+  let activeEdge = null;
+  function openPop(edgeId, rect) {
+    activeEdge = edgeId;
+    epTitle.textContent = `Lado ${edgeId} · ${edgeNames[edgeId]}`;
+    const inp = document.querySelector(`[data-edge-input="${edgeId}"]`);
+    epInput.value = inp ? inp.value : '';
+    const box = stageEl.getBoundingClientRect();
+    pop.style.left = (rect.left - box.left + rect.width/2 - 115) + 'px';
+    pop.style.top = (rect.top - box.top - 80) + 'px';
+    pop.classList.add('open');
+    document.querySelectorAll('.side').forEach(r => r.classList.toggle('active', r.dataset.edge === edgeId));
+    setTimeout(() => epInput.focus(), 30);
+  }
+  function closePop() { pop.classList.remove('open'); activeEdge = null; }
+  function applyPop() {
+    if (!activeEdge) return;
+    const v = epInput.value.trim();
+    const chip = document.querySelector(`.edge-chip[data-edge="${activeEdge}"] text`);
+    const inp = document.querySelector(`[data-edge-input="${activeEdge}"]`);
+    if (chip) chip.textContent = `${v} m`;
+    if (inp) inp.value = v;
+    if (activeEdge === 'S1') document.getElementById('mFront').innerHTML = `${v} <small>m</small>`;
+    markDirty();
+    closePop();
+  }
+  document.querySelectorAll('.edge-chip').forEach(c => {
+    c.addEventListener('click', e => { e.stopPropagation(); openPop(c.dataset.edge, c.getBoundingClientRect()); });
+  });
+  document.querySelectorAll('[data-edge-input]').forEach(inp => {
+    inp.addEventListener('input', () => {
+      const id = inp.dataset.edgeInput;
+      const chip = document.querySelector(`.edge-chip[data-edge="${id}"] text`);
+      if (chip) chip.textContent = `${inp.value} m`;
+      if (id === 'S1') document.getElementById('mFront').innerHTML = `${inp.value} <small>m</small>`;
+      markDirty();
+    });
+    inp.addEventListener('focus', () => {
+      document.querySelectorAll('.side').forEach(r => r.classList.toggle('active', r.dataset.edge === inp.dataset.edgeInput));
+    });
+  });
+  epApply.addEventListener('click', applyPop);
+  epInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter') applyPop();
+    if (e.key === 'Escape') closePop();
+  });
+  document.addEventListener('click', e => {
+    if (!pop.contains(e.target) && !e.target.closest('.edge-chip')) closePop();
+  });
+
+  // Vertex selection
+  const vNames = { V1: 'V1 · frente esquerda', V2: 'V2 · frente direita', V3: 'V3 · fundo direita', V4: 'V4 · fundo esquerda' };
+  const vCoords = {
+    V1: ['−23.43562', '−46.47318'],
+    V2: ['−23.43568', '−46.47242'],
+    V3: ['−23.43641', '−46.47236'],
+    V4: ['−23.43638', '−46.47312'],
+  };
+  function selectVertex(vid) {
+    document.querySelectorAll('circle.vertex').forEach(c => c.classList.toggle('active', c.dataset.vertex === vid));
+    document.querySelectorAll('.vtab').forEach(t => t.classList.toggle('active', t.dataset.vertex === vid));
+    document.getElementById('vTitle').textContent = vNames[vid];
+    document.getElementById('vLat').value = vCoords[vid][0];
+    document.getElementById('vLng').value = vCoords[vid][1];
+  }
+  document.querySelectorAll('circle.vertex').forEach(c => {
+    c.addEventListener('click', e => { e.stopPropagation(); selectVertex(c.dataset.vertex); });
+  });
+  document.querySelectorAll('.vtab').forEach(t => {
+    t.addEventListener('click', () => selectVertex(t.dataset.vertex));
+  });
+  ['vLat','vLng'].forEach(id => document.getElementById(id).addEventListener('input', markDirty));
+
+  // Zoom
+  let zoom = 19;
+  const zlvl = document.getElementById('zlvl');
+  function setZoom(z) {
+    zoom = Math.max(14, Math.min(22, z));
+    zlvl.textContent = 'z ' + zoom;
+    const s = 1 + (zoom - 19) * 0.08;
+    stage.style.transform = `scale(${s})`;
+    stage.style.transformOrigin = 'center';
+  }
+  document.getElementById('btnZin').addEventListener('click', () => setZoom(zoom + 1));
+  document.getElementById('btnZout').addEventListener('click', () => setZoom(zoom - 1));
+  document.getElementById('btnFit').addEventListener('click', () => setZoom(19));
+
+  // Keyboard
+  document.addEventListener('keydown', e => {
+    if (e.target.matches('input, textarea')) return;
+    if (e.key === '+' || e.key === '=') setZoom(zoom + 1);
+    if (e.key === '-' || e.key === '_') setZoom(zoom - 1);
+    if (e.key === 'f' || e.key === 'F') setZoom(19);
+  });
+
+  // Save → back to hub
+  function save() { window.location.href = 'terreno.html'; }
+  document.getElementById('btnSave').addEventListener('click', save);
+  document.getElementById('btnSave2').addEventListener('click', save);
+</script>
+</body>
+</html>

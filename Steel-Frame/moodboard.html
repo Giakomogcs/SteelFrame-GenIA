@@ -1,0 +1,360 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Moodboard &amp; tokens · SteelFrame GenIA</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700;900&family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/app.css">
+<style>
+  .mood-page { max-width: 1320px; margin: 0 auto; padding: var(--space-12) var(--space-6); }
+  .mood-head { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: var(--space-12); flex-wrap: wrap; gap: var(--space-4); }
+  .mood-head h1 { font-family: var(--font-display); font-size: var(--fs-3xl); font-weight: var(--fw-bold); letter-spacing: -0.02em; line-height: 1; margin-bottom: var(--space-4); }
+  .mood-head .lede { font-size: var(--fs-lg); color: var(--color-text-secondary); max-width: 60ch; }
+
+  .mood-section { margin-bottom: var(--space-16); }
+  .mood-section-head {
+    display: flex; align-items: baseline; gap: var(--space-3);
+    margin-bottom: var(--space-6);
+    border-bottom: 1px solid var(--color-stroke);
+    padding-bottom: var(--space-3);
+  }
+  .mood-section-head .num {
+    font-family: var(--font-mono);
+    color: var(--color-primary-500);
+    font-size: var(--fs-xs);
+    letter-spacing: 0.1em;
+  }
+  .mood-section-head h2 { font-size: var(--fs-xl); font-weight: var(--fw-semibold); flex: 1; }
+  .mood-section-head .meta { font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--color-text-secondary); }
+
+  /* Mood references grid */
+  .ref-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-4); }
+  @media (max-width: 920px) { .ref-grid { grid-template-columns: repeat(2, 1fr); } }
+  .ref-card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-stroke);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    aspect-ratio: 4/5;
+    display: flex; flex-direction: column;
+  }
+  .ref-visual { flex: 1; position: relative; }
+  .ref-card .ref-meta { padding: var(--space-3) var(--space-4); border-top: 1px solid var(--color-stroke); }
+  .ref-card .ref-name { font-size: var(--fs-body); font-weight: var(--fw-semibold); }
+  .ref-card .ref-tag { font-size: var(--fs-xs); color: var(--color-text-secondary); font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 0.05em; }
+
+  .ref-monocle {
+    background:
+      radial-gradient(ellipse at 30% 40%, rgba(215, 32, 66, 0.30), transparent 50%),
+      linear-gradient(180deg, #0a0a0c, #1a1a1c);
+  }
+  .ref-monocle::after {
+    content: 'INDUSTRIAL DARK'; position: absolute; bottom: 12px; left: 12px;
+    font-family: var(--font-display); font-weight: 900; color: white; font-size: 28px;
+    letter-spacing: -0.04em; line-height: 0.9; max-width: 60%;
+  }
+  .ref-mono2 {
+    background:
+      linear-gradient(135deg, rgba(255, 117, 36, 0.20), transparent 60%),
+      #1d1c22;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px);
+    background-size: 32px 32px;
+  }
+  .ref-mono2::after { content: 'GRID + AÇO'; position: absolute; bottom: 12px; left: 12px; font-family: var(--font-mono); color: var(--color-primary-500); font-size: 14px; letter-spacing: 0.1em; }
+
+  .ref-mono3 { background: radial-gradient(circle at 70% 30%, #2a2520, #0a0a0c); }
+  .ref-mono3::before {
+    content: ''; position: absolute; inset: 0;
+    background:
+      radial-gradient(ellipse 60% 40% at 50% 50%, transparent 30%, rgba(255, 117, 36, 0.40) 30.5%, transparent 32%),
+      radial-gradient(ellipse 50% 32% at 50% 50%, transparent 40%, rgba(255, 117, 36, 0.35) 40.5%, transparent 42%);
+  }
+  .ref-mono3::after { content: 'TOPOGRAFIA'; position: absolute; bottom: 12px; left: 12px; font-family: var(--font-mono); color: rgba(255, 117, 36, 0.9); font-size: 14px; letter-spacing: 0.1em; }
+
+  .ref-mono4 {
+    background:
+      linear-gradient(135deg, rgba(215, 32, 66, 0.4), rgba(138, 25, 58, 0.4)),
+      #1a1a1c;
+  }
+  .ref-mono4::after {
+    content: 'SENAI · DT'; position: absolute; bottom: 12px; left: 12px;
+    font-family: var(--font-display); font-weight: 900; font-size: 32px; color: white; letter-spacing: -0.03em;
+  }
+
+  /* Color palette */
+  .palette { display: grid; grid-template-columns: repeat(6, 1fr); gap: var(--space-3); }
+  @media (max-width: 920px) { .palette { grid-template-columns: repeat(3, 1fr); } }
+  .swatch {
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    border: 1px solid var(--color-stroke);
+  }
+  .swatch-chip { aspect-ratio: 1/1; }
+  .swatch-meta { padding: var(--space-3); background: var(--color-surface); }
+  .swatch-name { font-size: var(--fs-sm); font-weight: var(--fw-semibold); margin-bottom: 2px; }
+  .swatch-hex { font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--color-text-secondary); }
+
+  /* Type spec */
+  .type-spec { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-6); }
+  @media (max-width: 920px) { .type-spec { grid-template-columns: 1fr; } }
+  .type-card { background: var(--color-surface); border: 1px solid var(--color-stroke); border-radius: var(--radius-md); padding: var(--space-6); }
+  .type-card .type-tag { font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--color-primary-500); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: var(--space-4); }
+  .type-card .sample-3xl { font-family: var(--font-display); font-size: 56px; font-weight: 900; line-height: 0.9; letter-spacing: -0.03em; margin-bottom: var(--space-4); }
+  .type-card .sample-2xl { font-family: var(--font-display); font-size: 32px; font-weight: 700; line-height: 1.1; margin-bottom: var(--space-3); }
+  .type-card .sample-body { font-size: var(--fs-md); line-height: 1.55; color: var(--color-text-secondary); margin-bottom: var(--space-4); max-width: 50ch; }
+  .type-card .sample-mono { font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--color-text-primary); }
+  .type-card .specs { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2); font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--color-text-secondary); margin-top: var(--space-4); padding-top: var(--space-4); border-top: 1px solid var(--color-stroke); }
+
+  /* Spacing & radius display */
+  .spec-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-4); }
+  @media (max-width: 920px) { .spec-grid { grid-template-columns: repeat(2, 1fr); } }
+  .spec-card { background: var(--color-surface); border: 1px solid var(--color-stroke); border-radius: var(--radius-md); padding: var(--space-4); }
+  .spec-name { font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: var(--space-3); }
+  .spec-demo { background: var(--color-primary-500); }
+  .spec-value { font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--color-text-primary); margin-top: var(--space-3); font-weight: var(--fw-semibold); }
+
+  /* Code block */
+  .code-block {
+    background: #0c0c0e;
+    border: 1px solid var(--color-stroke);
+    border-radius: var(--radius-md);
+    padding: var(--space-5);
+    overflow-x: auto;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    line-height: 1.6;
+    color: #c2c2c2;
+  }
+  .code-block .tk { color: var(--color-primary-500); }
+  .code-block .vl { color: #FF7524; }
+  .code-block .co { color: var(--color-text-muted); }
+
+  /* Principles */
+  .principles { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-4); }
+  @media (max-width: 920px) { .principles { grid-template-columns: 1fr; } }
+  .principle {
+    padding: var(--space-5);
+    border: 1px solid var(--color-stroke);
+    border-radius: var(--radius-md);
+    background: var(--color-surface);
+  }
+  .principle .num {
+    font-family: var(--font-mono);
+    font-size: var(--fs-2xl);
+    font-weight: var(--fw-bold);
+    color: var(--color-primary-500);
+    line-height: 1;
+    margin-bottom: var(--space-3);
+  }
+  .principle h3 { font-size: var(--fs-md); margin-bottom: var(--space-2); }
+  .principle p { font-size: var(--fs-sm); color: var(--color-text-secondary); line-height: 1.6; }
+
+  .back-link {
+    display: inline-flex; align-items: center; gap: 6px;
+    color: var(--color-text-secondary);
+    font-size: var(--fs-sm);
+    margin-bottom: var(--space-4);
+    font-family: var(--font-mono);
+  }
+  .back-link:hover { color: var(--color-primary-500); }
+</style>
+</head>
+<body>
+<div class="mood-page">
+  <a class="back-link" href="index.html">← Voltar ao índice</a>
+  <header class="mood-head">
+    <div>
+      <span class="text-xs muted mono" style="text-transform:uppercase; letter-spacing:0.1em">DESIGN SYSTEM · v1.0 · 28/mai/2026</span>
+      <h1>SteelFrame GenIA<br><span style="color: var(--color-primary-500)">Premium engineering tool</span></h1>
+      <p class="lede">Identidade industrial-tech do SENAI Distrito Tecnológico elevada ao nível de ferramenta sênior de engenharia. Escuro por padrão, vermelho institucional como único acento, monoespaçada para tudo que é número.</p>
+    </div>
+    <div class="row" style="gap: var(--space-2)">
+      <span class="pill pill-primary"><span class="dot"></span>Distrito Tecnológico</span>
+      <span class="pill pill-neutral"><span class="dot"></span>Dark-first</span>
+    </div>
+  </header>
+
+  <!-- 01 · Moodboard -->
+  <section class="mood-section">
+    <header class="mood-section-head">
+      <span class="num">01</span>
+      <h2>Moodboard visual</h2>
+      <span class="meta">Industrial · tech · engenharia · brasileiro</span>
+    </header>
+    <div class="ref-grid">
+      <article class="ref-card">
+        <div class="ref-visual ref-monocle"></div>
+        <div class="ref-meta"><div class="ref-name">Linear / Vercel</div><div class="ref-tag">Dark · system fonts · density</div></div>
+      </article>
+      <article class="ref-card">
+        <div class="ref-visual ref-mono2"></div>
+        <div class="ref-meta"><div class="ref-name">Datadog dashboard</div><div class="ref-tag">Grid · cards · mono numerics</div></div>
+      </article>
+      <article class="ref-card">
+        <div class="ref-visual ref-mono3"></div>
+        <div class="ref-meta"><div class="ref-name">Mapbox topography</div><div class="ref-tag">Hillshade · curvas · laranja DT</div></div>
+      </article>
+      <article class="ref-card">
+        <div class="ref-visual ref-mono4"></div>
+        <div class="ref-meta"><div class="ref-name">SENAI institucional</div><div class="ref-tag">Vermelho #D72042 · Korolev</div></div>
+      </article>
+    </div>
+  </section>
+
+  <!-- 02 · Princípios -->
+  <section class="mood-section">
+    <header class="mood-section-head">
+      <span class="num">02</span>
+      <h2>Princípios visuais</h2>
+      <span class="meta">3 regras que governam todo o produto</span>
+    </header>
+    <div class="principles">
+      <article class="principle">
+        <div class="num">01</div>
+        <h3>Dark-first, sem exceções</h3>
+        <p>Engenheiros operam o dia inteiro nessa ferramenta. Fundo <code class="mono">#121212</code>, superfícies em <code class="mono">#1d1c22</code>. Tema claro fica para o PDF impresso do relatório.</p>
+      </article>
+      <article class="principle">
+        <div class="num">02</div>
+        <h3>Vermelho parcimônia</h3>
+        <p>O <code class="mono">#D72042</code> aparece em CTAs primários, status de viabilidade e premissas confirmadas pelo agente. Nunca em fundo, nunca em mais de 2 elementos por tela.</p>
+      </article>
+      <article class="principle">
+        <div class="num">03</div>
+        <h3>Mono para tudo que é número</h3>
+        <p>m², R$, %, cotas, IDs, datas — sempre em JetBrains Mono com <code class="mono">tabular-nums</code>. Sans corre o texto, serifa Korolev/Barlow conduz títulos.</p>
+      </article>
+    </div>
+  </section>
+
+  <!-- 03 · Cores -->
+  <section class="mood-section">
+    <header class="mood-section-head">
+      <span class="num">03</span>
+      <h2>Paleta de cores</h2>
+      <span class="meta">Manual da marca SENAI-SP DT · OKLch derivado</span>
+    </header>
+    <div class="palette">
+      <div class="swatch"><div class="swatch-chip" style="background: #D72042"></div><div class="swatch-meta"><div class="swatch-name">Primary 500</div><div class="swatch-hex">#D72042 · CTA</div></div></div>
+      <div class="swatch"><div class="swatch-chip" style="background: #8A193A"></div><div class="swatch-meta"><div class="swatch-name">Borgonha</div><div class="swatch-hex">#8A193A · hover</div></div></div>
+      <div class="swatch"><div class="swatch-chip" style="background: #FF7524"></div><div class="swatch-meta"><div class="swatch-name">Orange</div><div class="swatch-hex">#FF7524 · topografia</div></div></div>
+      <div class="swatch"><div class="swatch-chip" style="background: #121212"></div><div class="swatch-meta"><div class="swatch-name">Background</div><div class="swatch-hex">#121212 · canvas</div></div></div>
+      <div class="swatch"><div class="swatch-chip" style="background: #1d1c22"></div><div class="swatch-meta"><div class="swatch-name">Surface</div><div class="swatch-hex">#1d1c22 · sidebar / card</div></div></div>
+      <div class="swatch"><div class="swatch-chip" style="background: #232323"></div><div class="swatch-meta"><div class="swatch-name">Surface elev.</div><div class="swatch-hex">#232323 · input</div></div></div>
+      <div class="swatch"><div class="swatch-chip" style="background: #ffffff"></div><div class="swatch-meta"><div class="swatch-name">Text primary</div><div class="swatch-hex">#ffffff</div></div></div>
+      <div class="swatch"><div class="swatch-chip" style="background: #9b9b9b"></div><div class="swatch-meta"><div class="swatch-name">Text secondary</div><div class="swatch-hex">#9b9b9b</div></div></div>
+      <div class="swatch"><div class="swatch-chip" style="background: #5E6267"></div><div class="swatch-meta"><div class="swatch-name">Text muted</div><div class="swatch-hex">#5E6267</div></div></div>
+      <div class="swatch"><div class="swatch-chip" style="background: #17a34a"></div><div class="swatch-meta"><div class="swatch-name">Success</div><div class="swatch-hex">#17a34a · viável</div></div></div>
+      <div class="swatch"><div class="swatch-chip" style="background: #eab308"></div><div class="swatch-meta"><div class="swatch-name">Warning</div><div class="swatch-hex">#eab308 · briefing</div></div></div>
+      <div class="swatch"><div class="swatch-chip" style="background: #dc2626"></div><div class="swatch-meta"><div class="swatch-name">Danger</div><div class="swatch-hex">#dc2626 · bloqueio</div></div></div>
+    </div>
+  </section>
+
+  <!-- 04 · Tipografia -->
+  <section class="mood-section">
+    <header class="mood-section-head">
+      <span class="num">04</span>
+      <h2>Tipografia</h2>
+      <span class="meta">Display · Body · Mono</span>
+    </header>
+    <div class="type-spec">
+      <article class="type-card">
+        <div class="type-tag">Display</div>
+        <div class="sample-3xl">Casa térrea<br>em Vila Madalena.</div>
+        <div class="sample-2xl">Estimativa preliminar de viabilidade</div>
+        <div class="specs">
+          <span>Família: Barlow / Korolev</span><span>Pesos: 500–900</span>
+          <span>Letter-spacing: −0.02em</span><span>Line-height: 0.9–1.1</span>
+        </div>
+      </article>
+      <article class="type-card">
+        <div class="type-tag">Body + Mono</div>
+        <p class="sample-body">Lote de 312 m² com inclinação leve (6,3%). Construção em Light Steel Frame, padrão médio-alto, prazo estimado de 5–7 meses. Texto corre em DM Sans com line-height 1.55.</p>
+        <div class="sample-mono">R$ 487.620,00  ·  130 m²  ·  3,2 t aço  ·  v3 · 28/05/26</div>
+        <div class="specs">
+          <span>Body: DM Sans 14–16</span><span>Mono: JetBrains Mono 12–14</span>
+          <span>Numerics: tabular</span><span>Line-height body: 1.5</span>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <!-- 05 · Spacing + radius -->
+  <section class="mood-section">
+    <header class="mood-section-head">
+      <span class="num">05</span>
+      <h2>Espaçamento &amp; raios</h2>
+      <span class="meta">Grade 8pt · escala compacta</span>
+    </header>
+    <div class="spec-grid" style="margin-bottom: var(--space-4)">
+      <div class="spec-card"><div class="spec-name">space-2 · 8px</div><div class="spec-demo" style="height: 8px; width: 100%"></div><div class="spec-value">--space-2</div></div>
+      <div class="spec-card"><div class="spec-name">space-4 · 16px</div><div class="spec-demo" style="height: 16px; width: 100%"></div><div class="spec-value">--space-4</div></div>
+      <div class="spec-card"><div class="spec-name">space-6 · 24px</div><div class="spec-demo" style="height: 24px; width: 100%"></div><div class="spec-value">--space-6</div></div>
+      <div class="spec-card"><div class="spec-name">space-8 · 32px</div><div class="spec-demo" style="height: 32px; width: 100%"></div><div class="spec-value">--space-8</div></div>
+    </div>
+    <div class="spec-grid">
+      <div class="spec-card"><div class="spec-name">radius-sm · 4px</div><div class="spec-demo" style="height: 64px; width: 100%; border-radius: 4px"></div><div class="spec-value">inputs · pills</div></div>
+      <div class="spec-card"><div class="spec-name">radius-md · 8px</div><div class="spec-demo" style="height: 64px; width: 100%; border-radius: 8px"></div><div class="spec-value">cards · botões</div></div>
+      <div class="spec-card"><div class="spec-name">radius-lg · 12px</div><div class="spec-demo" style="height: 64px; width: 100%; border-radius: 12px"></div><div class="spec-value">painéis</div></div>
+      <div class="spec-card"><div class="spec-name">radius-full · 9999px</div><div class="spec-demo" style="height: 64px; width: 100%; border-radius: 9999px"></div><div class="spec-value">badges · avatares</div></div>
+    </div>
+  </section>
+
+  <!-- 06 · Code block: tokens.css -->
+  <section class="mood-section">
+    <header class="mood-section-head">
+      <span class="num">06</span>
+      <h2>Tokens em CSS — pronto pra colar</h2>
+      <span class="meta">Cole no :root global do projeto Next.js</span>
+    </header>
+    <pre class="code-block"><span class="co">/* steelframe-tokens.css — bind no :root global */</span>
+<span class="tk">:root</span> {
+  <span class="co">/* surfaces (dark-first) */</span>
+  <span class="tk">--color-background</span>:        <span class="vl">#121212</span>;
+  <span class="tk">--color-surface</span>:           <span class="vl">#1d1c22</span>;
+  <span class="tk">--color-surface-elevated</span>:  <span class="vl">#232323</span>;
+
+  <span class="co">/* brand acento — usar com parcimônia */</span>
+  <span class="tk">--color-primary-500</span>:       <span class="vl">#D72042</span>;
+  <span class="tk">--color-primary-700</span>:       <span class="vl">#b8163d</span>;  <span class="co">/* hover */</span>
+  <span class="tk">--color-borgonha</span>:          <span class="vl">#8A193A</span>;
+  <span class="tk">--color-orange</span>:            <span class="vl">#FF7524</span>;  <span class="co">/* topografia */</span>
+
+  <span class="co">/* texto */</span>
+  <span class="tk">--color-text-primary</span>:      <span class="vl">#ffffff</span>;
+  <span class="tk">--color-text-secondary</span>:    <span class="vl">#9b9b9b</span>;
+  <span class="tk">--color-text-muted</span>:        <span class="vl">#5E6267</span>;
+
+  <span class="co">/* status */</span>
+  <span class="tk">--color-success</span>:           <span class="vl">#17a34a</span>;
+  <span class="tk">--color-warning</span>:           <span class="vl">#eab308</span>;
+  <span class="tk">--color-danger</span>:            <span class="vl">#dc2626</span>;
+
+  <span class="co">/* tipografia */</span>
+  <span class="tk">--font-display</span>: <span class="vl">'Barlow'</span>, <span class="vl">'Korolev'</span>, system-ui, sans-serif;
+  <span class="tk">--font-body</span>:    <span class="vl">'DM Sans'</span>, system-ui, sans-serif;
+  <span class="tk">--font-mono</span>:    <span class="vl">'JetBrains Mono'</span>, ui-monospace, monospace;
+
+  <span class="co">/* escala (8pt) */</span>
+  <span class="tk">--space-2</span>: <span class="vl">8px</span>;   <span class="tk">--space-4</span>: <span class="vl">16px</span>;
+  <span class="tk">--space-6</span>: <span class="vl">24px</span>;  <span class="tk">--space-8</span>: <span class="vl">32px</span>;
+
+  <span class="co">/* raios */</span>
+  <span class="tk">--radius-sm</span>: <span class="vl">4px</span>;   <span class="tk">--radius-md</span>: <span class="vl">8px</span>;
+  <span class="tk">--radius-lg</span>: <span class="vl">12px</span>;  <span class="tk">--radius-full</span>: <span class="vl">9999px</span>;
+}
+
+<span class="co">/* utilitário obrigatório p/ numerics */</span>
+<span class="tk">.num</span> { font-family: <span class="tk">var(--font-mono)</span>; font-variant-numeric: tabular-nums; }
+</pre>
+  </section>
+
+</div>
+</body>
+</html>

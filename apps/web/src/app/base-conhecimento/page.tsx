@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { Breadcrumb } from "@/components/Breadcrumb";
 
 export const metadata = {
   title: "Base de Conhecimento — SteelFrame GenIA",
@@ -71,94 +71,160 @@ const NORMS: { code: string; use: string }[] = [
   { code: "NBR 9077", use: "Saídas de emergência" },
 ];
 
-function Card({ title, items }: { title: string; items: Source[] }) {
+function KbCard({ title, items }: { title: string; items: Source[] }) {
   return (
-    <section className="dt-card p-5">
-      <h2 className="text-sm font-bold uppercase tracking-wide text-white/80">
-        {title}
-      </h2>
-      <ul className="mt-3 space-y-2">
+    <section className="card">
+      <div className="card-row">
+        <div>
+          <div className="card-title">{title}</div>
+          <div className="card-subtitle">Fontes oficiais consultadas pelo agente</div>
+        </div>
+      </div>
+      <div className="stack-sm">
         {items.map((s) => (
-          <li key={s.url} className="rounded-md bg-white/5 p-3">
-            <a
-              href={s.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sm font-semibold text-[#ff3d6a] hover:underline"
+          <a
+            key={s.url}
+            href={s.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: "block",
+              padding: "var(--space-3) var(--space-4)",
+              background: "var(--color-surface-elevated)",
+              border: "1px solid var(--color-stroke)",
+              borderRadius: "var(--radius-md)",
+              transition: "border-color 0.15s ease",
+            }}
+            className="kb-source"
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+              <span style={{ color: "var(--color-primary-500)", fontWeight: 600 }}>
+                {s.name}
+              </span>
+              <span className="text-xs muted">↗</span>
+            </div>
+            <div className="text-sm muted" style={{ marginTop: 4 }}>
+              {s.use}
+            </div>
+            <div
+              className="mono text-xs"
+              style={{
+                marginTop: 6,
+                color: "var(--color-text-muted)",
+                wordBreak: "break-all",
+              }}
             >
-              {s.name} ↗
-            </a>
-            <div className="mt-0.5 text-xs text-white/60">{s.use}</div>
-            <div className="mt-1 break-all font-mono text-[10px] text-white/40">
               {s.url}
             </div>
-          </li>
+          </a>
         ))}
-      </ul>
+      </div>
     </section>
   );
 }
 
 export default function KnowledgePage() {
   return (
-    <div className="space-y-6">
-      <div>
-        <Link href="/" className="text-xs text-[#ff3d6a] hover:underline">
-          ← Voltar
-        </Link>
-        <span className="dt-status-pill mt-2 mb-2 inline-flex">
-          Base do agente · SINAPI · CUB · GeoSampa · ABNT · OpenTopography
-        </span>
-        <h1 className="text-3xl font-extrabold uppercase tracking-tight text-white">
-          Base de conhecimento
-        </h1>
-        <p className="text-sm text-white/60">
-          Fontes oficiais consultadas pelo Agente Pré-Projeto para gerar
-          estimativas, validar viabilidade e aplicar normas brasileiras.
-        </p>
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-3">
-        <Card title="Topografia & Mapa" items={TOPO} />
-        <Card title="Custos" items={COSTS} />
-        <Card title="Legislação urbana" items={URBAN} />
-      </div>
-
-      <section className="dt-card p-5">
-        <h2 className="text-sm font-bold uppercase tracking-wide text-white/80">
-          Normas prioritárias (ABNT)
-        </h2>
-        <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-          {NORMS.map((n) => (
-            <div
-              key={n.code}
-              className="flex items-center justify-between rounded-md border border-white/10 bg-white/5 px-3 py-2"
-            >
-              <span className="font-mono text-xs font-bold text-[#ff3d6a]">
-                {n.code}
-              </span>
-              <span className="text-xs text-white/70">{n.use}</span>
-            </div>
-          ))}
+    <>
+      <header className="page-header">
+        <div className="stack-sm">
+          <Breadcrumb
+            items={[
+              { label: "SteelFrame GenIA", href: "/" },
+              { label: "Base de conhecimento" },
+            ]}
+          />
+          <div className="page-title-row">
+            <h1>Fontes que alimentam o agente</h1>
+            <span className="pill pill-primary">
+              <span className="dot" />
+              Auditável
+            </span>
+          </div>
+          <p className="text-sm muted" style={{ maxWidth: "72ch" }}>
+            Esta base lista TODAS as fontes oficiais que o Agente Pré-Projeto
+            consulta para gerar estimativas, validar viabilidade e aplicar normas
+            brasileiras. Cada premissa em um relatório é rastreável até uma
+            destas referências.
+          </p>
         </div>
-        <p className="mt-3 text-[11px] text-white/50">
+      </header>
+
+      <div className="grid-3">
+        <KbCard title="Topografia & Mapa" items={TOPO} />
+        <KbCard title="Custos" items={COSTS} />
+        <KbCard title="Legislação urbana" items={URBAN} />
+      </div>
+
+      <section className="card">
+        <div className="card-row">
+          <div>
+            <div className="card-title">Normas técnicas aplicáveis (ABNT)</div>
+            <div className="card-subtitle">
+              Referências prioritárias para galpões steel frame industriais
+            </div>
+          </div>
+        </div>
+        <table className="ds-table">
+          <thead>
+            <tr>
+              <th style={{ width: 160 }}>Código</th>
+              <th>Aplicação</th>
+            </tr>
+          </thead>
+          <tbody>
+            {NORMS.map((n) => (
+              <tr key={n.code}>
+                <td
+                  className="mono"
+                  style={{ color: "var(--color-primary-500)", fontWeight: 700 }}
+                >
+                  {n.code}
+                </td>
+                <td>{n.use}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <p className="text-xs muted" style={{ marginTop: "var(--space-3)" }}>
           Consulta oficial:{" "}
           <a
             href="https://www.abntcatalogo.com.br/"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-[#ff3d6a] hover:underline"
+            style={{ color: "var(--color-primary-500)", textDecoration: "underline" }}
           >
             abntcatalogo.com.br
           </a>
         </p>
       </section>
 
-      <p className="rounded-md border border-white/10 bg-white/5 p-3 text-[11px] text-white/60">
-        ⚠️ Esta plataforma entrega estimativas preliminares. Decisões finais
-        devem ser embasadas por projetos executivos, ART/RRT, sondagem,
-        levantamento topográfico e aprovação legal.
-      </p>
-    </div>
+      <section className="card">
+        <div className="card-row">
+          <div>
+            <div className="card-title">Como o agente cita</div>
+            <div className="card-subtitle">Contrato de evidência</div>
+          </div>
+        </div>
+        <p className="text-sm muted">
+          Toda hipótese adotada que não foi explicitamente informada no briefing
+          é registrada na seção <b>premissas</b> do relatório. Cada custo
+          remete a uma faixa SINAPI/CUB, cada norma citada pode ser conferida
+          no Catálogo ABNT, e cada camada topográfica indica sua fonte
+          (OpenTopography, OpenTopoMap ou Esri).
+        </p>
+      </section>
+
+      <div className="toast toast-warning" style={{ maxWidth: "none" }}>
+        <div>
+          <div className="toast-title">⚠️ Aviso técnico</div>
+          <div className="toast-desc">
+            Esta plataforma entrega estimativas preliminares. Decisões finais
+            devem ser embasadas por projetos executivos, ART/RRT, sondagem,
+            levantamento topográfico e aprovação legal.
+          </div>
+        </div>
+      </div>
+    </>
   );
 }
