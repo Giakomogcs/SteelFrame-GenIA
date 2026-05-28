@@ -69,7 +69,10 @@ export default function SitePlanViewer3D({
       0.5,
       4000,
     );
-    camera.position.set(120, 90, 120);
+    // Camera lives in the (-X, +Z) quadrant so the rendered scene matches the
+    // 2D editor orientation: +X grows to the right of the screen and +Z grows
+    // downward (south). Without this, +X ends up mirrored to the left.
+    camera.position.set(-120, 90, 120);
     cameraRef.current = camera;
 
     const controls = new OrbitControls(camera, renderer.domElement);
@@ -81,7 +84,7 @@ export default function SitePlanViewer3D({
     const hemi = new THREE.HemisphereLight(0xfff3e0, 0x202833, 0.7);
     scene.add(hemi);
     const dir = new THREE.DirectionalLight(0xffffff, 0.9);
-    dir.position.set(80, 120, 60);
+    dir.position.set(-80, 120, 60);
     scene.add(dir);
     const grid = new THREE.GridHelper(400, 40, 0x1f2937, 0x111827);
     grid.position.y = -0.01;
