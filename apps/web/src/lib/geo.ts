@@ -27,8 +27,7 @@ export function polygonAreaM2(points: LngLat[]): number {
     const [lng1, lat1] = pts[i];
     const [lng2, lat2] = pts[i + 1];
     area +=
-      toRad(lng2 - lng1) *
-      (2 + Math.sin(toRad(lat1)) + Math.sin(toRad(lat2)));
+      toRad(lng2 - lng1) * (2 + Math.sin(toRad(lat1)) + Math.sin(toRad(lat2)));
   }
   return Math.abs((area * EARTH_RADIUS * EARTH_RADIUS) / 2);
 }
@@ -112,7 +111,10 @@ export interface SlopeAnalysis {
  */
 export function diagonalSamples(polygon: LngLat[], n = 8): LngLat[] {
   if (polygon.length < 3) return [];
-  let minLng = Infinity, maxLng = -Infinity, minLat = Infinity, maxLat = -Infinity;
+  let minLng = Infinity,
+    maxLng = -Infinity,
+    minLat = Infinity,
+    maxLat = -Infinity;
   for (const [lng, lat] of polygon) {
     if (lng < minLng) minLng = lng;
     if (lng > maxLng) maxLng = lng;
@@ -167,10 +169,13 @@ export function computeSlopeAnalysis(
   const totalDist = samples[samples.length - 1].d - samples[0].d;
   const slopePct = totalDist > 0 ? (elevationDelta / totalDist) * 100 : 0;
   const classification: SlopeAnalysis["classification"] =
-    slopePct < 2 ? "plano"
-    : slopePct < 5 ? "suave"
-    : slopePct < 10 ? "moderado"
-    : "acentuado";
+    slopePct < 2
+      ? "plano"
+      : slopePct < 5
+        ? "suave"
+        : slopePct < 10
+          ? "moderado"
+          : "acentuado";
   const needsLeveling = slopePct > 3 || elevationDelta > 1.5;
   const earthworksM3 = needsLeveling
     ? Math.round((elevationDelta / 2) * areaM2)
@@ -179,7 +184,10 @@ export function computeSlopeAnalysis(
     slopePct: Number(slopePct.toFixed(2)),
     elevationDelta: Number(elevationDelta.toFixed(2)),
     elevationMean: Number(elevationMean.toFixed(1)),
-    profile: samples.map((s) => ({ d: Math.round(s.d), h: Number(s.h.toFixed(2)) })),
+    profile: samples.map((s) => ({
+      d: Math.round(s.d),
+      h: Number(s.h.toFixed(2)),
+    })),
     classification,
     needsLeveling,
     earthworksM3,

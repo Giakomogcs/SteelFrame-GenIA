@@ -46,8 +46,8 @@ const BRL = (n: number) =>
   n >= 1_000_000
     ? `R$ ${(n / 1_000_000).toFixed(2).replace(".", ",")} M`
     : n >= 1_000
-    ? `R$ ${(n / 1_000).toFixed(0)} mil`
-    : `R$ ${n.toFixed(0)}`;
+      ? `R$ ${(n / 1_000).toFixed(0)} mil`
+      : `R$ ${n.toFixed(0)}`;
 
 // Distribuição típica de custo (galpão industrial steel frame). Ajustada
 // por padrão construtivo no `apply()`.
@@ -64,7 +64,7 @@ export function deriveLayers(shed: IndustrialShed): LayerSpec[] {
   const total = Math.max(0, shed.estimate?.totalCost ?? 0);
   const area = Math.max(
     1,
-    shed.estimate?.coveredAreaM2 ?? shed.footprint.width * shed.footprint.depth
+    shed.estimate?.coveredAreaM2 ?? shed.footprint.width * shed.footprint.depth,
   );
   const steelKg = Math.max(0, shed.estimate?.steelKg ?? 0);
   const steelT = steelKg / 1000;
@@ -83,10 +83,31 @@ export function deriveLayers(shed: IndustrialShed): LayerSpec[] {
   // Ajuste leve de distribuição por padrão.
   const tweak: Record<LayerId, number> =
     standard === "alto"
-      ? { foundation: 0, structure: +0.02, floor: 0, services: +0.02, cladding: -0.02, roof: -0.02 }
+      ? {
+          foundation: 0,
+          structure: +0.02,
+          floor: 0,
+          services: +0.02,
+          cladding: -0.02,
+          roof: -0.02,
+        }
       : standard === "economico"
-      ? { foundation: 0, structure: -0.02, floor: -0.01, services: -0.02, cladding: +0.03, roof: +0.02 }
-      : { foundation: 0, structure: 0, floor: 0, services: 0, cladding: 0, roof: 0 };
+        ? {
+            foundation: 0,
+            structure: -0.02,
+            floor: -0.01,
+            services: -0.02,
+            cladding: +0.03,
+            roof: +0.02,
+          }
+        : {
+            foundation: 0,
+            structure: 0,
+            floor: 0,
+            services: 0,
+            cladding: 0,
+            roof: 0,
+          };
 
   const dist = (id: LayerId) => BASE_DIST[id] + tweak[id];
   const cost = (id: LayerId) => Math.round(total * dist(id));

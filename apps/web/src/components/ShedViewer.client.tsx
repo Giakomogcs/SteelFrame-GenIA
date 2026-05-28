@@ -46,8 +46,8 @@ const BRL = (n: number) =>
   n >= 1_000_000
     ? `R$ ${(n / 1_000_000).toFixed(2).replace(".", ",")} M`
     : n >= 1_000
-    ? `R$ ${Math.round(n / 1_000)} mil`
-    : `R$ ${n.toFixed(0)}`;
+      ? `R$ ${Math.round(n / 1_000)} mil`
+      : `R$ ${n.toFixed(0)}`;
 
 const fmtInt = (n: number) =>
   n.toLocaleString("pt-BR", { maximumFractionDigits: 0 });
@@ -85,7 +85,7 @@ function LayerGroup({
     groupRef.current.position.y = THREE.MathUtils.lerp(
       groupRef.current.position.y,
       targetY,
-      0.18
+      0.18,
     );
   });
 
@@ -111,7 +111,9 @@ function DimWrap({
     ref.current.traverse((o) => {
       const mesh = o as THREE.Mesh;
       if (!mesh.isMesh) return;
-      const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      const mats = Array.isArray(mesh.material)
+        ? mesh.material
+        : [mesh.material];
       mats.forEach((m) => {
         const mat = m as THREE.MeshStandardMaterial;
         if (!mat) return;
@@ -138,13 +140,13 @@ function Foundation({ shed }: { shed: IndustrialShed }) {
       <mesh key={`fl-${i}`} position={[-w / 2 + 0.6, -0.35, z]}>
         <boxGeometry args={[1.4, 0.6, 1.4]} />
         <meshStandardMaterial color={LAYER_COLOR.foundation} roughness={0.85} />
-      </mesh>
+      </mesh>,
     );
     blocks.push(
       <mesh key={`fr-${i}`} position={[w / 2 - 0.6, -0.35, z]}>
         <boxGeometry args={[1.4, 0.6, 1.4]} />
         <meshStandardMaterial color={LAYER_COLOR.foundation} roughness={0.85} />
-      </mesh>
+      </mesh>,
     );
   }
   // Viga baldrame (perímetro).
@@ -178,8 +180,7 @@ function Structure({ shed }: { shed: IndustrialShed }) {
   const bays = structure.bayCount;
   const spacing = structure.baySpacing;
   const ch = structure.clearHeight;
-  const rise =
-    roof.type === "gable" ? (w / 2) * (roof.slopePct / 100) : 0.3;
+  const rise = roof.type === "gable" ? (w / 2) * (roof.slopePct / 100) : 0.3;
   const col = 0.32;
   const beam = 0.22;
   const elements: JSX.Element[] = [];
@@ -190,12 +191,20 @@ function Structure({ shed }: { shed: IndustrialShed }) {
     elements.push(
       <mesh key={`cl-${i}`} position={[-w / 2 + col / 2, ch / 2, z]}>
         <boxGeometry args={[col, ch, col]} />
-        <meshStandardMaterial color={LAYER_COLOR.structure} metalness={0.4} roughness={0.5} />
+        <meshStandardMaterial
+          color={LAYER_COLOR.structure}
+          metalness={0.4}
+          roughness={0.5}
+        />
       </mesh>,
       <mesh key={`cr-${i}`} position={[w / 2 - col / 2, ch / 2, z]}>
         <boxGeometry args={[col, ch, col]} />
-        <meshStandardMaterial color={LAYER_COLOR.structure} metalness={0.4} roughness={0.5} />
-      </mesh>
+        <meshStandardMaterial
+          color={LAYER_COLOR.structure}
+          metalness={0.4}
+          roughness={0.5}
+        />
+      </mesh>,
     );
     // duas águas (gable): duas vigas inclinadas
     if (roof.type === "gable") {
@@ -209,7 +218,11 @@ function Structure({ shed }: { shed: IndustrialShed }) {
           rotation={[0, 0, -angle]}
         >
           <boxGeometry args={[len, beam, beam]} />
-          <meshStandardMaterial color={LAYER_COLOR.structure} metalness={0.4} roughness={0.5} />
+          <meshStandardMaterial
+            color={LAYER_COLOR.structure}
+            metalness={0.4}
+            roughness={0.5}
+          />
         </mesh>,
         <mesh
           key={`br-${i}`}
@@ -217,16 +230,24 @@ function Structure({ shed }: { shed: IndustrialShed }) {
           rotation={[0, 0, angle]}
         >
           <boxGeometry args={[len, beam, beam]} />
-          <meshStandardMaterial color={LAYER_COLOR.structure} metalness={0.4} roughness={0.5} />
-        </mesh>
+          <meshStandardMaterial
+            color={LAYER_COLOR.structure}
+            metalness={0.4}
+            roughness={0.5}
+          />
+        </mesh>,
       );
     } else {
       // viga horizontal (shed/flat)
       elements.push(
         <mesh key={`bb-${i}`} position={[0, ch + beam / 2, z]}>
           <boxGeometry args={[w, beam, beam]} />
-          <meshStandardMaterial color={LAYER_COLOR.structure} metalness={0.4} roughness={0.5} />
-        </mesh>
+          <meshStandardMaterial
+            color={LAYER_COLOR.structure}
+            metalness={0.4}
+            roughness={0.5}
+          />
+        </mesh>,
       );
     }
   }
@@ -242,8 +263,12 @@ function Structure({ shed }: { shed: IndustrialShed }) {
     elements.push(
       <mesh key={`pu-${p}`} position={[x, yTop, 0]}>
         <boxGeometry args={[0.1, 0.1, d]} />
-        <meshStandardMaterial color={LAYER_COLOR.structure} metalness={0.5} roughness={0.4} />
-      </mesh>
+        <meshStandardMaterial
+          color={LAYER_COLOR.structure}
+          metalness={0.5}
+          roughness={0.4}
+        />
+      </mesh>,
     );
   }
   return <group>{elements}</group>;
@@ -285,7 +310,7 @@ function Services({ shed }: { shed: IndustrialShed }) {
       <mesh key={`dk-${i}`} position={[x, 0.6, z]}>
         <boxGeometry args={[3, 1.2, 2.4]} />
         <meshStandardMaterial color={LAYER_COLOR.services} roughness={0.6} />
-      </mesh>
+      </mesh>,
     );
   });
   // hidrantes ao longo da fachada principal
@@ -296,7 +321,7 @@ function Services({ shed }: { shed: IndustrialShed }) {
       <mesh key={`hy-${i}`} position={[x, 0.5, d / 2 + 0.6]}>
         <cylinderGeometry args={[0.15, 0.15, 1, 12]} />
         <meshStandardMaterial color={LAYER_COLOR.services} roughness={0.5} />
-      </mesh>
+      </mesh>,
     );
   }
   return <group>{meshes}</group>;
@@ -331,19 +356,35 @@ function Cladding({ shed }: { shed: IndustrialShed }) {
       {/* telha lateral acima da base */}
       <mesh position={[0, base + (ch - base) / 2, -d / 2]}>
         <boxGeometry args={[w, ch - base, wallThk]} />
-        <meshStandardMaterial color={LAYER_COLOR.cladding} roughness={0.55} metalness={0.2} />
+        <meshStandardMaterial
+          color={LAYER_COLOR.cladding}
+          roughness={0.55}
+          metalness={0.2}
+        />
       </mesh>
       <mesh position={[0, base + (ch - base) / 2, d / 2]}>
         <boxGeometry args={[w, ch - base, wallThk]} />
-        <meshStandardMaterial color={LAYER_COLOR.cladding} roughness={0.55} metalness={0.2} />
+        <meshStandardMaterial
+          color={LAYER_COLOR.cladding}
+          roughness={0.55}
+          metalness={0.2}
+        />
       </mesh>
       <mesh position={[-w / 2, base + (ch - base) / 2, 0]}>
         <boxGeometry args={[wallThk, ch - base, d]} />
-        <meshStandardMaterial color={LAYER_COLOR.cladding} roughness={0.55} metalness={0.2} />
+        <meshStandardMaterial
+          color={LAYER_COLOR.cladding}
+          roughness={0.55}
+          metalness={0.2}
+        />
       </mesh>
       <mesh position={[w / 2, base + (ch - base) / 2, 0]}>
         <boxGeometry args={[wallThk, ch - base, d]} />
-        <meshStandardMaterial color={LAYER_COLOR.cladding} roughness={0.55} metalness={0.2} />
+        <meshStandardMaterial
+          color={LAYER_COLOR.cladding}
+          roughness={0.55}
+          metalness={0.2}
+        />
       </mesh>
     </group>
   );
@@ -368,19 +409,31 @@ function Roof({ shed }: { shed: IndustrialShed }) {
           rotation={[0, 0, -angle]}
         >
           <boxGeometry args={[len + overhang, 0.12, d + overhang * 2]} />
-          <meshStandardMaterial color={LAYER_COLOR.roof} roughness={0.5} metalness={0.3} />
+          <meshStandardMaterial
+            color={LAYER_COLOR.roof}
+            roughness={0.5}
+            metalness={0.3}
+          />
         </mesh>
         <mesh
           position={[half / 2, ch + rise / 2 + 0.05, 0]}
           rotation={[0, 0, angle]}
         >
           <boxGeometry args={[len + overhang, 0.12, d + overhang * 2]} />
-          <meshStandardMaterial color={LAYER_COLOR.roof} roughness={0.5} metalness={0.3} />
+          <meshStandardMaterial
+            color={LAYER_COLOR.roof}
+            roughness={0.5}
+            metalness={0.3}
+          />
         </mesh>
         {/* cumeeira */}
         <mesh position={[0, ch + rise + 0.08, 0]}>
           <boxGeometry args={[0.4, 0.08, d + overhang * 2]} />
-          <meshStandardMaterial color="#ff924a" roughness={0.4} metalness={0.4} />
+          <meshStandardMaterial
+            color="#ff924a"
+            roughness={0.4}
+            metalness={0.4}
+          />
         </mesh>
       </group>
     );
@@ -392,7 +445,11 @@ function Roof({ shed }: { shed: IndustrialShed }) {
   return (
     <mesh position={[0, ch + rise / 2 + 0.05, 0]} rotation={[0, 0, angle]}>
       <boxGeometry args={[w + overhang * 2, 0.12, d + overhang * 2]} />
-      <meshStandardMaterial color={LAYER_COLOR.roof} roughness={0.5} metalness={0.3} />
+      <meshStandardMaterial
+        color={LAYER_COLOR.roof}
+        roughness={0.5}
+        metalness={0.3}
+      />
     </mesh>
   );
 }
@@ -413,8 +470,8 @@ function GroundEnv({
     envMode === "satellite"
       ? "#3a4232"
       : envMode === "relief"
-      ? "#5a5142"
-      : "#2a2d33";
+        ? "#5a5142"
+        : "#2a2d33";
 
   return (
     <group>
@@ -614,7 +671,11 @@ function LayerFocus({
         <div className="lf-name">{spec.name}</div>
         <div className="lf-meta">{spec.meta}</div>
       </div>
-      <button className="lf-close" onClick={onClose} aria-label="Sair do isolamento">
+      <button
+        className="lf-close"
+        onClick={onClose}
+        aria-label="Sair do isolamento"
+      >
         ✕
       </button>
     </div>
@@ -624,7 +685,7 @@ function LayerFocus({
 function HudStats({ shed }: { shed: IndustrialShed }) {
   const area = Math.max(
     shed.estimate.coveredAreaM2 || shed.footprint.width * shed.footprint.depth,
-    1
+    1,
   );
   const steelT = (shed.estimate.steelKg || 0) / 1000;
   const total = shed.estimate.totalCost || area * shed.estimate.costPerM2;
@@ -645,13 +706,15 @@ function HudStats({ shed }: { shed: IndustrialShed }) {
       <div className="hud-card">
         <div className="hud-label">Dimensões</div>
         <div className="hud-value">
-          {shed.footprint.width.toFixed(0)} × {shed.footprint.depth.toFixed(0)} m
+          {shed.footprint.width.toFixed(0)} × {shed.footprint.depth.toFixed(0)}{" "}
+          m
         </div>
       </div>
       <div className="hud-card">
         <div className="hud-label">Vão · pé-direito</div>
         <div className="hud-value">
-          {shed.structure.freeSpan.toFixed(0)} · {shed.structure.clearHeight.toFixed(1)} m
+          {shed.structure.freeSpan.toFixed(0)} ·{" "}
+          {shed.structure.clearHeight.toFixed(1)} m
         </div>
       </div>
     </div>
@@ -731,7 +794,9 @@ function ViewportBottomBar({
           {p.label}
         </button>
       ))}
-      <div style={{ width: 1, height: 18, background: "var(--color-stroke)" }} />
+      <div
+        style={{ width: 1, height: 18, background: "var(--color-stroke)" }}
+      />
       <button
         className={`vp-btn ${xray ? "active" : ""}`}
         onClick={() => onXray(!xray)}
@@ -747,22 +812,29 @@ function ViewportBottomBar({
 // COMPONENTE PRINCIPAL
 // =============================================================
 
-export default function ShedViewerClient({ shed, height = "70vh", compact = false }: Props) {
+export default function ShedViewerClient({
+  shed,
+  height = "70vh",
+  compact = false,
+}: Props) {
   const layers = useMemo(() => deriveLayers(shed), [shed]);
   const layerMap = useMemo(
     () =>
-      layers.reduce<Record<LayerId, LayerSpec>>((acc, l) => {
-        acc[l.id] = l;
-        return acc;
-      }, {} as Record<LayerId, LayerSpec>),
-    [layers]
+      layers.reduce<Record<LayerId, LayerSpec>>(
+        (acc, l) => {
+          acc[l.id] = l;
+          return acc;
+        },
+        {} as Record<LayerId, LayerSpec>,
+      ),
+    [layers],
   );
 
   const [visible, setVisible] = useState<Record<LayerId, boolean>>(() =>
     LAYER_ORDER.reduce(
       (acc, id) => ({ ...acc, [id]: true }),
-      {} as Record<LayerId, boolean>
-    )
+      {} as Record<LayerId, boolean>,
+    ),
   );
   const [isolated, setIsolated] = useState<LayerId | null>(null);
   const [explode, setExplode] = useState(0);
@@ -790,7 +862,9 @@ export default function ShedViewerClient({ shed, height = "70vh", compact = fals
         camera={{ position: [55, 38, 65], fov: 38 }}
         dpr={[1, 2]}
         gl={{ antialias: true }}
-        style={{ background: "linear-gradient(180deg, #1d1c22 0%, #121212 100%)" }}
+        style={{
+          background: "linear-gradient(180deg, #1d1c22 0%, #121212 100%)",
+        }}
       >
         <ambientLight intensity={0.55} />
         <directionalLight

@@ -11,7 +11,11 @@ interface Props {
   initialCenter: LngLat;
 }
 
-export function TerrainEditClient({ id, initialPolygon, initialCenter }: Props) {
+export function TerrainEditClient({
+  id,
+  initialPolygon,
+  initialCenter,
+}: Props) {
   const [polygon, setPolygon] = useState<LngLat[]>(initialPolygon);
   const [area, setArea] = useState(0);
   const [saving, setSaving] = useState(false);

@@ -11,7 +11,9 @@ interface Props {
 /** Extrai a maior pegada (footprint) dentre os galpões salvos no terreno. */
 function pickFootprint(buildings: Building[]) {
   for (const b of buildings) {
-    const m = b.model as { footprint?: { width?: number; depth?: number } } | null;
+    const m = b.model as {
+      footprint?: { width?: number; depth?: number };
+    } | null;
     if (m?.footprint?.width && m?.footprint?.depth) {
       return { width: m.footprint.width, depth: m.footprint.depth };
     }
@@ -56,7 +58,10 @@ export function TerrainCard({ terrain }: Props) {
           <span className="pill pill-neutral mono">#SF-{shortId}</span>
         </div>
         <div className="terrain-thumb-meta">Sat · {created}</div>
-        <DeleteTerrainButton terrainId={terrain.id} terrainName={terrain.name} />
+        <DeleteTerrainButton
+          terrainId={terrain.id}
+          terrainName={terrain.name}
+        />
       </div>
       <div className="terrain-body">
         <div>
@@ -69,7 +74,10 @@ export function TerrainCard({ terrain }: Props) {
           <div className="stat">
             <span className="lbl">Área</span>
             <span className="val">
-              {terrain.areaM2.toLocaleString("pt-BR", { maximumFractionDigits: 0 })} m²
+              {terrain.areaM2.toLocaleString("pt-BR", {
+                maximumFractionDigits: 0,
+              })}{" "}
+              m²
             </span>
           </div>
           <div className="stat">

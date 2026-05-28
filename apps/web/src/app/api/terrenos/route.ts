@@ -14,7 +14,7 @@ const CreateTerrainSchema = z.object({
     .min(MIN_TERRAIN_AREA_M2, `Área mínima ${MIN_TERRAIN_AREA_M2} m².`)
     .max(
       MAX_TERRAIN_AREA_M2,
-      `Área máxima ${MAX_TERRAIN_AREA_M2 / 10_000} ha — selecione um lote, não uma região.`
+      `Área máxima ${MAX_TERRAIN_AREA_M2 / 10_000} ha — selecione um lote, não uma região.`,
     ),
 });
 
@@ -30,7 +30,10 @@ export async function POST(req: Request) {
   const body = await req.json();
   const parsed = CreateTerrainSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    return NextResponse.json(
+      { error: parsed.error.flatten() },
+      { status: 400 },
+    );
   }
   const created = await prisma.terrain.create({
     data: {

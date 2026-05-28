@@ -25,7 +25,10 @@ export default function NewTerrainPage() {
   function handleAddressResolved(full: string) {
     setAddress(full);
     if (!nameTouched) {
-      const parts = full.split(",").map((p) => p.trim()).filter(Boolean);
+      const parts = full
+        .split(",")
+        .map((p) => p.trim())
+        .filter(Boolean);
       const short = parts.slice(0, 2).join(" · ");
       setName(short || full);
     }

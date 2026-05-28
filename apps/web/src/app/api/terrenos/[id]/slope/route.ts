@@ -27,21 +27,19 @@ export async function POST(
 ) {
   const terrain = await prisma.terrain.findUnique({ where: { id: params.id } });
   if (!terrain) {
-    return NextResponse.json({ error: "Terreno não encontrado" }, { status: 404 });
+    return NextResponse.json(
+      { error: "Terreno não encontrado" },
+      { status: 404 },
+    );
   }
   const polygon = terrain.polygon as unknown as LngLat[];
   if (!polygon || polygon.length < 3) {
-    return NextResponse.json(
-      { error: "Polígono inválido" },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: "Polígono inválido" }, { status: 400 });
   }
 
   // 9 pontos ao longo da diagonal do bbox = boa cobertura sem estourar API.
   const samples = diagonalSamples(polygon, 9);
-  const locations = samples
-    .map(([lng, lat]) => `${lat},${lng}`)
-    .join("|");
+  const locations = samples.map(([lng, lat]) => `${lat},${lng}`).join("|");
 
   let api: ElevationApiResponse;
   try {

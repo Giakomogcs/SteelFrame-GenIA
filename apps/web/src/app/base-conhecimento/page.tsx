@@ -77,7 +77,9 @@ function KbCard({ title, items }: { title: string; items: Source[] }) {
       <div className="card-row">
         <div>
           <div className="card-title">{title}</div>
-          <div className="card-subtitle">Fontes oficiais consultadas pelo agente</div>
+          <div className="card-subtitle">
+            Fontes oficiais consultadas pelo agente
+          </div>
         </div>
       </div>
       <div className="stack-sm">
@@ -97,8 +99,16 @@ function KbCard({ title, items }: { title: string; items: Source[] }) {
             }}
             className="kb-source"
           >
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
-              <span style={{ color: "var(--color-primary-500)", fontWeight: 600 }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                gap: 8,
+              }}
+            >
+              <span
+                style={{ color: "var(--color-primary-500)", fontWeight: 600 }}
+              >
                 {s.name}
               </span>
               <span className="text-xs muted">↗</span>
@@ -143,9 +153,9 @@ export default function KnowledgePage() {
           </div>
           <p className="text-sm muted" style={{ maxWidth: "72ch" }}>
             Esta base lista TODAS as fontes oficiais que o Agente Pré-Projeto
-            consulta para gerar estimativas, validar viabilidade e aplicar normas
-            brasileiras. Cada premissa em um relatório é rastreável até uma
-            destas referências.
+            consulta para gerar estimativas, validar viabilidade e aplicar
+            normas brasileiras. Cada premissa em um relatório é rastreável até
+            uma destas referências.
           </p>
         </div>
       </header>
@@ -192,7 +202,10 @@ export default function KnowledgePage() {
             href="https://www.abntcatalogo.com.br/"
             target="_blank"
             rel="noopener noreferrer"
-            style={{ color: "var(--color-primary-500)", textDecoration: "underline" }}
+            style={{
+              color: "var(--color-primary-500)",
+              textDecoration: "underline",
+            }}
           >
             abntcatalogo.com.br
           </a>
@@ -208,9 +221,9 @@ export default function KnowledgePage() {
         </div>
         <p className="text-sm muted">
           Toda hipótese adotada que não foi explicitamente informada no briefing
-          é registrada na seção <b>premissas</b> do relatório. Cada custo
-          remete a uma faixa SINAPI/CUB, cada norma citada pode ser conferida
-          no Catálogo ABNT, e cada camada topográfica indica sua fonte
+          é registrada na seção <b>premissas</b> do relatório. Cada custo remete
+          a uma faixa SINAPI/CUB, cada norma citada pode ser conferida no
+          Catálogo ABNT, e cada camada topográfica indica sua fonte
           (OpenTopography, OpenTopoMap ou Esri).
         </p>
       </section>

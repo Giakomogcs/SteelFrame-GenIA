@@ -27,8 +27,8 @@ export default async function RelatoriosPage() {
             </span>
           </div>
           <p className="text-sm muted" style={{ maxWidth: "64ch" }}>
-            Galpões paramétricos estudados pelo agente em todos os terrenos
-            da carteira.
+            Galpões paramétricos estudados pelo agente em todos os terrenos da
+            carteira.
           </p>
         </div>
       </header>

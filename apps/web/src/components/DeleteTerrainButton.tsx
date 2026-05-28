@@ -17,7 +17,7 @@ export function DeleteTerrainButton({ terrainId, terrainName }: Props) {
     e.stopPropagation();
     if (busy) return;
     const ok = window.confirm(
-      `Apagar o terreno "${terrainName}"?\n\nEssa ação também removerá todos os galpões vinculados e não pode ser desfeita.`
+      `Apagar o terreno "${terrainName}"?\n\nEssa ação também removerá todos os galpões vinculados e não pode ser desfeita.`,
     );
     if (!ok) return;
     setBusy(true);
@@ -33,7 +33,7 @@ export function DeleteTerrainButton({ terrainId, terrainName }: Props) {
     } catch (err) {
       console.error(err);
       window.alert(
-        err instanceof Error ? err.message : "Erro ao apagar o terreno."
+        err instanceof Error ? err.message : "Erro ao apagar o terreno.",
       );
       setBusy(false);
     }

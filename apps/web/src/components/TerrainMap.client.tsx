@@ -96,14 +96,14 @@ export default function TerrainMapClient({
     if (polygon.length >= 3) {
       if (area < MIN_TERRAIN_AREA_M2) {
         errs.push(
-          `Área muito pequena (${Math.round(area)} m²). Mínimo ${MIN_TERRAIN_AREA_M2} m².`
+          `Área muito pequena (${Math.round(area)} m²). Mínimo ${MIN_TERRAIN_AREA_M2} m².`,
         );
       }
       if (area > MAX_TERRAIN_AREA_M2) {
         errs.push(
           `Área muito grande (${(area / 10_000).toFixed(1)} ha). Máximo ${(
             MAX_TERRAIN_AREA_M2 / 10_000
-          ).toFixed(0)} ha — selecione um lote, não uma região.`
+          ).toFixed(0)} ha — selecione um lote, não uma região.`,
         );
       }
     }
@@ -121,7 +121,7 @@ export default function TerrainMapClient({
     const ctrl = new AbortController();
     fetch(
       `https://nominatim.openstreetmap.org/reverse?format=json&zoom=18&addressdetails=1&lat=${lat}&lon=${lng}`,
-      { headers: { Accept: "application/json" }, signal: ctrl.signal }
+      { headers: { Accept: "application/json" }, signal: ctrl.signal },
     )
       .then((r) => r.json())
       .then((data: { display_name?: string } | null) => {

@@ -31,7 +31,11 @@ function metersToLngDeg(m: number, lat: number) {
   return m / (METERS_PER_DEG_LAT * Math.cos((lat * Math.PI) / 180));
 }
 
-export default function TerrainThumbClient({ polygon, building, interactive = false }: Props) {
+export default function TerrainThumbClient({
+  polygon,
+  building,
+  interactive = false,
+}: Props) {
   if (!polygon || polygon.length < 3) {
     return <div className="map-placeholder" />;
   }

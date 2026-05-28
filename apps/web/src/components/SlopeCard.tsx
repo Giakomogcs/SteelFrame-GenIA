@@ -54,7 +54,8 @@ export default function SlopeCard({ terrainId, initial }: Props) {
           elevationDelta: initial.elevationDelta ?? 0,
           elevationMean: initial.elevationMean ?? 0,
           classification: classifyFromPct(initial.slopePct),
-          needsLeveling: initial.slopePct > 3 || (initial.elevationDelta ?? 0) > 1.5,
+          needsLeveling:
+            initial.slopePct > 3 || (initial.elevationDelta ?? 0) > 1.5,
           earthworksM3: 0,
           profile: initial.profile ?? [],
         }
@@ -106,8 +107,8 @@ export default function SlopeCard({ terrainId, initial }: Props) {
             {loading
               ? "Consultando…"
               : analysis
-              ? "Recalcular"
-              : "Medir relevo (open-elevation)"}
+                ? "Recalcular"
+                : "Medir relevo (open-elevation)"}
           </button>
         </div>
       </div>
@@ -138,9 +139,7 @@ export default function SlopeCard({ terrainId, initial }: Props) {
           )}
 
           <div
-            className={`slope-banner ${
-              analysis.needsLeveling ? "warn" : "ok"
-            }`}
+            className={`slope-banner ${analysis.needsLeveling ? "warn" : "ok"}`}
           >
             {analysis.needsLeveling ? (
               <>
@@ -190,13 +189,14 @@ function ProfileChart({ profile }: { profile: { d: number; h: number }[] }) {
     padL + ((d - dMin) / Math.max(1, dMax - dMin)) * innerW;
   const y = (h: number) => padT + (1 - (h - hMin) / hRange) * innerH;
   const linePath = profile
-    .map((p, i) => `${i === 0 ? "M" : "L"}${x(p.d).toFixed(1)},${y(p.h).toFixed(1)}`)
+    .map(
+      (p, i) =>
+        `${i === 0 ? "M" : "L"}${x(p.d).toFixed(1)},${y(p.h).toFixed(1)}`,
+    )
     .join(" ");
   const areaPath =
     `M${x(dMin).toFixed(1)},${(padT + innerH).toFixed(1)} ` +
-    profile
-      .map((p) => `L${x(p.d).toFixed(1)},${y(p.h).toFixed(1)}`)
-      .join(" ") +
+    profile.map((p) => `L${x(p.d).toFixed(1)},${y(p.h).toFixed(1)}`).join(" ") +
     ` L${x(dMax).toFixed(1)},${(padT + innerH).toFixed(1)} Z`;
   return (
     <svg
@@ -226,12 +226,7 @@ function ProfileChart({ profile }: { profile: { d: number; h: number }[] }) {
       <text x={2} y={padT + 4} fontSize={9} fill="rgba(255,255,255,0.5)">
         {hMax.toFixed(0)} m
       </text>
-      <text
-        x={2}
-        y={padT + innerH}
-        fontSize={9}
-        fill="rgba(255,255,255,0.5)"
-      >
+      <text x={2} y={padT + innerH} fontSize={9} fill="rgba(255,255,255,0.5)">
         {hMin.toFixed(0)} m
       </text>
     </svg>

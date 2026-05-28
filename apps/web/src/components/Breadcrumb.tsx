@@ -11,7 +11,10 @@ export function Breadcrumb({ items }: { items: Crumb[] }) {
       {items.map((it, i) => {
         const last = i === items.length - 1;
         return (
-          <span key={i} style={{ display: "inline-flex", gap: 8, alignItems: "center" }}>
+          <span
+            key={i}
+            style={{ display: "inline-flex", gap: 8, alignItems: "center" }}
+          >
             {it.href && !last ? (
               <Link href={it.href}>{it.label}</Link>
             ) : (
