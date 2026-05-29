@@ -62,8 +62,8 @@
   --overlay-glass: rgba(29, 28, 34, 0.78);
 
   /* Typography */
-  --font-display: "Barlow", "Korolev", -apple-system, system-ui, sans-serif;
-  --font-body: "DM Sans", -apple-system, system-ui, sans-serif;
+  --font-display: "Montserrat", -apple-system, system-ui, sans-serif;
+  --font-body: "Montserrat", -apple-system, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
 
   --fs-xs: 11px;

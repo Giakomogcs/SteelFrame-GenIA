@@ -8,15 +8,15 @@
   --color-primary-200: #f9b8c4;
   --color-primary-300: #f58a9e;
   --color-primary-400: #e94d6a;
-  --color-primary-500: #D72042;
-  --color-primary-600: #D72042;
+  --color-primary-500: #d72042;
+  --color-primary-600: #d72042;
   --color-primary-700: #b8163d;
   --color-primary-800: #931131;
   --color-primary-950: #4a0819;
 
-  --color-borgonha: #8A193A;
-  --color-orange: #FF7524;
-  --color-red-orange: #FF3300;
+  --color-borgonha: #8a193a;
+  --color-orange: #ff7524;
+  --color-red-orange: #ff3300;
 
   /* ===== Surfaces (dark-first) ===== */
   --color-background: #121212;
@@ -28,14 +28,14 @@
   /* ===== Text ===== */
   --color-text-primary: #ffffff;
   --color-text-secondary: #9b9b9b;
-  --color-text-muted: #5E6267;
+  --color-text-muted: #5e6267;
   --color-text-disabled: #404040;
 
   /* ===== Stroke ===== */
   --color-stroke: #2a2d34;
   --color-stroke-strong: #333333;
   --color-stroke-input: #39404a;
-  --color-stroke-primary: #D72042;
+  --color-stroke-primary: #d72042;
 
   /* ===== Status ===== */
   --color-success: #17a34a;
@@ -46,7 +46,7 @@
   --color-danger-soft: rgba(220, 38, 38, 0.12);
   --color-info: #2196f3;
   --color-info-soft: rgba(33, 150, 243, 0.12);
-  --color-primary-soft: rgba(215, 32, 66, 0.10);
+  --color-primary-soft: rgba(215, 32, 66, 0.1);
   --color-primary-glow: rgba(215, 32, 66, 0.28);
 
   /* ===== Overlays ===== */
@@ -54,9 +54,9 @@
   --overlay-glass: rgba(29, 28, 34, 0.78);
 
   /* ===== Typography ===== */
-  --font-display: 'Barlow', 'Korolev', -apple-system, system-ui, sans-serif;
-  --font-body: 'DM Sans', -apple-system, system-ui, sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --font-display: "Montserrat", -apple-system, system-ui, sans-serif;
+  --font-body: "Montserrat", -apple-system, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
 
   --fs-xs: 11px;
   --fs-sm: 12px;
@@ -98,7 +98,8 @@
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
   --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.5);
-  --shadow-glow: 0 0 0 1px var(--color-primary-glow), 0 0 24px var(--color-primary-glow);
+  --shadow-glow:
+    0 0 0 1px var(--color-primary-glow), 0 0 24px var(--color-primary-glow);
 
   /* ===== Layout ===== */
   --sidebar-w: 247px;
@@ -106,8 +107,16 @@
 }
 
 /* ===== Reset & base ===== */
-*, *::before, *::after { box-sizing: border-box; }
-html, body { margin: 0; padding: 0; }
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
 body {
   background: var(--color-background);
   color: var(--color-text-primary);
@@ -117,17 +126,47 @@ body {
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
-h1, h2, h3, h4, h5 {
+h1,
+h2,
+h3,
+h4,
+h5 {
   font-family: var(--font-display);
   font-weight: var(--fw-semibold);
   letter-spacing: -0.01em;
   margin: 0;
   color: var(--color-text-primary);
 }
-p { margin: 0; text-wrap: pretty; }
-a { color: inherit; text-decoration: none; }
-button { font: inherit; cursor: pointer; border: 0; background: transparent; color: inherit; }
-img, svg { display: block; max-width: 100%; }
-input, select, textarea { font: inherit; color: inherit; }
-.num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
-.mono { font-family: var(--font-mono); }
+p {
+  margin: 0;
+  text-wrap: pretty;
+}
+a {
+  color: inherit;
+  text-decoration: none;
+}
+button {
+  font: inherit;
+  cursor: pointer;
+  border: 0;
+  background: transparent;
+  color: inherit;
+}
+img,
+svg {
+  display: block;
+  max-width: 100%;
+}
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+.num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+.mono {
+  font-family: var(--font-mono);
+}

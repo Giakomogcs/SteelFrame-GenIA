@@ -185,6 +185,7 @@ export default function TerrainMapClient({
   const [search, setSearch] = useState("");
   const [searchTarget, setSearchTarget] = useState<LngLat | null>(null);
   const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const [baseLayer, setBaseLayer] = useState<"satellite" | "street" | "relief">(
     "satellite",
   );
@@ -220,21 +221,24 @@ export default function TerrainMapClient({
     if (!closed || (!onAddressResolved && !onLocationResolved)) return;
     const [lng, lat] = polygonCenter(polygon);
     const ctrl = new AbortController();
-    fetch(
-      `https://nominatim.openstreetmap.org/reverse?format=json&zoom=18&addressdetails=1&lat=${lat}&lon=${lng}`,
-      { headers: { Accept: "application/json" }, signal: ctrl.signal },
-    )
+    fetch(`/api/geocode?q=${lat},${lng}`, {
+      headers: { Accept: "application/json" },
+      signal: ctrl.signal,
+    })
       .then((r) => r.json())
       .then(
         (
-          data: {
-            display_name?: string;
-            address?: NominatimAddress;
-          } | null,
+          data:
+            | {
+                displayName?: string | null;
+                address?: NominatimAddress | null;
+              }[]
+            | null,
         ) => {
-          if (data?.display_name) onAddressResolved?.(data.display_name);
-          if (data?.address)
-            onLocationResolved?.(parseNominatimAddress(data.address));
+          const first = data?.[0];
+          if (first?.displayName) onAddressResolved?.(first.displayName);
+          if (first?.address)
+            onLocationResolved?.(parseNominatimAddress(first.address));
         },
       )
       .catch(() => {
@@ -314,23 +318,30 @@ export default function TerrainMapClient({
     e.preventDefault();
     if (!search.trim()) return;
     setSearching(true);
+    setSearchError(null);
     try {
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&limit=1&addressdetails=1&q=${encodeURIComponent(search)}`,
-        { headers: { Accept: "application/json" } },
-      );
+      const res = await fetch(`/api/geocode?q=${encodeURIComponent(search)}`, {
+        headers: { Accept: "application/json" },
+      });
+      if (!res.ok) {
+        throw new Error("Falha ao buscar endereço.");
+      }
       const data = (await res.json()) as {
         lat: string;
         lon: string;
-        display_name?: string;
-        address?: NominatimAddress;
+        displayName?: string | null;
+        address?: NominatimAddress | null;
       }[];
       if (data[0]) {
         setSearchTarget([parseFloat(data[0].lon), parseFloat(data[0].lat)]);
-        if (data[0].display_name) onAddressResolved?.(data[0].display_name);
+        if (data[0].displayName) onAddressResolved?.(data[0].displayName);
         if (data[0].address)
           onLocationResolved?.(parseNominatimAddress(data[0].address));
+      } else {
+        setSearchError("Nenhum endereço encontrado.");
       }
+    } catch {
+      setSearchError("Não foi possível buscar o endereço. Tente novamente.");
     } finally {
       setSearching(false);
     }
@@ -413,6 +424,10 @@ export default function TerrainMapClient({
           </div>
         )}
       </div>
+
+      {searchError && (
+        <p className="text-sm text-red-400">{searchError}</p>
+      )}
 
       <div className="relative overflow-hidden rounded-xl border border-white/10">
         <MapContainer

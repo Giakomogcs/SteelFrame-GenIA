@@ -96,16 +96,6 @@ const MAT_SKYLIGHT = new THREE.MeshStandardMaterial({
   emissiveIntensity: 0.25,
   side: THREE.DoubleSide,
 });
-const MAT_DOCK = new THREE.MeshStandardMaterial({
-  color: 0x111827,
-  roughness: 0.4,
-  metalness: 0.2,
-});
-const MAT_DOCK_FRAME = new THREE.MeshStandardMaterial({
-  color: 0xfacc15,
-  roughness: 0.5,
-  metalness: 0.3,
-});
 const MAT_PORTAL = new THREE.MeshStandardMaterial({
   color: 0x1e293b,
   roughness: 0.4,
@@ -479,9 +469,7 @@ export function buildShedMesh(
       );
     }
     if (shed) {
-      addDocks(g, shed, w, d, placement.id);
       addOpenings(g, shed, w, d, placement.id);
-      addZoneFloors(g, shed, w, d, placement.id);
       addZoneVolumes(g, shed, w, d, placement.id);
       if (shed.mezzanine) {
         addMezzanine(g, shed, w, d, placement.id);
@@ -739,45 +727,6 @@ function addGableEnds(
   geom.dispose();
 }
 
-/** Colored floor patches marking each functional program area (zoneamento).
- * Renders one thin translucent slab per zone so the user can read the
- * intended use of every part of the shed floor. */
-function addZoneFloors(
-  parent: THREE.Group,
-  shed: IndustrialShed,
-  width: number,
-  depth: number,
-  id: string,
-): void {
-  if (!shed.zones || shed.zones.length === 0) return;
-  const halfW = width / 2;
-  const halfD = depth / 2;
-  const sx = width / Math.max(1, shed.footprint.width);
-  const sz = depth / Math.max(1, shed.footprint.depth);
-  let i = 0;
-  for (const zone of shed.zones) {
-    const zw = Math.max(1, zone.width * sx);
-    const zd = Math.max(1, zone.depth * sz);
-    const zx = -halfW + zone.x * sx + zw / 2;
-    const zz = -halfD + zone.z * sz + zd / 2;
-    const color = ZONE_COLORS[zone.type] ?? 0x9ca3af;
-    const mat = new THREE.MeshStandardMaterial({
-      color,
-      roughness: 0.85,
-      metalness: 0.05,
-      transparent: true,
-      opacity: 0.38,
-      emissive: new THREE.Color(color),
-      emissiveIntensity: 0.12,
-    });
-    const slab = new THREE.Mesh(new THREE.BoxGeometry(zw, 0.06, zd), mat);
-    slab.position.set(zx, 0.07, zz);
-    slab.name = `zone:${id}:${zone.type}:${i}:floor`;
-    parent.add(slab);
-    i++;
-  }
-}
-
 function addGableRoof(
   parent: THREE.Group,
   width: number,
@@ -854,58 +803,6 @@ function addSkylightStrips(
 }
 
 /** Dock doors rendered as colored rectangles flush with the chosen wall. */
-function addDocks(
-  parent: THREE.Group,
-  shed: IndustrialShed,
-  width: number,
-  depth: number,
-  id: string,
-): void {
-  if (!shed.docks || shed.docks.length === 0) return;
-  const dockWidth = 3;
-  const dockHeight = 3.5;
-  // Treat shed's local north (z=depth) as our +Z front.
-  const halfW = width / 2;
-  const halfD = depth / 2;
-  let i = 0;
-  for (const dock of shed.docks) {
-    let x = 0;
-    let z = 0;
-    let rotY = 0;
-    if (dock.wall === "north" || dock.wall === "south") {
-      // Map shed.x in [0..shed.footprint.width] → local [-halfW..halfW].
-      const relX = (dock.x / Math.max(1, shed.footprint.width)) * width;
-      x = -halfW + relX;
-      z = dock.wall === "north" ? halfD - 0.11 : -halfD + 0.11;
-      rotY = 0;
-    } else {
-      const relZ = (dock.z / Math.max(1, shed.footprint.depth)) * depth;
-      z = -halfD + relZ;
-      x = dock.wall === "east" ? halfW - 0.11 : -halfW + 0.11;
-      rotY = Math.PI / 2;
-    }
-    // Door + frame.
-    const door = new THREE.Mesh(
-      new THREE.BoxGeometry(dockWidth, dockHeight, 0.05),
-      MAT_DOCK,
-    );
-    door.position.set(x, dockHeight / 2 + 0.1, z);
-    door.rotation.y = rotY;
-    door.name = `dock:${id}:${i}`;
-    parent.add(door);
-    const frame = new THREE.Mesh(
-      new THREE.BoxGeometry(dockWidth + 0.4, 0.15, 0.05),
-      MAT_DOCK_FRAME,
-    );
-    frame.position.set(x, dockHeight + 0.1, z);
-    frame.rotation.y = rotY;
-    frame.name = `dock:${id}:${i}:lintel`;
-    parent.add(frame);
-    i++;
-  }
-}
-
-/** Sectional portals + man-doors as visible openings on the chosen wall. */
 function addOpenings(
   parent: THREE.Group,
   shed: IndustrialShed,
