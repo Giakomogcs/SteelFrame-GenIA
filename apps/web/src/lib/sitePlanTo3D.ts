@@ -398,8 +398,6 @@ export function buildGatesLayer(
 
 // ---- Layer 6/7 — shed (skeleton + envelope) -----------------------------
 
-const COLUMN_SIZE = 0.3;
-
 /**
  * Pure shed builder. Creates a Group centered at (0,0) sized by the
  * placement's footprint — caller is responsible for translating/rotating
@@ -430,7 +428,6 @@ export function buildShedMesh(
     placement.rotationRad ?? 0,
   );
   const height = shed?.structure.clearHeight ?? 8;
-  const freeSpan = shed?.structure.freeSpan ?? Math.min(w, d);
   const baySpacing = shed?.structure.baySpacing ?? 6;
   const bayCount =
     shed?.structure.bayCount ?? Math.max(1, Math.round(d / baySpacing));
@@ -443,28 +440,15 @@ export function buildShedMesh(
   floor.name = `floor:${placement.id}`;
   g.add(floor);
 
-  // Steel-frame skeleton: pairs of columns along Z, trusses on top.
-  // `bayCount` no schema é "Nº de pórticos" → criamos exatamente esse número
-  // de pórticos (não bayCount+1) distribuídos sobre a profundidade REAL do
-  // placement `d` (não `baySpacing × bayCount`, que pode divergir e fazer a
-  // estrutura ultrapassar o tamanho pedido no wizard).
-  const halfSpan = Math.min(freeSpan, w) / 2;
-  const portalCount = Math.max(1, Math.min(60, bayCount));
-  const portalSpacing = portalCount > 1 ? d / (portalCount - 1) : 0;
-  for (let i = 0; i < portalCount; i++) {
-    const z = portalCount > 1 ? -d / 2 + i * portalSpacing : 0;
-    addColumn(g, -halfSpan, z, height, placement.id, i, "L");
-    addColumn(g, halfSpan, z, height, placement.id, i, "R");
-    addTruss(
-      g,
-      z,
-      halfSpan * 2,
-      Math.max(1, height * 0.18),
-      height,
-      placement.id,
-      i,
-    );
-  }
+  // Steel-frame skeleton. `bayCount` no schema é "Nº de pórticos". Os pórticos
+  // são apoiados na LINHA DA PAREDE (±w/2) e as águas (rafters) seguem
+  // EXATAMENTE a mesma inclinação do telhado (roof.slopePct), de modo que a
+  // estrutura acompanhe o formato real do galpão — colunas, água e cumeeira
+  // coincidem com vedação e cobertura. Vigas longitudinais (eave/cumeeira) e
+  // terças amarram os pórticos entre si.
+  const portalCount = Math.max(2, Math.min(60, bayCount));
+  const roofPitch = shed?.roof?.slopePct ?? 10;
+  addSteelFrame(g, w, d, height, roofPitch, portalCount, placement.id);
 
   if (lod === "architectural") {
     const baseH = Math.min(
@@ -473,6 +457,7 @@ export function buildShedMesh(
     );
     const palette = paletteForUse(placement.use);
     addLayeredWalls(g, w, d, height, baseH, placement.id, palette);
+    addGableEnds(g, w, d, height, roofPitch, placement.id, palette);
     addGableRoof(
       g,
       w,
@@ -496,6 +481,7 @@ export function buildShedMesh(
     if (shed) {
       addDocks(g, shed, w, d, placement.id);
       addOpenings(g, shed, w, d, placement.id);
+      addZoneFloors(g, shed, w, d, placement.id);
       addZoneVolumes(g, shed, w, d, placement.id);
       if (shed.mezzanine) {
         addMezzanine(g, shed, w, d, placement.id);
@@ -506,53 +492,143 @@ export function buildShedMesh(
   return g;
 }
 
-function addColumn(
+/** Small helper: an axis-aligned box mesh with a layer-prefixed name. */
+function addNamedBox(
   parent: THREE.Group,
-  x: number,
-  z: number,
-  height: number,
-  id: string,
-  bay: number,
-  side: "L" | "R",
-): void {
-  const geom = new THREE.BoxGeometry(COLUMN_SIZE, height, COLUMN_SIZE);
-  const m = new THREE.Mesh(geom, MAT_COLUMN);
-  m.position.set(x, height / 2, z);
-  m.name = `column:${id}:b${bay}:${side}`;
-  parent.add(m);
+  size: [number, number, number],
+  pos: [number, number, number],
+  mat: THREE.Material,
+  name: string,
+  rotZ = 0,
+): THREE.Mesh {
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), mat);
+  mesh.position.set(...pos);
+  if (rotZ) mesh.rotation.z = rotZ;
+  mesh.name = name;
+  parent.add(mesh);
+  return mesh;
 }
 
-function addTruss(
+/**
+ * Realistic single-span steel portal frame skeleton.
+ *
+ * • Columns sit on the wall line (±width/2) so the frame footprint equals the
+ *   envelope footprint.
+ * • Rafters follow the SAME gable pitch as the roof (rise = halfWidth·pitch%),
+ *   meeting at the ridge — the steel now matches the real shed shape.
+ * • Knee braces stiffen each eave joint; an apex post supports the ridge.
+ * • Longitudinal members (eave beams + ridge beam) and roof purlins (terças)
+ *   tie the portals together, giving a believable industrial skeleton.
+ *
+ * Every mesh keeps the `column:`/`truss:` name prefixes so the viewer's
+ * "Estrutura" layer toggle continues to work.
+ */
+function addSteelFrame(
   parent: THREE.Group,
-  z: number,
-  span: number,
-  rise: number,
-  baseY: number,
+  width: number,
+  depth: number,
+  eaveHeight: number,
+  pitchPct: number,
+  portalCount: number,
   id: string,
-  bay: number,
 ): void {
-  const group = new THREE.Group();
-  group.position.set(0, baseY, z);
-  group.name = `truss:${id}:b${bay}`;
-  // Bottom chord.
-  const bot = new THREE.Mesh(new THREE.BoxGeometry(span, 0.15, 0.15), MAT_BEAM);
-  bot.name = `truss:${id}:b${bay}:bottom`;
-  group.add(bot);
-  // Two top slopes.
-  const halfSpan = span / 2;
-  for (const dir of [-1, 1] as const) {
-    const len = Math.hypot(halfSpan, rise);
-    const angle = Math.atan2(rise, halfSpan) * dir;
-    const slope = new THREE.Mesh(
-      new THREE.BoxGeometry(len, 0.15, 0.15),
-      MAT_BEAM,
+  const halfW = width / 2;
+  const rise = halfW * (pitchPct / 100);
+  const count = Math.max(2, Math.min(60, portalCount));
+  const spacing = depth / (count - 1);
+  const colW = Math.min(0.55, Math.max(0.3, eaveHeight * 0.045));
+  const rafterH = Math.max(0.24, colW * 0.85);
+  const rafLen = Math.hypot(halfW, rise);
+  const rafAng = Math.atan2(rise, halfW);
+
+  for (let i = 0; i < count; i++) {
+    const z = -depth / 2 + i * spacing;
+    // Columns on the wall line + base plates.
+    for (const dir of [-1, 1] as const) {
+      const cx = dir * (halfW - colW / 2);
+      const side = dir < 0 ? "L" : "R";
+      addNamedBox(
+        parent,
+        [colW, eaveHeight, colW],
+        [cx, eaveHeight / 2, z],
+        MAT_COLUMN,
+        `column:${id}:b${i}:${side}`,
+      );
+      addNamedBox(
+        parent,
+        [colW * 2.1, 0.12, colW * 2.1],
+        [cx, 0.06, z],
+        MAT_BEAM,
+        `column:${id}:b${i}:${side}:base`,
+      );
+      // Rafter (top chord) following the roof pitch.
+      addNamedBox(
+        parent,
+        [rafLen, rafterH, 0.16],
+        [(halfW / 2) * dir, eaveHeight + rise / 2, z],
+        MAT_BEAM,
+        `truss:${id}:b${i}:rafter${dir > 0 ? "R" : "L"}`,
+        -rafAng * dir,
+      );
+      // Knee brace at the eave joint (45°-ish gusset strut).
+      const braceLen = Math.min(2.2, eaveHeight * 0.35);
+      addNamedBox(
+        parent,
+        [braceLen, 0.14, 0.12],
+        [
+          dir * (halfW - braceLen * 0.55),
+          eaveHeight - braceLen * 0.4,
+          z,
+        ],
+        MAT_BEAM,
+        `truss:${id}:b${i}:knee${dir > 0 ? "R" : "L"}`,
+        dir * (Math.PI / 4),
+      );
+    }
+    // Apex post tying both rafters at the ridge.
+    addNamedBox(
+      parent,
+      [0.16, Math.max(0.6, rise * 0.9), 0.16],
+      [0, eaveHeight + rise - Math.max(0.6, rise * 0.9) / 2, z],
+      MAT_COLUMN,
+      `truss:${id}:b${i}:apex`,
     );
-    slope.position.set((halfSpan / 2) * dir, rise / 2, 0);
-    slope.rotation.z = -angle;
-    slope.name = `truss:${id}:b${bay}:slope${dir > 0 ? "R" : "L"}`;
-    group.add(slope);
   }
-  parent.add(group);
+
+  // Longitudinal eave beams (both walls) + ridge beam tie portals along Z.
+  for (const dir of [-1, 1] as const) {
+    addNamedBox(
+      parent,
+      [0.2, 0.24, depth],
+      [dir * (halfW - colW / 2), eaveHeight - 0.12, 0],
+      MAT_BEAM,
+      `truss:${id}:eave${dir > 0 ? "R" : "L"}`,
+    );
+  }
+  addNamedBox(
+    parent,
+    [0.2, 0.22, depth],
+    [0, eaveHeight + rise - 0.11, 0],
+    MAT_BEAM,
+    `truss:${id}:ridge`,
+  );
+
+  // Roof purlins (terças) running along Z on each slope.
+  const purlinsPerSlope = Math.max(2, Math.round(rafLen / 1.6));
+  for (const dir of [-1, 1] as const) {
+    for (let p = 1; p <= purlinsPerSlope; p++) {
+      const t = p / (purlinsPerSlope + 1); // 0..1 from eave to ridge
+      const px = dir * halfW * (1 - t);
+      const py = eaveHeight + rise * t + rafterH * 0.6;
+      addNamedBox(
+        parent,
+        [0.09, 0.12, depth],
+        [px, py, 0],
+        MAT_COLUMN,
+        `truss:${id}:purlin${dir > 0 ? "R" : "L"}:${p}`,
+      );
+    }
+  }
 }
 
 function addWalls(
@@ -631,6 +707,78 @@ function addLayeredWalls(
       upper.name = `wall:${id}:${wlObj.name}:upper`;
       parent.add(upper);
     }
+  }
+}
+
+/** Triangular gable-end infill closing the wall under the roof peak on the
+ * front and back faces (avoids a visible open triangle between eave and ridge). */
+function addGableEnds(
+  parent: THREE.Group,
+  width: number,
+  depth: number,
+  eaveHeight: number,
+  pitchPct: number,
+  id: string,
+  palette?: { wallMetal: number },
+): void {
+  const halfW = width / 2;
+  const rise = halfW * (pitchPct / 100);
+  if (rise < 0.05) return;
+  const mat = palette
+    ? cloneStandard(MAT_WALL_METAL, palette.wallMetal)
+    : MAT_WALL_METAL.clone();
+  mat.side = THREE.DoubleSide;
+  const shape = new THREE.Shape();
+  shape.moveTo(-halfW, 0);
+  shape.lineTo(halfW, 0);
+  shape.lineTo(0, rise);
+  shape.closePath();
+  const geom = new THREE.ShapeGeometry(shape);
+  for (const dir of [-1, 1] as const) {
+    const m = new THREE.Mesh(geom.clone(), mat);
+    m.position.set(0, eaveHeight, dir * (depth / 2));
+    m.name = `wall:${id}:gable${dir > 0 ? "F" : "B"}`;
+    parent.add(m);
+  }
+  geom.dispose();
+}
+
+/** Colored floor patches marking each functional program area (zoneamento).
+ * Renders one thin translucent slab per zone so the user can read the
+ * intended use of every part of the shed floor. */
+function addZoneFloors(
+  parent: THREE.Group,
+  shed: IndustrialShed,
+  width: number,
+  depth: number,
+  id: string,
+): void {
+  if (!shed.zones || shed.zones.length === 0) return;
+  const halfW = width / 2;
+  const halfD = depth / 2;
+  const sx = width / Math.max(1, shed.footprint.width);
+  const sz = depth / Math.max(1, shed.footprint.depth);
+  let i = 0;
+  for (const zone of shed.zones) {
+    const zw = Math.max(1, zone.width * sx);
+    const zd = Math.max(1, zone.depth * sz);
+    const zx = -halfW + zone.x * sx + zw / 2;
+    const zz = -halfD + zone.z * sz + zd / 2;
+    const color = ZONE_COLORS[zone.type] ?? 0x9ca3af;
+    const mat = new THREE.MeshStandardMaterial({
+      color,
+      roughness: 0.85,
+      metalness: 0.05,
+      transparent: true,
+      opacity: 0.38,
+      emissive: new THREE.Color(color),
+      emissiveIntensity: 0.12,
+    });
+    const slab = new THREE.Mesh(new THREE.BoxGeometry(zw, 0.06, zd), mat);
+    slab.position.set(zx, 0.07, zz);
+    slab.name = `zone:${id}:${zone.type}:${i}:floor`;
+    parent.add(slab);
+    i++;
   }
 }
 

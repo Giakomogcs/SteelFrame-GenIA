@@ -7,6 +7,37 @@ import { isIndustrialShed, type IndustrialShed } from "@/lib/shedSchema";
 import { SitePlanSchema, type SitePlan } from "@/lib/sitePlanSchema";
 import { DeleteBuildingButton } from "@/components/DeleteBuildingButton";
 import type { LngLat } from "@/lib/geo";
+import { COST_PER_M2, STEEL_KG_PER_M2 } from "@/lib/shedDefaults";
+
+/** Heurísticas de fallback (espelham `generateFallbackShed`). */
+const BAY_SPACING_BY_USE: Record<string, number> = {
+  logistics: 8,
+  distribution_center: 8,
+  cross_dock: 8,
+  cold_storage: 8,
+  industrial: 7,
+  manufacturing: 7,
+};
+const CLEAR_HEIGHT_BY_USE: Record<string, number> = {
+  logistics: 10,
+  distribution_center: 10,
+  cross_dock: 10,
+  cold_storage: 12,
+  industrial: 8,
+  manufacturing: 8,
+};
+
+/** Área (m²) de um polígono local (ENU) via shoelace. */
+function polygonAreaLocal(poly: { x: number; z: number }[]): number {
+  if (!poly || poly.length < 3) return 0;
+  let a = 0;
+  for (let i = 0; i < poly.length; i++) {
+    const p = poly[i];
+    const q = poly[(i + 1) % poly.length];
+    a += p.x * q.z - q.x * p.z;
+  }
+  return Math.abs(a) / 2;
+}
 
 // 3D viewers carregam só no client e só quando há seleção
 const ShedViewer = dynamic(() => import("@/components/ShedViewer"), {
@@ -82,32 +113,68 @@ function summarize(model: unknown) {
     const sheds: IndustrialShed[] = site.buildings
       .map((b) => b.shed)
       .filter((s): s is IndustrialShed => !!s && isIndustrialShed(s));
-    const totalCost = sheds.reduce(
-      (acc, s) => acc + (s.estimate.totalCost || 0),
-      0,
-    );
-    // Área coberta: prefere estimate dos sheds embarcados; cai para
-    // targetAreaM2 das BuildingPlacement (estudos sem shed sintetizado ainda).
+    // KPIs agregados: custo, aço, pórticos e pé-direito. Sempre exibe um
+    // valor — quando o `BuildingPlacement` ainda não tem `shed` sintetizado,
+    // calculamos uma estimativa paramétrica a partir do footprint e do uso.
+    let totalCost = 0;
+    let steelKg = 0;
+    let bays = 0;
+    let height = 0;
+    for (const b of site.buildings) {
+      const s = b.shed;
+      const footprintArea = polygonAreaLocal(b.footprintPolygon);
+      // bbox local do footprint para inferir profundidade.
+      let bMinX = Infinity,
+        bMaxX = -Infinity,
+        bMinZ = Infinity,
+        bMaxZ = -Infinity;
+      for (const p of b.footprintPolygon) {
+        if (p.x < bMinX) bMinX = p.x;
+        if (p.x > bMaxX) bMaxX = p.x;
+        if (p.z < bMinZ) bMinZ = p.z;
+        if (p.z > bMaxZ) bMaxZ = p.z;
+      }
+      const bDepth = Number.isFinite(bMinZ) ? bMaxZ - bMinZ : 0;
+      const areaB = footprintArea > 0 ? footprintArea : b.targetAreaM2 || 0;
+      const use = (s?.use ?? b.use) as string;
+      const spacing = BAY_SPACING_BY_USE[use] ?? 8;
+      const fallbackDepth =
+        bDepth > 0 ? bDepth : areaB > 0 ? Math.sqrt(areaB * 2) : 0;
+
+      if (s && isIndustrialShed(s) && s.estimate.totalCost > 0) {
+        totalCost += s.estimate.totalCost;
+      } else {
+        totalCost += Math.round(areaB * COST_PER_M2.medio);
+      }
+      if (s && isIndustrialShed(s) && s.estimate.steelKg > 0) {
+        steelKg += s.estimate.steelKg;
+      } else {
+        steelKg += Math.round(areaB * STEEL_KG_PER_M2.porticos_aco);
+      }
+      if (s && isIndustrialShed(s) && s.structure.bayCount > 0) {
+        bays += s.structure.bayCount;
+      } else if (fallbackDepth > 0) {
+        bays += Math.max(3, Math.round(fallbackDepth / spacing));
+      }
+      const hB =
+        s && isIndustrialShed(s) && s.structure.clearHeight > 0
+          ? s.structure.clearHeight
+          : (CLEAR_HEIGHT_BY_USE[use] ?? 10);
+      if (hB > height) height = hB;
+    }
+    // Área coberta: prefere estimate dos sheds embarcados; cai para a área
+    // real do footprint (ou targetAreaM2) quando não há shed sintetizado.
     const areaFromSheds = sheds.reduce(
       (acc, s) =>
         acc +
         (s.estimate.coveredAreaM2 || s.footprint.width * s.footprint.depth),
       0,
     );
-    const areaFromPlacements = site.buildings.reduce(
-      (acc, b) => acc + (b.targetAreaM2 || 0),
-      0,
-    );
+    const areaFromPlacements = site.buildings.reduce((acc, b) => {
+      const fp = polygonAreaLocal(b.footprintPolygon);
+      return acc + (fp > 0 ? fp : b.targetAreaM2 || 0);
+    }, 0);
     const areaM2 = areaFromSheds > 0 ? areaFromSheds : areaFromPlacements;
-    const steelKg = sheds.reduce(
-      (acc, s) => acc + (s.estimate.steelKg || 0),
-      0,
-    );
-    const bays = sheds.reduce((acc, s) => acc + (s.structure.bayCount || 0), 0);
-    const height = sheds.reduce(
-      (max, s) => Math.max(max, s.structure.clearHeight || 0),
-      0,
-    );
     const costPerM2 = areaM2 > 0 ? totalCost / areaM2 : 0;
     // Bounding box dos footprints locais para apresentar dimensões agregadas.
     let minX = Infinity,
@@ -179,18 +246,44 @@ function summarize(model: unknown) {
   } | null;
   const width = m?.footprint?.width ?? 0;
   const depth = m?.footprint?.depth ?? 0;
+  const areaLegacy =
+    m?.estimate?.coveredAreaM2 ?? m?.footprint?.areaM2 ?? width * depth;
+  const useLegacy = m?.use ?? "logistics";
+  const spacingLegacy = BAY_SPACING_BY_USE[useLegacy] ?? 8;
+  const fallbackDepth =
+    depth > 0 ? depth : areaLegacy > 0 ? Math.sqrt(areaLegacy * 2) : 0;
+  const baysLegacy =
+    m?.bays && m.bays > 0
+      ? m.bays
+      : fallbackDepth > 0
+        ? Math.max(3, Math.round(fallbackDepth / spacingLegacy))
+        : 0;
+  const heightLegacy =
+    m?.height && m.height > 0
+      ? m.height
+      : (CLEAR_HEIGHT_BY_USE[useLegacy] ?? 10);
+  const steelLegacy =
+    m?.estimate?.steelKg ??
+    m?.estimatedSteelKg ??
+    (areaLegacy > 0
+      ? Math.round(areaLegacy * STEEL_KG_PER_M2.porticos_aco)
+      : 0);
+  const costLegacy =
+    m?.estimate?.totalCost ??
+    m?.estimatedCost ??
+    (areaLegacy > 0 ? Math.round(areaLegacy * COST_PER_M2.medio) : 0);
   return {
     kind: "legacy" as const,
     use: m?.use ?? "—",
     standard: "—",
     width,
     depth,
-    areaM2: m?.estimate?.coveredAreaM2 ?? m?.footprint?.areaM2 ?? width * depth,
-    totalCost: m?.estimate?.totalCost ?? m?.estimatedCost ?? 0,
-    costPerM2: m?.estimate?.costPerM2 ?? 0,
-    steelKg: m?.estimate?.steelKg ?? m?.estimatedSteelKg ?? 0,
-    bays: m?.bays ?? 0,
-    height: m?.height ?? 0,
+    areaM2: areaLegacy,
+    totalCost: costLegacy,
+    costPerM2: areaLegacy > 0 ? costLegacy / areaLegacy : 0,
+    steelKg: steelLegacy,
+    bays: baysLegacy,
+    height: heightLegacy,
     shed: null,
     site: null as SitePlan | null,
     buildingCount: 0,

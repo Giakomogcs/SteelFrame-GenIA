@@ -9,7 +9,14 @@ import {
 } from "./shedDefaults";
 import { buildKnowledgeBlock } from "./knowledge";
 
-const MAX_RETRIES = 3;
+// Limite de retries em caso de JSON inválido. Cada retry custa mais ~10-30s
+// de latência ao usuário, então mantemos baixo e caímos no fallback
+// determinístico rapidamente se o modelo insistir em respostas inválidas.
+const MAX_RETRIES = 1;
+/** Teto de tokens da resposta — evita o modelo "viajar" e cortar 30s+ de stream. */
+const MAX_OUTPUT_TOKENS = 4000;
+/** Timeout duro por tentativa (ms) — falha rápido e cai no fallback. */
+const REQUEST_TIMEOUT_MS = 75_000;
 
 export const SHED_SYSTEM_PROMPT = `Você é um agente de pré-projeto especializado em galpões logísticos e industriais em Steel Frame / pórticos de aço no Brasil.
 Converta o briefing do usuário em UM ÚNICO JSON VÁLIDO conforme o schema "IndustrialShed".
@@ -102,7 +109,13 @@ export type ShedSSEEvent =
 function getAzureConfig() {
   const endpoint = process.env.AZURE_AI_ENDPOINT?.replace(/\/+$/, "");
   const apiKey = process.env.AZURE_AI_API_KEY;
-  const model = process.env.AZURE_AI_MODEL || "gpt-5.4-mini";
+  // AZURE_AI_FAST_MODEL: deployment mais barato/rápido (ex.: gpt-4o-mini)
+  // usado pelo fluxo per-shed do wizard, onde latência é crítica.
+  // Cai em AZURE_AI_MODEL → gpt-5.4-mini se não configurado.
+  const model =
+    process.env.AZURE_AI_FAST_MODEL ||
+    process.env.AZURE_AI_MODEL ||
+    "gpt-5.4-mini";
   const apiVersion = process.env.AZURE_AI_API_VERSION || "2024-05-01-preview";
   return { endpoint, apiKey, model, apiVersion };
 }
@@ -135,9 +148,11 @@ async function* azureStream(
       model,
       messages,
       temperature: 0.3,
+      max_tokens: MAX_OUTPUT_TOKENS,
       response_format: { type: "json_object" },
       stream: true,
     }),
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });
 
   if (!res.ok) {

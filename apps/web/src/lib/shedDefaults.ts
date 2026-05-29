@@ -1,5 +1,6 @@
 // Fallback determinístico + heurísticas para o IndustrialShed.
 import type { IndustrialShed } from "./shedSchema";
+import type { BuildingPlacement } from "./sitePlanSchema";
 import { COST_PER_M2_BY_STATE } from "./knowledge";
 
 export interface FallbackContext {
@@ -214,6 +215,80 @@ export function generateFallbackShed(
     confidence: 0.5,
   };
 
+  return shed;
+}
+
+/** Largura/profundidade reais (frame local) do footprint de um placement. */
+function footprintLocalSize(
+  poly: { x: number; z: number }[],
+  rotationRad = 0,
+): { w: number; d: number } {
+  const pts =
+    rotationRad && poly.length
+      ? (() => {
+          const c = poly.reduce((a, p) => ({ x: a.x + p.x, z: a.z + p.z }), {
+            x: 0,
+            z: 0,
+          });
+          const cx = c.x / poly.length;
+          const cz = c.z / poly.length;
+          const cos = Math.cos(-rotationRad);
+          const sin = Math.sin(-rotationRad);
+          return poly.map((p) => {
+            const dx = p.x - cx;
+            const dz = p.z - cz;
+            return { x: dx * cos - dz * sin, z: dx * sin + dz * cos };
+          });
+        })()
+      : poly;
+  let minX = Infinity,
+    maxX = -Infinity,
+    minZ = Infinity,
+    maxZ = -Infinity;
+  for (const v of pts) {
+    if (v.x < minX) minX = v.x;
+    if (v.x > maxX) maxX = v.x;
+    if (v.z < minZ) minZ = v.z;
+    if (v.z > maxZ) maxZ = v.z;
+  }
+  return { w: maxX - minX, d: maxZ - minZ };
+}
+
+/**
+ * Galpão sintetizado (em memória, nunca persistido) a partir do placement —
+ * mesma lógica do viewer 3D (`deriveShedForPlacement`), porém sem dependência
+ * do Three.js para poder rodar em Server Components. Útil para somar custos /
+ * área coberta quando o placement guarda apenas o footprint.
+ */
+export function synthesizeShedFromPlacement(
+  placement: BuildingPlacement,
+): IndustrialShed {
+  const { w, d } = footprintLocalSize(
+    placement.footprintPolygon,
+    placement.rotationRad ?? 0,
+  );
+  const areaM2 = Math.max(placement.targetAreaM2 ?? 0, Math.round(w * d));
+  const shed = generateFallbackShed({
+    areaM2,
+    use: placement.use,
+    standard: "medio",
+  });
+  shed.footprint = {
+    width: Math.max(6, Math.round(w)),
+    depth: Math.max(6, Math.round(d)),
+  };
+  shed.structure.freeSpan = Math.min(
+    shed.structure.freeSpan,
+    shed.footprint.width,
+  );
+  const bayCount = Math.max(
+    2,
+    Math.round(shed.footprint.depth / shed.structure.baySpacing),
+  );
+  shed.structure.bayCount = bayCount;
+  shed.structure.baySpacing = Number(
+    (shed.footprint.depth / bayCount).toFixed(2),
+  );
   return shed;
 }
 

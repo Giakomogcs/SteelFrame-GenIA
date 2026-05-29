@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@sfg/db";
-import { TerrainCard } from "@/components/TerrainCard";
+import { TerrainsExplorer } from "@/components/TerrainsExplorer";
 import { Breadcrumb } from "@/components/Breadcrumb";
 
 export const dynamic = "force-dynamic";
@@ -149,36 +149,7 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* Filter rail */}
-      <section className="filter-rail">
-        <div className="search-wrap">
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <circle cx="11" cy="11" r="7" />
-            <line x1="21" y1="21" x2="16.65" y2="16.65" />
-          </svg>
-          <input
-            className="search"
-            placeholder="Buscar por endereço, bairro, ID…"
-          />
-        </div>
-        <div className="filter-group">
-          <span className="filter-label">Status</span>
-          <button className="chip active">Todos</button>
-          <button className="chip">Viável ({viaveis})</button>
-          <button className="chip">Em briefing ({emBriefing})</button>
-          <button className="chip">Sem briefing ({semBriefing})</button>
-        </div>
-      </section>
-
+      {/* Filter rail + grid (busca, estado, cidade, status) */}
       {terrains.length === 0 ? (
         <div className="card empty">
           <div className="empty-icon">🗺️</div>
@@ -192,11 +163,7 @@ export default async function HomePage() {
           </Link>
         </div>
       ) : (
-        <section className="terrain-grid">
-          {terrains.map((t) => (
-            <TerrainCard key={t.id} terrain={t} />
-          ))}
-        </section>
+        <TerrainsExplorer terrains={terrains} />
       )}
     </>
   );

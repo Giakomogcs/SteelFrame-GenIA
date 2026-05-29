@@ -11,6 +11,8 @@ import { prisma } from "@sfg/db";
 import {
   gridSamples,
   computeSlopeFromGrid,
+  profileLineSamples,
+  buildProfile,
   type LngLat,
   type SlopeAnalysis,
 } from "@/lib/geo";
@@ -18,6 +20,9 @@ import { fetchElevations } from "@/lib/elevationProvider";
 
 /** Quantidade de células por lado da grade. 10×10 = 100 → 1 req OpenTopoData. */
 const GRID_N = 10;
+/** Pontos densos ao longo do eixo principal do polígono para o perfil AA'.
+ *  Mantemos GRID_N²+PROFILE_N ≤ 200 (2 chunks de OpenTopoData ou 1 req de OT). */
+const PROFILE_N = 60;
 
 export async function measureAndPersistSlope(
   terrainId: string,
@@ -28,13 +33,34 @@ export async function measureAndPersistSlope(
   if (!polygon || polygon.length < 3) throw new Error("Polígono inválido");
 
   const grid = gridSamples(polygon, GRID_N);
-  const points: Array<[number, number]> = grid.samples.map((s) => [
+  const profileLine = profileLineSamples(polygon, PROFILE_N);
+
+  const gridPoints: Array<[number, number]> = grid.samples.map((s) => [
     s.lng,
     s.lat,
   ]);
+  const profilePoints: Array<[number, number]> = profileLine.points.map((p) => [
+    p[0],
+    p[1],
+  ]);
+  const allPoints = [...gridPoints, ...profilePoints];
 
-  const { elevations } = await fetchElevations(points, grid.bbox);
-  const analysis = computeSlopeFromGrid(grid, elevations, polygon);
+  // bbox cobrindo grid + linha do perfil (caso a corda exceda o bbox do grid)
+  const allLngs = allPoints.map((p) => p[0]);
+  const allLats = allPoints.map((p) => p[1]);
+  const bbox = {
+    minLng: Math.min(...allLngs),
+    maxLng: Math.max(...allLngs),
+    minLat: Math.min(...allLats),
+    maxLat: Math.max(...allLats),
+  };
+
+  const { elevations } = await fetchElevations(allPoints, bbox);
+  const gridElev = elevations.slice(0, gridPoints.length);
+  const profileElev = elevations.slice(gridPoints.length);
+
+  const profile = buildProfile(profileLine.points, profileElev);
+  const analysis = computeSlopeFromGrid(grid, gridElev, polygon, profile);
 
   await prisma.terrain.update({
     where: { id: terrain.id },

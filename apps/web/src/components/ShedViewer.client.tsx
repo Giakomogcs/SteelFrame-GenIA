@@ -66,7 +66,7 @@ function LayerGroup({
 }: {
   layer: LayerId;
   visible: boolean;
-  isolated: LayerId | null;
+  isolated: Set<LayerId>;
   explode: number;
   xray?: boolean;
   children: React.ReactNode;
@@ -78,7 +78,9 @@ function LayerGroup({
   // interna (treliças, colunas, mezanino). Outras camadas não afetadas.
   const xrayMult =
     xray && (layer === "roof" || layer === "cladding") ? 0.18 : 1;
-  const dim = (isolated && isolated !== layer ? 0.08 : 1) * xrayMult;
+  // Multi-seleção: quando há camadas isoladas, as demais ficam apagadas.
+  const isDimmed = isolated.size > 0 && !isolated.has(layer);
+  const dim = (isDimmed ? 0.08 : 1) * xrayMult;
 
   useFrame(() => {
     if (!groupRef.current) return;
@@ -745,34 +747,34 @@ function LayerRail({
   isolated,
   explode,
   onToggle,
-  onIsolate,
+  onToggleIsolate,
   onExplode,
 }: {
   layers: LayerSpec[];
   visible: Record<LayerId, boolean>;
-  isolated: LayerId | null;
+  isolated: Set<LayerId>;
   explode: number;
   onToggle: (id: LayerId) => void;
-  onIsolate: (id: LayerId | null) => void;
+  onToggleIsolate: (id: LayerId) => void;
   onExplode: (v: number) => void;
 }) {
   return (
     <div className="layer-rail">
       <div className="layer-rail-head">
         <span className="lr-title">Camadas</span>
-        <span className="lr-sub">isolar · esconder · explodir</span>
+        <span className="lr-sub">isolar (multi) · esconder · explodir</span>
       </div>
       <div className="layer-chips">
         {/* renderiza de cima → baixo: roof → foundation (como no protótipo) */}
         {[...layers].reverse().map((L) => {
           const isVisible = visible[L.id];
-          const isActive = isolated === L.id;
+          const isActive = isolated.has(L.id);
           return (
             <button
               key={L.id}
               className={`layer-chip lc-${L.id} ${isActive ? "active" : ""}`}
               aria-pressed={isVisible}
-              onClick={() => onIsolate(isActive ? null : L.id)}
+              onClick={() => onToggleIsolate(L.id)}
               style={{ ["--lc-color" as any]: L.color }}
             >
               <span className="lc-tag" style={{ background: L.color }}>
@@ -814,22 +816,24 @@ function LayerRail({
 }
 
 function LayerFocus({
-  layer,
-  spec,
+  specs,
   onClose,
 }: {
-  layer: LayerId;
-  spec: LayerSpec;
+  specs: LayerSpec[];
   onClose: () => void;
 }) {
+  const lead = specs[0];
+  if (!lead) return null;
   return (
-    <div className="layer-focus" style={{ ["--lf-color" as any]: spec.color }}>
-      <span className="lf-tag" style={{ background: spec.color }}>
-        {spec.idx}
+    <div className="layer-focus" style={{ ["--lf-color" as any]: lead.color }}>
+      <span className="lf-tag" style={{ background: lead.color }}>
+        {specs.length === 1 ? lead.idx : `${specs.length}\u00d7`}
       </span>
       <div className="lf-info">
-        <div className="lf-name">{spec.name}</div>
-        <div className="lf-meta">{spec.meta}</div>
+        <div className="lf-name">{specs.map((s) => s.name).join(" + ")}</div>
+        <div className="lf-meta">
+          {specs.length === 1 ? lead.meta : `${specs.length} camadas isoladas`}
+        </div>
       </div>
       <button
         className="lf-close"
@@ -997,7 +1001,9 @@ export default function ShedViewerClient({
       {} as Record<LayerId, boolean>,
     ),
   );
-  const [isolated, setIsolated] = useState<LayerId | null>(null);
+  const [isolated, setIsolated] = useState<Set<LayerId>>(
+    () => new Set<LayerId>(),
+  );
   const [explode, setExplode] = useState(0);
   const [envMode, setEnvMode] = useState<EnvMode>("satellite");
   const [envOpacity, setEnvOpacity] = useState(0.6);
@@ -1007,7 +1013,7 @@ export default function ShedViewerClient({
   // Esc → sair do isolamento
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && isolated) setIsolated(null);
+      if (e.key === "Escape" && isolated.size > 0) setIsolated(new Set());
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -1015,6 +1021,14 @@ export default function ShedViewerClient({
 
   const onToggle = (id: LayerId) =>
     setVisible((prev) => ({ ...prev, [id]: !prev[id] }));
+
+  const onToggleIsolate = (id: LayerId) =>
+    setIsolated((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
 
   return (
     <div className="viewport" style={{ height, position: "relative" }}>
@@ -1140,17 +1154,16 @@ export default function ShedViewerClient({
             isolated={isolated}
             explode={explode}
             onToggle={onToggle}
-            onIsolate={setIsolated}
+            onToggleIsolate={onToggleIsolate}
             onExplode={setExplode}
           />
 
           <HudStats shed={shed} />
 
-          {isolated && (
+          {isolated.size > 0 && (
             <LayerFocus
-              layer={isolated}
-              spec={layerMap[isolated]}
-              onClose={() => setIsolated(null)}
+              specs={[...isolated].map((id) => layerMap[id])}
+              onClose={() => setIsolated(new Set())}
             />
           )}
 

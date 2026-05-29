@@ -184,7 +184,13 @@ async function fetchFromOpenTopoData(
   for (let i = 0; i < points.length; i += CHUNK) {
     const slice = points.slice(i, i + CHUNK);
     const locations = slice.map(([lng, lat]) => `${lat},${lng}`).join("|");
-    const url = `${base}?locations=${encodeURIComponent(locations)}`;
+    // interpolation=bilinear é o default da API, mas tornamos explícito
+    // para garantir suavização entre células do DEM (SRTM30m). Sem isso,
+    // pontos muito próximos retornam a MESMA altitude (snap à célula),
+    // o que produz o efeito de "platô-degrau-platô" no perfil AA'.
+    const url =
+      `${base}?locations=${encodeURIComponent(locations)}` +
+      `&interpolation=bilinear`;
     const res = await fetch(url, { signal: AbortSignal.timeout(15_000) });
     if (!res.ok) {
       const body = await res.text().catch(() => "");

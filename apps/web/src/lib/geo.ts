@@ -246,6 +246,68 @@ export function diagonalSamples(polygon: LngLat[], n = 8): LngLat[] {
   return out;
 }
 
+/**
+ * Encontra a corda mais longa entre dois vértices do polígono — o
+ * "eixo principal" geométrico, melhor candidato para o perfil AA'.
+ * Retorna os dois extremos em (lng, lat).
+ */
+export function principalAxis(polygon: LngLat[]): [LngLat, LngLat] | null {
+  if (!polygon || polygon.length < 2) return null;
+  let bestA: LngLat = polygon[0];
+  let bestB: LngLat = polygon[1];
+  let bestD = -1;
+  for (let i = 0; i < polygon.length; i++) {
+    for (let j = i + 1; j < polygon.length; j++) {
+      const d = haversineM(polygon[i], polygon[j]);
+      if (d > bestD) {
+        bestD = d;
+        bestA = polygon[i];
+        bestB = polygon[j];
+      }
+    }
+  }
+  return [bestA, bestB];
+}
+
+/**
+ * Amostra N pontos equidistantes ao longo do eixo principal do polígono.
+ * Esses pontos são usados como **perfil AA'** denso — independente da
+ * grade NxN de volumes — e devem ser consultados ao provider de elevação
+ * para gerar um corte topográfico realista (sem "platôs degrau" causados
+ * pela colocação de poucos pontos sobre células de DEM de 30 m).
+ */
+export function profileLineSamples(
+  polygon: LngLat[],
+  n = 40,
+): { points: LngLat[]; lengthM: number } {
+  const axis = principalAxis(polygon);
+  if (!axis) return { points: [], lengthM: 0 };
+  const [a, b] = axis;
+  const lengthM = haversineM(a, b);
+  const points: LngLat[] = [];
+  for (let i = 0; i < n; i++) {
+    const t = i / (n - 1);
+    points.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]);
+  }
+  return { points, lengthM };
+}
+
+/** Constrói perfil { d, h } a partir de pontos AA' densos + elevações. */
+export function buildProfile(
+  points: LngLat[],
+  elevations: number[],
+): { d: number; h: number }[] {
+  const out: { d: number; h: number }[] = [];
+  let acc = 0;
+  for (let i = 0; i < points.length; i++) {
+    if (i > 0) acc += haversineM(points[i - 1], points[i]);
+    const h = elevations[i];
+    if (!Number.isFinite(h)) continue;
+    out.push({ d: Math.round(acc), h: Number(h.toFixed(2)) });
+  }
+  return out;
+}
+
 /** Distancia em metros entre dois pontos lat/lng (Haversine). */
 export function haversineM(a: LngLat, b: LngLat): number {
   const [lng1, lat1] = a;
@@ -403,6 +465,75 @@ export function gridSamples(polygon: LngLat[], n: number): GridSampling {
   };
 }
 
+/** Resolve sistema linear 3×3 (regra de Cramer). Retorna null se singular. */
+function solve3x3(
+  m: number[][],
+  v: number[],
+): [number, number, number] | null {
+  const det = (a: number[][]) =>
+    a[0][0] * (a[1][1] * a[2][2] - a[1][2] * a[2][1]) -
+    a[0][1] * (a[1][0] * a[2][2] - a[1][2] * a[2][0]) +
+    a[0][2] * (a[1][0] * a[2][1] - a[1][1] * a[2][0]);
+  const D = det(m);
+  if (Math.abs(D) < 1e-9) return null;
+  const col = (j: number) => {
+    const mm = m.map((row) => row.slice());
+    for (let r = 0; r < 3; r++) mm[r][j] = v[r];
+    return det(mm) / D;
+  };
+  return [col(0), col(1), col(2)];
+}
+
+/**
+ * Inclinação média (%) via plano de mínimos quadrados z = a·x + b·y + c
+ * ajustado às cotas reais das células (coords locais em metros). A magnitude
+ * do gradiente √(a² + b²) é a declividade real do terreno — independente da
+ * direção do perfil AA' e robusta a ruído pontual do DEM, ao contrário de
+ * (desnível máximo ÷ comprimento do perfil), que mistura direções diferentes.
+ */
+export function planeSlopePct(
+  cells: { lng: number; lat: number; h: number }[],
+): number {
+  if (cells.length < 3) return 0;
+  const ref: LngLat = [cells[0].lng, cells[0].lat];
+  const local = toLocalMeters(
+    cells.map((c) => [c.lng, c.lat] as LngLat),
+    ref,
+  );
+  let sxx = 0,
+    sxy = 0,
+    syy = 0,
+    sx = 0,
+    sy = 0,
+    sxz = 0,
+    syz = 0,
+    sz = 0;
+  const n = cells.length;
+  for (let i = 0; i < n; i++) {
+    const { x, y } = local[i];
+    const z = cells[i].h;
+    sxx += x * x;
+    sxy += x * y;
+    syy += y * y;
+    sx += x;
+    sy += y;
+    sxz += x * z;
+    syz += y * z;
+    sz += z;
+  }
+  const sol = solve3x3(
+    [
+      [sxx, sxy, sx],
+      [sxy, syy, sy],
+      [sx, sy, n],
+    ],
+    [sxz, syz, sz],
+  );
+  if (!sol) return 0;
+  const [a, b] = sol;
+  return Math.sqrt(a * a + b * b) * 100;
+}
+
 /**
  * Calcula análise de relevo a partir de um GRID 2D amostrado com elevações
  * reais. Integração de corte/aterro usa a área real de cada célula.
@@ -416,6 +547,7 @@ export function computeSlopeFromGrid(
   grid: GridSampling,
   elevations: number[],
   polygon: LngLat[],
+  profileOverride?: { d: number; h: number }[],
 ): SlopeAnalysis {
   const { samples, cellAreaM2 } = grid;
   const cells = samples
@@ -494,31 +626,39 @@ export function computeSlopeFromGrid(
   const recommended = [...options].sort((a, b) => a.totalCost - b.totalCost)[0]
     .key;
 
-  // Perfil AA': diagonal SW→NE da grade.
-  const N = grid.n;
-  const profileCells: { lng: number; lat: number; h: number }[] = [];
-  for (let i = 0; i < N; i++) {
-    const s = cells.find((c) => c.row === i && c.col === i);
-    if (s) profileCells.push({ lng: s.lng, lat: s.lat, h: s.h });
-  }
-  let accD = 0;
-  const profile: { d: number; h: number }[] = [];
-  for (let i = 0; i < profileCells.length; i++) {
-    if (i > 0) {
-      const a = profileCells[i - 1];
-      const b = profileCells[i];
-      accD += haversineM([a.lng, a.lat], [b.lng, b.lat]);
+  // Perfil AA': se o caller passou um perfil denso (amostrado ao longo do
+  // eixo principal do polígono), usamos ele — produz uma curva suave em
+  // vez do "platô-degrau-platô" típico de pegar só a diagonal do grid 10×10
+  // sobre células de DEM de 30 m.
+  let profile: { d: number; h: number }[];
+  if (profileOverride && profileOverride.length > 1) {
+    profile = profileOverride;
+  } else {
+    const N = grid.n;
+    const profileCells: { lng: number; lat: number; h: number }[] = [];
+    for (let i = 0; i < N; i++) {
+      const s = cells.find((c) => c.row === i && c.col === i);
+      if (s) profileCells.push({ lng: s.lng, lat: s.lat, h: s.h });
     }
-    profile.push({
-      d: Math.round(accD),
-      h: Number(profileCells[i].h.toFixed(2)),
-    });
+    let accD = 0;
+    profile = [];
+    for (let i = 0; i < profileCells.length; i++) {
+      if (i > 0) {
+        const a = profileCells[i - 1];
+        const b = profileCells[i];
+        accD += haversineM([a.lng, a.lat], [b.lng, b.lat]);
+      }
+      profile.push({
+        d: Math.round(accD),
+        h: Number(profileCells[i].h.toFixed(2)),
+      });
+    }
   }
 
-  const totalDist =
-    profile.length > 1 ? profile[profile.length - 1].d - profile[0].d : 0;
   const elevationDelta = hMax - hMin;
-  const slopePct = totalDist > 0 ? (elevationDelta / totalDist) * 100 : 0;
+  // Declividade real via plano ajustado às células internas (gradiente médio),
+  // não o desnível máximo ÷ comprimento do perfil — que mistura direções.
+  const slopePct = planeSlopePct(usedCells);
   const classification: SlopeAnalysis["classification"] =
     slopePct < 2
       ? "plano"

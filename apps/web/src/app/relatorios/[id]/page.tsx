@@ -5,6 +5,7 @@ import { Breadcrumb } from "@/components/Breadcrumb";
 import SitePlanViewer3D from "@/components/SitePlanViewer3D.client";
 import { SitePlanSchema, type SitePlan } from "@/lib/sitePlanSchema";
 import { isIndustrialShed, type IndustrialShed } from "@/lib/shedSchema";
+import { synthesizeShedFromPlacement } from "@/lib/shedDefaults";
 import {
   computeViability,
   baseCostPerM2,
@@ -217,12 +218,15 @@ export default async function ReportDetailPage({
 
   // Sheds que efetivamente compõem o projeto:
   // 1) shed embutido em cada BuildingPlacement do SitePlan (caso novo),
-  // 2) fallback: o próprio building.model quando ainda é um IndustrialShed puro.
-  const embeddedSheds: IndustrialShed[] = (site?.buildings ?? [])
-    .map((b) => b.shed)
-    .filter((s): s is IndustrialShed => !!s && isIndustrialShed(s));
+  // 2) síntese a partir do footprint quando o placement só guarda a geometria,
+  // 3) fallback: o próprio building.model quando ainda é um IndustrialShed puro.
+  const planSheds: IndustrialShed[] = (site?.buildings ?? []).map((b) =>
+    b.shed && isIndustrialShed(b.shed)
+      ? (b.shed as IndustrialShed)
+      : synthesizeShedFromPlacement(b),
+  );
   const sheds: IndustrialShed[] =
-    embeddedSheds.length > 0 ? embeddedSheds : shed ? [shed] : [];
+    planSheds.length > 0 ? planSheds : shed ? [shed] : [];
 
   const coveredArea = sheds.reduce(
     (acc, s) =>

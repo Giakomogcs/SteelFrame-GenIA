@@ -192,7 +192,10 @@ export default function SitePlanViewer3D({
     cladding: true,
     roof: true,
   });
-  const [isolatedLayer, setIsolatedLayer] = useState<LayerKey | null>(null);
+  // Conjunto de camadas isoladas (multi-seleção). Vazio = mostra tudo.
+  const [isolatedLayers, setIsolatedLayers] = useState<Set<LayerKey>>(
+    () => new Set<LayerKey>(),
+  );
   const [explodeAmount, setExplodeAmount] = useState(0); // 0..1
   const [mapOpacity, setMapOpacity] = useState(0.65); // 0..1
 
@@ -429,12 +432,12 @@ export default function SitePlanViewer3D({
       // Hide-roof tem precedência (já tratado no efeito acima); aqui só
       // aplicamos visibilidade da camada e isolamento.
       const layerOn = layerVisible[layer];
-      const isolated = isolatedLayer == null || isolatedLayer === layer;
+      const isolated = isolatedLayers.size === 0 || isolatedLayers.has(layer);
       const roofForcedHidden = hideRoof && layer === "roof";
       mesh.visible = !roofForcedHidden && layerOn && isolated;
       mesh.position.y = baseY + EXPLODE_OFFSETS[layer] * explodeAmount * spanY;
     });
-  }, [layerVisible, isolatedLayer, explodeAmount, hideRoof, site]);
+  }, [layerVisible, isolatedLayers, explodeAmount, hideRoof, site]);
 
   // Map plane opacity slider — fades the basemap without disposing it.
   useEffect(() => {
@@ -652,15 +655,15 @@ export default function SitePlanViewer3D({
 
   // Esc clears the layer isolation, mirroring the mockup's "Esc" hint.
   useEffect(() => {
-    if (isolatedLayer == null && !pseudoFullscreen) return;
+    if (isolatedLayers.size === 0 && !pseudoFullscreen) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
-      if (isolatedLayer != null) setIsolatedLayer(null);
+      if (isolatedLayers.size > 0) setIsolatedLayers(new Set<LayerKey>());
       if (pseudoFullscreen) setPseudoFullscreen(false);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [isolatedLayer, pseudoFullscreen]);
+  }, [isolatedLayers, pseudoFullscreen]);
 
   const toggleFullscreen = () => {
     const host = hostRef.current;
@@ -773,10 +776,7 @@ export default function SitePlanViewer3D({
     return `R$ ${fmtNum(n)}`;
   };
 
-  const focusedLayer =
-    isolatedLayer != null
-      ? LAYER_META.find((l) => l.key === isolatedLayer)
-      : undefined;
+  const focusedLayers = LAYER_META.filter((l) => isolatedLayers.has(l.key));
 
   const rootClass = [
     "viewer-3d",
@@ -886,7 +886,7 @@ export default function SitePlanViewer3D({
           </div>
           {LAYER_META.map((l) => {
             const visible = layerVisible[l.key];
-            const isActive = isolatedLayer === l.key;
+            const isActive = isolatedLayers.has(l.key);
             return (
               <button
                 key={l.key}
@@ -895,9 +895,14 @@ export default function SitePlanViewer3D({
                 aria-pressed={visible}
                 data-active={isActive}
                 onClick={() =>
-                  setIsolatedLayer((cur) => (cur === l.key ? null : l.key))
+                  setIsolatedLayers((cur) => {
+                    const next = new Set(cur);
+                    if (next.has(l.key)) next.delete(l.key);
+                    else next.add(l.key);
+                    return next;
+                  })
                 }
-                title={`${l.name} — clique para isolar (Esc para voltar)`}
+                title={`${l.name} — clique para isolar (multi-seleção · Esc para voltar)`}
               >
                 <span className="viewer-3d__lc-idx">{l.idx}</span>
                 <span>
@@ -967,7 +972,7 @@ export default function SitePlanViewer3D({
                 cladding: true,
                 roof: true,
               });
-              setIsolatedLayer(null);
+              setIsolatedLayers(new Set<LayerKey>());
               setExplodeAmount(0);
             }}
           >
@@ -1032,17 +1037,27 @@ export default function SitePlanViewer3D({
       )}
 
       {/* ----- Layer focus callout (top-center quando isolado) ------------ */}
-      {!compact && focusedLayer && (
+      {!compact && focusedLayers.length > 0 && (
         <div className="viewer-3d__panel viewer-3d__focus" role="status">
-          <span className="viewer-3d__focus-tag">{focusedLayer.idx}</span>
+          <span className="viewer-3d__focus-tag">
+            {focusedLayers.length === 1
+              ? focusedLayers[0].idx
+              : `${focusedLayers.length}\u00d7`}
+          </span>
           <div>
-            <div className="viewer-3d__focus-name">{focusedLayer.name}</div>
-            <div className="viewer-3d__focus-meta">{focusedLayer.tag}</div>
+            <div className="viewer-3d__focus-name">
+              {focusedLayers.map((l) => l.name).join(" + ")}
+            </div>
+            <div className="viewer-3d__focus-meta">
+              {focusedLayers.length === 1
+                ? focusedLayers[0].tag
+                : `${focusedLayers.length} camadas isoladas`}
+            </div>
           </div>
           <button
             type="button"
             className="viewer-3d__focus-close"
-            onClick={() => setIsolatedLayer(null)}
+            onClick={() => setIsolatedLayers(new Set<LayerKey>())}
           >
             Ver tudo · Esc
           </button>

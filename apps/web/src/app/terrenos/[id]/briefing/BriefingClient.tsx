@@ -153,6 +153,16 @@ export default function BriefingClient({
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [selectedBuildingId, setSelectedBuildingId] = useState<string | null>(null);
+  // Estado granular para o overlay de geração 3D — exibe etapa atual,
+  // contagem de galpões finalizados e um pulso por SSE chunk recebido.
+  const [genProgress, setGenProgress] = useState<{
+    stage: "preparing" | "generating" | "saving" | "redirecting" | "error";
+    label: string;
+    done: number;
+    total: number;
+    /** percentual 0-100 da etapa atual (galpão sendo gerado) */
+    currentPct: number;
+  } | null>(null);
 
   // Lot projection (local meters) and edges, memoized.
   const lot = useMemo(() => projectLotToLocal(polygon), [polygon]);
@@ -430,6 +440,14 @@ export default function BriefingClient({
   async function handleGenerate() {
     setError(null);
     setSubmitting(true);
+    const totalSheds = candidate.site?.buildings.length ?? 0;
+    setGenProgress({
+      stage: "preparing",
+      label: "Validando briefing e criando estudo…",
+      done: 0,
+      total: totalSheds,
+      currentPct: 0,
+    });
     try {
       if (!candidate.site) {
         throw new Error(candidate.error ?? "SitePlan ainda inválido.");
@@ -445,6 +463,34 @@ export default function BriefingClient({
       // Each placement gets its own IndustrialShed with different size /
       // style / zones so we never end up with N identical clones.
       const placements = candidate.site.buildings;
+      setGenProgress({
+        stage: "generating",
+        label:
+          placements.length > 1
+            ? `Gerando ${placements.length} galpões com IA em paralelo…`
+            : `Gerando galpão com IA…`,
+        done: 0,
+        total: placements.length,
+        currentPct: 0,
+      });
+
+      // pulso somado por SSE chunk de qualquer galpão — usado só para
+      // mostrar que o stream está "vivo" antes do primeiro galpão terminar.
+      const sseTicks = { count: 0 };
+      const bumpPulse = () => {
+        sseTicks.count += 1;
+        // log-curve: cada chunk move menos que o anterior, tetando em ~85%.
+        const pulse = Math.min(
+          85,
+          Math.round(85 * (1 - Math.exp(-sseTicks.count / 25))),
+        );
+        setGenProgress((p) =>
+          p && p.stage === "generating" && p.done === 0
+            ? { ...p, currentPct: pulse }
+            : p,
+        );
+      };
+
       const sheds = await Promise.all(
         placements.map((p, idx) =>
           generateShedForPlacement({
@@ -456,6 +502,22 @@ export default function BriefingClient({
             briefingId: id,
             standard: state.programa.standard,
             clearHeight: state.clearHeight,
+            onChunk: bumpPulse,
+          }).then((shed) => {
+            setGenProgress((prev) => {
+              if (!prev || prev.stage !== "generating") return prev;
+              const done = prev.done + 1;
+              return {
+                ...prev,
+                done,
+                currentPct: Math.round((done / prev.total) * 100),
+                label:
+                  done === prev.total
+                    ? "Galpões gerados, montando lote 3D…"
+                    : `Gerando galpão ${done + 1} de ${prev.total}…`,
+              };
+            });
+            return shed;
           }),
         ),
       );
@@ -470,6 +532,13 @@ export default function BriefingClient({
         })),
       };
 
+      setGenProgress({
+        stage: "saving",
+        label: "Salvando estudo 3D no servidor…",
+        done: placements.length,
+        total: placements.length,
+        currentPct: 95,
+      });
       const save = await fetch(`/api/terrenos/${terrainId}/site-plan`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -479,9 +548,17 @@ export default function BriefingClient({
         const j = (await save.json().catch(() => ({}))) as { error?: string };
         throw new Error(j.error ?? "Falha ao salvar SitePlan.");
       }
+      setGenProgress({
+        stage: "redirecting",
+        label: "Abrindo viewer 3D…",
+        done: placements.length,
+        total: placements.length,
+        currentPct: 100,
+      });
       router.push(`/terrenos/${terrainId}/estudo/${id}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
+      setGenProgress(null);
     } finally {
       setSubmitting(false);
     }
@@ -518,6 +595,22 @@ export default function BriefingClient({
             <p className="text-sm muted">{terrainAddress}</p>
           )}
         </div>
+        <button
+          type="button"
+          className="btn btn--ghost"
+          onClick={() => {
+            if (
+              window.confirm(
+                "Voltar para o terreno? Alterações não salvas no briefing serão perdidas.",
+              )
+            ) {
+              router.push(`/terrenos/${terrainId}`);
+            }
+          }}
+          title="Voltar para o terreno"
+        >
+          ← Voltar ao terreno
+        </button>
       </header>
 
       <BriefingStepper
@@ -720,7 +813,7 @@ export default function BriefingClient({
             }
           }}
         >
-          ← Voltar
+          {step === 0 ? "← Sair do briefing" : "← Passo anterior"}
         </button>
         {step < STEPS.length - 1 ? (
           <button type="button" className="btn btn--primary" onClick={nextStep}>
@@ -744,7 +837,146 @@ export default function BriefingClient({
           </button>
         )}
       </footer>
+
+      {genProgress && <GenerateOverlay progress={genProgress} />}
     </>
+  );
+}
+
+// ---- Overlay de geração do 3D -------------------------------------------
+
+function GenerateOverlay({
+  progress,
+}: {
+  progress: {
+    stage: "preparing" | "generating" | "saving" | "redirecting" | "error";
+    label: string;
+    done: number;
+    total: number;
+    currentPct: number;
+  };
+}) {
+  // Pondera as etapas: preparing 0-10%, generating 10-90%, saving 90-98%,
+  // redirecting 98-100% — assim a barra global reflete o pipeline inteiro.
+  const overall = (() => {
+    const ratio = progress.total > 0 ? progress.done / progress.total : 0;
+    switch (progress.stage) {
+      case "preparing":
+        return 8;
+      case "generating":
+        // Dentro do bloco 10-90 reservamos 80 pontos: galpões prontos
+        // valem a maior parte, mas pulsamos com o currentPct enquanto
+        // nenhum galpão terminou ainda (ratio = 0).
+        return Math.round(
+          10 +
+            (ratio > 0
+              ? 80 * ratio
+              : Math.min(60, (progress.currentPct / 100) * 60)),
+        );
+      case "saving":
+        return 95;
+      case "redirecting":
+        return 100;
+      default:
+        return 0;
+    }
+  })();
+  const indeterminate =
+    progress.stage === "generating" && progress.done === 0;
+  return (
+    <div
+      className="gen-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Gerando estudo 3D"
+    >
+      <div className="gen-overlay__card">
+        <div className="gen-overlay__icon" aria-hidden="true">
+          <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M32 6 L58 20 L58 44 L32 58 L6 44 L6 20 Z" />
+            <path d="M6 20 L32 34 L58 20" />
+            <path d="M32 34 L32 58" />
+          </svg>
+        </div>
+        <h2 className="gen-overlay__title">Construindo seu estudo 3D</h2>
+        <p className="gen-overlay__label">{progress.label}</p>
+        <div
+          className={`gen-overlay__bar${indeterminate ? " gen-overlay__bar--pulse" : ""}`}
+          role="progressbar"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={overall}
+        >
+          <div
+            className="gen-overlay__bar-fill"
+            style={{ width: `${overall}%` }}
+          />
+        </div>
+        <div className="gen-overlay__meta">
+          <span>{overall}%</span>
+          {progress.total > 0 && (
+            <span>
+              {progress.done}/{progress.total} galpões
+            </span>
+          )}
+        </div>
+        <ul className="gen-overlay__steps">
+          <Stage
+            active={progress.stage === "preparing"}
+            done={
+              progress.stage !== "preparing" && progress.stage !== "error"
+            }
+            label="Validar briefing"
+          />
+          <Stage
+            active={progress.stage === "generating"}
+            done={
+              progress.stage === "saving" || progress.stage === "redirecting"
+            }
+            label={
+              progress.total > 1
+                ? `Gerar ${progress.total} galpões com IA`
+                : "Gerar galpão com IA"
+            }
+          />
+          <Stage
+            active={progress.stage === "saving"}
+            done={progress.stage === "redirecting"}
+            label="Salvar SitePlan"
+          />
+          <Stage
+            active={progress.stage === "redirecting"}
+            done={false}
+            label="Abrir viewer 3D"
+          />
+        </ul>
+        <p className="gen-overlay__hint">
+          Isso costuma levar de 10 s a 1 min — não feche a aba enquanto o
+          modelo está sendo construído.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function Stage({
+  active,
+  done,
+  label,
+}: {
+  active: boolean;
+  done: boolean;
+  label: string;
+}) {
+  return (
+    <li
+      className={`gen-overlay__step${active ? " is-active" : ""}${done ? " is-done" : ""}`}
+    >
+      <span className="gen-overlay__step-dot" aria-hidden="true">
+        {done ? "✓" : active ? "" : ""}
+      </span>
+      <span>{label}</span>
+    </li>
   );
 }
 
@@ -1250,60 +1482,190 @@ interface PlacementGenInput {
   clearHeight: number;
 }
 
-/** Heuristic variation hints so each building in a multi-shed study differs. */
-const VARIATIONS: Array<{
+// ============================================================
+// Templates ricos por TIPO DE USO. Cada uso ganha um programa
+// arquitetônico completo (zonas, docas, mezanino, escritórios em
+// 2 pavimentos, área técnica, banheiros, pátio) e variantes
+// secundárias quando há > 1 galpão do mesmo uso no mesmo lote.
+// ============================================================
+
+interface UseTemplate {
   label: string;
   detail: string;
   standardOverride?: "economico" | "medio" | "alto";
-}> = [
-  {
-    label: "operação principal com mezanino administrativo",
-    detail:
-      "Inclua um mezanino de escritório (≥ 60 m²) no canto frontal, salas de gerência, sala de reunião e copa.",
-  },
-  {
-    label: "expedição cross-dock com docas dos dois lados",
-    detail:
-      "Distribua docas em paredes opostas (norte e sul), pé-direito ≥ 11 m, área de staging ampliada.",
-    standardOverride: "alto",
-  },
-  {
-    label: "manufatura/produção com ponte rolante",
-    detail:
-      "Inclua ponte rolante (5–10 t) e zona de produção contínua; reduza skylight, reforce área técnica e oficinas.",
-  },
-  {
-    label: "cold storage refrigerado",
-    detail:
-      "Envoltória sandwich PIR, baixa skylight, antecâmara + casa de máquinas, doca rebaixada com seal.",
-    standardOverride: "alto",
-  },
-  {
-    label: "anexo administrativo com vestiários ampliados",
-    detail:
-      "Escritórios em 2 pavimentos (≥ 120 m²/piso), vestiários masculino/feminino completos, refeitório com cozinha.",
-  },
-  {
-    label: "centro de distribuição com alta rotatividade",
-    detail:
-      "Múltiplas docas niveladas no fundo, picking + armazenagem segregados, AVCB com sprinklers.",
-    standardOverride: "alto",
-  },
-];
+}
 
-function variationFor(
+const USE_BASE: Record<BuildingUse, UseTemplate> = {
+  logistics: {
+    label: "centro logístico completo com mezanino administrativo",
+    detail: [
+      "PROGRAMA OBRIGATÓRIO (Logística):",
+      "- ZONAS internas (no array zones, sem sobrepor):",
+      "  • armazenagem (porta-paletes) ocupando ≥ 60% da área útil, floorLoad_kN_m2=50, height=pé-direito.",
+      "  • recebimento na parede da frente (sul), largura ≥ 8 m, height=pé-direito.",
+      "  • expedicao na parede oposta (norte), largura ≥ 8 m, height=pé-direito.",
+      "  • picking entre armazenagem e expedição, floorLoad_kN_m2=30.",
+      "  • escritorio frontal junto à entrada, 2 pavimentos (height = 2 × 3 = 6 m), área ≥ 80 m²/piso, floorLoad_kN_m2=2.5.",
+      "  • vestiario (masculino + feminino) ≥ 30 m², height=3.",
+      "  • refeitorio ≥ 40 m² com cozinha de apoio.",
+      "  • area_tecnica (CME, bombas, gerador) ≥ 20 m².",
+      "  • avcb_hidrante em canto da fachada.",
+      "- MEZANINO: bloco mezzanine sobre o escritório, height=3, load_kN_m2=2.5.",
+      "- DOCAS: 4–8 docks niveladas na parede norte (wall='north'), type='nivelada', levelers=true, seal=true, espaçadas 4 m.",
+      "- ABERTURAS: 1 portao_seccional 5×5 m por doca + porta_pessoal 1×2.1 m no escritório + 2 porta_corta_fogo.",
+      "- YARD: parkingTrucks ≥ docks.length, parkingCars ≥ 10, truckCircle_m ≥ 22.",
+      "- UTILITIES: sprinklers=true (área > 1500 m²), hydrants ≥ 2, firePump=true.",
+    ].join("\n"),
+  },
+  industrial: {
+    label: "galpão industrial com produção, oficina e apoio",
+    detail: [
+      "PROGRAMA OBRIGATÓRIO (Industrial):",
+      "- ZONAS:",
+      "  • producao ocupando ≥ 55% da área, floorLoad_kN_m2=80, height=pé-direito.",
+      "  • recebimento (matéria-prima) na frente, ≥ 6 m de largura.",
+      "  • expedicao (produto acabado) no fundo, ≥ 6 m de largura.",
+      "  • area_tecnica (oficina + manutenção + compressores) ≥ 40 m².",
+      "  • escritorio + sala de supervisão na frente, 2 pavimentos, ≥ 60 m²/piso, height=6.",
+      "  • vestiario (m+f) ≥ 40 m² com chuveiros.",
+      "  • refeitorio ≥ 30 m².",
+      "- MEZANINO: sobre o escritório, height=3, load_kN_m2=2.5.",
+      "- DOCAS: 2 docks (1 recebimento sul + 1 expedição norte), type='nivelada', levelers=true.",
+      "- PONTE ROLANTE: inclua 1 craneRails com capacity_t=5, span=footprint.width-2, height=clearHeight-1.5.",
+      "- ABERTURAS: 2 portao_seccional + porta_pessoal escritório + 3 porta_corta_fogo.",
+      "- UTILITIES: compressedAir=true, power_kVA ≥ 300, firePump=true.",
+      "- floor.type='industrial_polido', thickness_cm ≥ 15.",
+    ].join("\n"),
+  },
+  cross_dock: {
+    label: "terminal cross-dock com docas em paredes opostas",
+    detail: [
+      "PROGRAMA OBRIGATÓRIO (Cross-dock):",
+      "- ZONAS:",
+      "  • recebimento ocupando toda a parede sul (faixa de 12 m de profundidade).",
+      "  • expedicao ocupando toda a parede norte (faixa de 12 m de profundidade).",
+      "  • staging central (entre recebimento e expedição), floorLoad_kN_m2=30.",
+      "  • escritorio compacto no canto frontal, 1 pavimento, ≥ 40 m², height=3.5.",
+      "  • vestiario ≥ 20 m², refeitorio ≥ 20 m², area_tecnica ≥ 15 m².",
+      "- DOCAS: 6–12 docks na parede SUL + 6–12 na parede NORTE (mesma quantidade), type='nivelada', levelers=true, seal=true.",
+      "- ABERTURAS: portao_seccional 5×5 m por doca + porta_pessoal lateral + 2 porta_corta_fogo.",
+      "- structure.clearHeight ≥ 11 m, roof.skylightPct ≤ 4 (operação 24h).",
+      "- YARD: parkingTrucks = soma docks, truckCircle_m ≥ 25.",
+      "- SEM armazenagem profunda — staging é temporário.",
+    ].join("\n"),
+    standardOverride: "alto",
+  },
+  distribution_center: {
+    label: "centro de distribuição multi-cliente com alta rotatividade",
+    detail: [
+      "PROGRAMA OBRIGATÓRIO (Centro de Distribuição):",
+      "- ZONAS:",
+      "  • armazenagem porta-paletes ocupando ≥ 50% da área, floorLoad_kN_m2=60.",
+      "  • picking ≥ 15% da área, com mezanino picking 1 nível acima.",
+      "  • recebimento (parede sul) ≥ 10 m de largura.",
+      "  • expedicao (parede norte) ≥ 10 m de largura.",
+      "  • escritorio multi-pavimento frontal: 2 pavimentos, ≥ 100 m²/piso (gerência, monitoramento, reunião, copa).",
+      "  • vestiario (m+f) ≥ 50 m², refeitorio ≥ 60 m² + cozinha, area_tecnica ≥ 30 m².",
+      "  • avcb_hidrante visível na fachada.",
+      "- MEZANINO: width = footprint.width × 0.3, depth = footprint.depth × 0.25, height=3, load_kN_m2=4.",
+      "- DOCAS: 8–16 docks niveladas distribuídas na parede norte, levelers=true, seal=true.",
+      "- ABERTURAS: 1 portao_seccional por doca + porta_pessoal + 4 porta_corta_fogo.",
+      "- UTILITIES: sprinklers=true, hydrants ≥ 4, firePump=true, power_kVA ≥ 500.",
+      "- YARD: parkingTrucks ≥ docks.length × 1.5, parkingCars ≥ 30, retentionPond=true.",
+      "- structure.clearHeight ≥ 12 m (porta-paletes 5 níveis).",
+    ].join("\n"),
+    standardOverride: "alto",
+  },
+  cold_storage: {
+    label: "câmara fria com antecâmara e casa de máquinas",
+    detail: [
+      "PROGRAMA OBRIGATÓRIO (Cold Storage):",
+      "- ZONAS:",
+      "  • armazenagem refrigerada ocupando ≥ 60% da área, floorLoad_kN_m2=50, height=pé-direito.",
+      "  • recebimento antecâmara (parede sul), largura ≥ 6 m, height=pé-direito.",
+      "  • expedicao antecâmara (parede norte), largura ≥ 6 m.",
+      "  • area_tecnica casa de máquinas (compressores + condensadores) ≥ 30 m².",
+      "  • escritorio frontal compacto, 1 pavimento, ≥ 40 m², height=3.",
+      "  • vestiario ≥ 25 m², refeitorio ≥ 25 m².",
+      "- ENVELOPE: walls=sandwich PIR 100 mm, roof=sandwich PIR 150 mm, skylightPct=0.",
+      "- DOCAS: 2–4 docks rebaixadas com seal térmico (type='rebaixada', seal=true) na parede norte.",
+      "- ABERTURAS: portas frigoríficas isoladas + porta_pessoal escritório + 2 porta_corta_fogo.",
+      "- UTILITIES: power_kVA ≥ 400, firePump=true.",
+      "- structure.clearHeight ≥ 10 m.",
+    ].join("\n"),
+    standardOverride: "alto",
+  },
+  manufacturing: {
+    label: "manufatura completa com células produtivas e qualidade",
+    detail: [
+      "PROGRAMA OBRIGATÓRIO (Manufatura):",
+      "- ZONAS:",
+      "  • producao em células ocupando ≥ 50% da área, floorLoad_kN_m2=80.",
+      "  • recebimento mat-prima sul, ≥ 6 m.",
+      "  • expedicao acabados norte, ≥ 6 m.",
+      "  • area_tecnica (ferramentaria + qualidade + manutenção) ≥ 50 m².",
+      "  • escritorio + sala de engenharia, 2 pavimentos, ≥ 80 m²/piso, height=6.",
+      "  • vestiario (m+f) ≥ 50 m² com chuveiros, refeitorio ≥ 50 m² + cozinha.",
+      "- MEZANINO: sobre escritório + sala de qualidade, height=3, load_kN_m2=3.",
+      "- DOCAS: 2 docks (recebimento sul + expedição norte), levelers=true.",
+      "- PONTE ROLANTE: 1 craneRails capacity_t=10, span=footprint.width-2.",
+      "- UTILITIES: compressedAir=true, power_kVA ≥ 500, firePump=true, sprinklers=true.",
+      "- floor.type='industrial_polido', thickness_cm ≥ 20.",
+    ].join("\n"),
+  },
+};
+
+const USE_VARIANTS: Record<BuildingUse, string[]> = {
+  logistics: [
+    "Variante A: hub de e-commerce — picking automatizado, mezanino estendido ≥ 150 m²/piso.",
+    "Variante B: armazém seco tradicional — porta-paletes 4 níveis, escritório compacto.",
+    "Variante C: operação 3PL multi-cliente — divisórias de segregação por cliente, 2 portões pessoais.",
+  ],
+  industrial: [
+    "Variante A: linha de montagem leve — ponte rolante 5 t, fluxo linear sul→norte.",
+    "Variante B: usinagem pesada — ponte rolante 10 t, piso reforçado 100 kN/m².",
+    "Variante C: produção contínua com expedição lateral (wall='east').",
+  ],
+  cross_dock: [
+    "Variante A: alta velocidade — 12 docas/lado, sem staging permanente.",
+    "Variante B: consolidação — 6 docas/lado + staging ampliado.",
+  ],
+  distribution_center: [
+    "Variante A: CD nacional — mezanino picking footprint × 0.4, escritório 3 pavimentos.",
+    "Variante B: CD regional menor — 8 docas, mezanino só sobre escritório.",
+  ],
+  cold_storage: [
+    "Variante A: câmara fria única — antecâmara ampla, 4 docas com seal térmico.",
+    "Variante B: câmaras múltiplas — divisórias com portas frigoríficas, 2 antecâmaras.",
+  ],
+  manufacturing: [
+    "Variante A: manufatura discreta — células de produção, mezanino qualidade.",
+    "Variante B: manufatura contínua — linha única, ponte rolante 10 t.",
+  ],
+};
+
+function templateFor(
+  use: BuildingUse,
   index: number,
   total: number,
-): (typeof VARIATIONS)[number] {
-  if (total <= 1) return VARIATIONS[0];
-  return VARIATIONS[index % VARIATIONS.length];
+): UseTemplate {
+  const base = USE_BASE[use] ?? USE_BASE.logistics;
+  if (total <= 1) return base;
+  const variants = USE_VARIANTS[use] ?? [];
+  if (variants.length === 0) return base;
+  const variant = variants[index % variants.length];
+  return {
+    ...base,
+    label: `${base.label} — variante ${String.fromCharCode(65 + (index % variants.length))}`,
+    detail: `${base.detail}\n\n${variant}`,
+  };
 }
 
 async function generateShedForPlacement(
-  input: PlacementGenInput,
+  input: PlacementGenInput & { onChunk?: () => void },
 ): Promise<IndustrialShed | null> {
   const { placement, index, total, terrainId, terrainName, briefingId } = input;
-  const v = variationFor(index, total);
+  const v = templateFor(placement.use, index, total);
   const bbox = polygonBBox(placement.footprintPolygon);
   const footW = Math.max(6, Math.round(bbox.maxX - bbox.minX));
   const footD = Math.max(6, Math.round(bbox.maxZ - bbox.minZ));
@@ -1316,11 +1678,14 @@ async function generateShedForPlacement(
     `Pé-direito útil desejado: ~${input.clearHeight} m.`,
     `Padrão construtivo: ${standard}.`,
     `Característica obrigatória deste galpão: ${v.label}.`,
-    `Detalhe: ${v.detail}`,
+    "",
+    v.detail,
+    "",
     total > 1
-      ? `Importante: este é o galpão #${index + 1} de ${total}; ele deve ser claramente diferente dos demais em programa, tipologia de cobertura, layout de zonas e abertura de docas.`
+      ? `Importante: este é o galpão #${index + 1} de ${total} no lote; ele deve diferenciar-se dos demais em layout de zonas, número/posição de docas e arranjo do mezanino.`
       : "",
     `O JSON deve usar exatamente footprint.width=${footW} e footprint.depth=${footD} para casar com o posicionamento já fixado pelo wizard.`,
+    "As zonas devem cobrir ao menos 70% da área útil (sem sobrepor) e seguir EXATAMENTE o programa acima.",
   ]
     .filter(Boolean)
     .join("\n");
@@ -1339,7 +1704,7 @@ async function generateShedForPlacement(
       }),
     });
     if (!res.ok || !res.body) return null;
-    const shed = await readShedFromSse(res.body);
+    const shed = await readShedFromSse(res.body, input.onChunk);
     if (!shed) return null;
     // Force footprint to the placement's actual size so the renderer aligns.
     return {
@@ -1354,6 +1719,7 @@ async function generateShedForPlacement(
 /** Reads an SSE stream from /api/ai/generate and returns the final shed. */
 async function readShedFromSse(
   body: ReadableStream<Uint8Array>,
+  onChunk?: () => void,
 ): Promise<IndustrialShed | null> {
   const reader = body.getReader();
   const decoder = new TextDecoder();
@@ -1363,6 +1729,7 @@ async function readShedFromSse(
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
+      onChunk?.();
       buffer += decoder.decode(value, { stream: true });
       const events = buffer.split("\n\n");
       buffer = events.pop() ?? "";

@@ -1,33 +1,108 @@
 import Link from "next/link";
 import { prisma } from "@sfg/db";
 import { Breadcrumb } from "@/components/Breadcrumb";
-import { isIndustrialShed } from "@/lib/shedSchema";
+import {
+  ReportsExplorer,
+  type ReportRowData,
+  type ReportTerrainGroup,
+} from "@/components/ReportsExplorer";
+import { isIndustrialShed, type IndustrialShed } from "@/lib/shedSchema";
+import { SitePlanSchema } from "@/lib/sitePlanSchema";
+import { synthesizeShedFromPlacement } from "@/lib/shedDefaults";
+import { computeViability, extractUF } from "@/lib/knowledge";
 
 export const dynamic = "force-dynamic";
 
-interface ReportLite {
-  id: string;
-  code: string;
-  version: number;
-  status: string;
-  verdict: string;
-  createdAt: Date;
-  building: { id: string; name: string; model: unknown } | null;
+/** Reconstrói a viabilidade SINAPI/CUB de um galpão (mesma lógica do relatório). */
+function shedCost(shed: IndustrialShed, uf?: string): number {
+  const est = computeViability({
+    uf,
+    standard: shed.standard,
+    areaM2: shed.footprint.width * shed.footprint.depth,
+    storeys: shed.mezzanine ? 2 : 1,
+    insulation:
+      shed.envelope.insulation === "nenhum"
+        ? "basico"
+        : shed.envelope.insulation,
+    roofCover: shed.roof.cover,
+    freeSpanM: shed.structure.freeSpan,
+    clearHeightM: shed.structure.clearHeight,
+    floorLoadKnM2: shed.floor.load_kN_m2,
+    docksCount: shed.docks.length,
+    avcbRequired: shed.safety.avcbRequired,
+    slopePct: shed.lot.slopePct ?? null,
+    hasSounding: undefined,
+    hasTopo: shed.lot.slopePct != null,
+  });
+  return est.totalCost.base;
 }
 
-interface BriefingGroup {
-  id: string;
-  title: string;
-  status: string;
-  acceptedAt: Date | null;
-  reports: ReportLite[];
+/**
+ * Custo total do galpão de um relatório. Igual ao card "Custo total" da
+ * página de detalhe / viewer 3D: usa o valor estimado salvo se houver, senão
+ * recalcula a viabilidade a partir do(s) shed(s) do SitePlan (sintetizando
+ * quando o placement só guarda o footprint) ou do model direto.
+ */
+function readCost(
+  buildingModel: unknown,
+  sitePlanData: unknown,
+  state?: string | null,
+): number {
+  // 1) Coleta os sheds: SitePlan referenciado → model como SitePlan → model como shed.
+  let sheds: IndustrialShed[] = [];
+  const fromSitePlan = (data: unknown): IndustrialShed[] => {
+    const parsed = SitePlanSchema.safeParse(data);
+    if (!parsed.success) return [];
+    return (parsed.data.buildings ?? []).map((b) =>
+      b.shed && isIndustrialShed(b.shed)
+        ? b.shed
+        : synthesizeShedFromPlacement(b),
+    );
+  };
+
+  if (sitePlanData) sheds = fromSitePlan(sitePlanData);
+  if (sheds.length === 0) sheds = fromSitePlan(buildingModel);
+  if (sheds.length === 0 && isIndustrialShed(buildingModel)) {
+    sheds = [buildingModel];
+  }
+  if (sheds.length === 0) return 0;
+
+  // 2) Soma o custo salvo; se zerado, recalcula a viabilidade.
+  const stored = sheds.reduce((acc, s) => acc + (s.estimate.totalCost || 0), 0);
+  if (stored > 0) return stored;
+
+  const ufResolved = extractUF(state ?? null);
+  const uf = ufResolved === "BR" ? undefined : ufResolved;
+  return sheds.reduce((acc, s) => acc + shedCost(s, uf), 0);
 }
 
-interface TerrainGroup {
-  id: string;
-  name: string;
-  briefings: BriefingGroup[];
-  legacyReports: ReportLite[];
+function mapReport(
+  r: {
+    id: string;
+    code: string;
+    version: number;
+    status: string;
+    createdAt: Date;
+    blocks: unknown;
+    building: { id: string; name: string; model: unknown } | null;
+  },
+  state: string | null,
+  sitePlanById: Map<string, unknown>,
+): ReportRowData {
+  const blocks = r.blocks as { sitePlanId?: string } | null;
+  const sitePlanData = blocks?.sitePlanId
+    ? (sitePlanById.get(blocks.sitePlanId) ?? null)
+    : null;
+  return {
+    id: r.id,
+    code: r.code,
+    version: r.version,
+    status: r.status,
+    date: r.createdAt.toISOString(),
+    buildingId: r.building?.id ?? null,
+    buildingName: r.building?.name ?? "—",
+    cost: readCost(r.building?.model ?? null, sitePlanData, state),
+  };
 }
 
 export default async function RelatoriosPage() {
@@ -51,20 +126,43 @@ export default async function RelatoriosPage() {
     orderBy: { updatedAt: "desc" },
   });
 
-  const groups: TerrainGroup[] = terrains
+  // Recupera os SitePlans referenciados em report.blocks.sitePlanId — alguns
+  // relatórios guardam o galpão no SitePlan separado, não em building.model.
+  const sitePlanIds = new Set<string>();
+  for (const t of terrains) {
+    const collect = (blocks: unknown) => {
+      const b = blocks as { sitePlanId?: string } | null;
+      if (b?.sitePlanId) sitePlanIds.add(b.sitePlanId);
+    };
+    for (const b of t.briefings) for (const r of b.reports) collect(r.blocks);
+    for (const r of t.reports) collect(r.blocks);
+  }
+  const sitePlanById = new Map<string, unknown>();
+  if (sitePlanIds.size > 0) {
+    const plans = await prisma.sitePlan.findMany({
+      where: { id: { in: Array.from(sitePlanIds) } },
+      select: { id: true, data: true },
+    });
+    for (const p of plans) sitePlanById.set(p.id, p.data);
+  }
+
+  const groups: ReportTerrainGroup[] = terrains
     .map((t) => ({
       id: t.id,
       name: t.name,
+      city: t.city,
+      state: t.state,
       briefings: t.briefings
         .filter((b) => b.reports.length > 0)
         .map((b) => ({
           id: b.id,
           title: b.title,
-          status: b.status,
-          acceptedAt: b.acceptedAt,
-          reports: b.reports,
+          statusLabel: b.acceptedAt
+            ? `aceito em ${new Date(b.acceptedAt).toLocaleDateString("pt-BR")}`
+            : `status: ${b.status}`,
+          reports: b.reports.map((r) => mapReport(r, t.state, sitePlanById)),
         })),
-      legacyReports: t.reports,
+      legacyReports: t.reports.map((r) => mapReport(r, t.state, sitePlanById)),
     }))
     .filter((g) => g.briefings.length > 0 || g.legacyReports.length > 0);
 
@@ -110,157 +208,8 @@ export default async function RelatoriosPage() {
           </Link>
         </div>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-          {groups.map((g) => (
-            <section key={g.id} className="card" style={{ padding: 16 }}>
-              <header
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "baseline",
-                  marginBottom: 12,
-                }}
-              >
-                <h2 style={{ margin: 0, fontSize: "var(--fs-md)" }}>
-                  <Link
-                    href={`/terrenos/${g.id}`}
-                    style={{ color: "var(--color-primary-500)" }}
-                  >
-                    {g.name}
-                  </Link>
-                </h2>
-                <span className="text-xs muted">
-                  {g.briefings.length} briefing(s) · {g.legacyReports.length}{" "}
-                  legado(s)
-                </span>
-              </header>
-
-              {g.briefings.map((b) => (
-                <article
-                  key={b.id}
-                  style={{
-                    padding: 12,
-                    background: "var(--color-surface-elevated)",
-                    borderRadius: "var(--radius-md)",
-                    marginBottom: 10,
-                  }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      marginBottom: 8,
-                    }}
-                  >
-                    <div>
-                      <div style={{ fontWeight: 600 }}>{b.title}</div>
-                      <div className="text-xs muted">
-                        {b.acceptedAt
-                          ? `aceito em ${new Date(b.acceptedAt).toLocaleDateString("pt-BR")}`
-                          : `status: ${b.status}`}
-                      </div>
-                    </div>
-                    <Link
-                      href={`/terrenos/${g.id}/estudo/${b.id}`}
-                      className="btn btn-ghost btn-sm"
-                    >
-                      Abrir estudo
-                    </Link>
-                  </div>
-                  <ReportTable rows={b.reports} terrainId={g.id} />
-                </article>
-              ))}
-
-              {g.legacyReports.length > 0 && (
-                <article style={{ marginTop: 10 }}>
-                  <h3 className="text-sm muted" style={{ margin: "0 0 8px" }}>
-                    Sem briefing (legado)
-                  </h3>
-                  <ReportTable rows={g.legacyReports} terrainId={g.id} />
-                </article>
-              )}
-            </section>
-          ))}
-        </div>
+        <ReportsExplorer groups={groups} />
       )}
     </>
-  );
-}
-
-function ReportTable({
-  rows,
-  terrainId,
-}: {
-  rows: ReportLite[];
-  terrainId: string;
-}) {
-  if (rows.length === 0)
-    return <p className="text-xs muted">Sem relatórios.</p>;
-  return (
-    <table className="ds-table" style={{ width: "100%" }}>
-      <thead>
-        <tr>
-          <th>Código · v</th>
-          <th>Galpão</th>
-          <th style={{ width: 140 }}>Custo total</th>
-          <th style={{ width: 110 }}>Status</th>
-          <th style={{ width: 100 }}>Data</th>
-          <th style={{ width: 80 }}></th>
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((r) => {
-          const raw = r.building?.model as unknown;
-          const shed = isIndustrialShed(raw) ? raw : null;
-          const cost = shed?.estimate.totalCost ?? 0;
-          return (
-            <tr key={r.id}>
-              <td className="mono">
-                {r.code} · v{r.version}
-              </td>
-              <td>{r.building?.name ?? "—"}</td>
-              <td className="mono">
-                {cost
-                  ? `R$ ${(cost / 1_000_000).toLocaleString("pt-BR", { maximumFractionDigits: 2 })} M`
-                  : "—"}
-              </td>
-              <td>
-                <span
-                  className={`pill ${
-                    r.status === "issued"
-                      ? "pill-success"
-                      : r.status === "superseded"
-                        ? "pill-neutral"
-                        : "pill-info"
-                  }`}
-                >
-                  {r.status}
-                </span>
-              </td>
-              <td className="text-xs muted">
-                {new Date(r.createdAt).toLocaleDateString("pt-BR")}
-              </td>
-              <td>
-                <Link
-                  href={`/relatorios/${r.id}`}
-                  className="btn btn-ghost btn-sm"
-                >
-                  Abrir
-                </Link>
-                {r.building?.id && (
-                  <Link
-                    href={`/terrenos/${terrainId}/construcoes/${r.building.id}`}
-                    className="text-xs muted"
-                    style={{ display: "block", marginTop: 2 }}
-                  >
-                    3D ↗
-                  </Link>
-                )}
-              </td>
-            </tr>
-          );
-        })}
-      </tbody>
-    </table>
   );
 }

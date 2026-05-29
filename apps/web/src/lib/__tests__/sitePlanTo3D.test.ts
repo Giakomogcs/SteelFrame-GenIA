@@ -116,12 +116,16 @@ describe("sitePlanTo3D — group structure", () => {
       // minimal stub: only fields used by buildShedMesh
     } as never;
     const g = buildShedMesh(placement, shed);
-    const trusses = g.children.filter((c) => c.name.startsWith("truss:"));
-    // bayCount = "Nº de pórticos" (schema): criamos exatamente esse número
-    // de pórticos, distribuídos sobre a profundidade real do placement.
-    expect(trusses).toHaveLength(4);
-    const columns = g.children.filter((c) => c.name.startsWith("column:"));
-    expect(columns).toHaveLength(2 * 4); // L + R por pórtico
+    // bayCount = "Nº de pórticos" (schema): criamos exatamente esse número de
+    // pórticos. Cada pórtico tem um montante de cumeeira (`apex`) e duas
+    // colunas principais (L/R) na linha da parede; placas de base e terças
+    // longitudinais são membros auxiliares e não contam como pórtico.
+    const apexes = g.children.filter((c) => c.name.endsWith(":apex"));
+    expect(apexes).toHaveLength(4);
+    const mainColumns = g.children.filter((c) =>
+      /^column:.*:(L|R)$/.test(c.name),
+    );
+    expect(mainColumns).toHaveLength(2 * 4); // L + R por pórtico
   });
 });
 
