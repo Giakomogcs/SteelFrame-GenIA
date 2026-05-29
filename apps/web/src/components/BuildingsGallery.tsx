@@ -196,7 +196,9 @@ function summarize(model: unknown) {
     return {
       kind: "site" as const,
       use: USE_LABEL[dominantUse] ?? dominantUse,
-      standard: dominantStd ? (STANDARD_LABEL[dominantStd] ?? dominantStd) : "—",
+      standard: dominantStd
+        ? (STANDARD_LABEL[dominantStd] ?? dominantStd)
+        : "—",
       width: bboxW,
       depth: bboxD,
       areaM2,
@@ -375,13 +377,7 @@ function SiteThumb({
         strokeWidth={1}
       />
       {buildingPaths.map((d, i) => (
-        <path
-          key={i}
-          d={d}
-          fill={fill}
-          stroke={stroke}
-          strokeWidth={1.4}
-        />
+        <path key={i} d={d} fill={fill} stroke={stroke} strokeWidth={1.4} />
       ))}
       <text
         x={W / 2}
@@ -509,21 +505,25 @@ function ShedThumb({ model, selected }: { model: unknown; selected: boolean }) {
       ))}
       {/* eixo dos pórticos (linhas verticais) */}
       {sum.kind === "shed" && sum.shed && sum.shed.structure.bayCount > 1
-        ? Array.from({ length: sum.shed.structure.bayCount + 1 }).map((_, i) => {
-            const t = i / sum.shed!.structure.bayCount;
-            const x = ox + t * drawW;
-            return (
-              <line
-                key={i}
-                x1={x}
-                y1={oy}
-                x2={x}
-                y2={oy + drawH}
-                stroke={selected ? "rgba(215,32,66,0.4)" : "rgba(255,255,255,0.15)"}
-                strokeWidth={0.6}
-              />
-            );
-          })
+        ? Array.from({ length: sum.shed.structure.bayCount + 1 }).map(
+            (_, i) => {
+              const t = i / sum.shed!.structure.bayCount;
+              const x = ox + t * drawW;
+              return (
+                <line
+                  key={i}
+                  x1={x}
+                  y1={oy}
+                  x2={x}
+                  y2={oy + drawH}
+                  stroke={
+                    selected ? "rgba(215,32,66,0.4)" : "rgba(255,255,255,0.15)"
+                  }
+                  strokeWidth={0.6}
+                />
+              );
+            },
+          )
         : null}
       {/* cota largura no rodapé */}
       <text
@@ -718,9 +718,7 @@ export default function BuildingsGallery({
           <div className="building-hero-dash">
             <div className="dash-kpi dash-kpi-hero">
               <div className="dash-kpi-lbl">Custo estimado</div>
-              <div className="dash-kpi-val">
-                {fmtR$(selectedSum.totalCost)}
-              </div>
+              <div className="dash-kpi-val">{fmtR$(selectedSum.totalCost)}</div>
               <div className="dash-kpi-foot">
                 {selectedSum.costPerM2 > 0
                   ? `${fmtR$(selectedSum.costPerM2)}/m² · SINAPI/CUB`

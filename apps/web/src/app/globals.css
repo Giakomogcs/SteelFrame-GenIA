@@ -6307,7 +6307,6 @@ textarea {
   }
 }
 
-
 /* ===== Overlay: Gerando estudo 3D ===== */
 .gen-overlay {
   position: fixed;
@@ -6447,13 +6446,24 @@ textarea {
   color: var(--color-text-muted);
 }
 @keyframes genPulse {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(100%); }
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
 }
 @keyframes genIconSpin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 @keyframes genDotPulse {
-  0%, 100% { box-shadow: 0 0 0 4px var(--color-primary-soft); }
-  50% { box-shadow: 0 0 0 8px transparent; }
+  0%,
+  100% {
+    box-shadow: 0 0 0 4px var(--color-primary-soft);
+  }
+  50% {
+    box-shadow: 0 0 0 8px transparent;
+  }
 }

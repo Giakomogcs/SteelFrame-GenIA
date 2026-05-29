@@ -54,10 +54,20 @@ function convexPolygonsOverlap(
     }
   }
   for (const ax of axes) {
-    let aMin = Infinity, aMax = -Infinity;
-    for (const v of a) { const d = v.x * ax.x + v.z * ax.z; aMin = Math.min(aMin, d); aMax = Math.max(aMax, d); }
-    let bMin = Infinity, bMax = -Infinity;
-    for (const v of b) { const d = v.x * ax.x + v.z * ax.z; bMin = Math.min(bMin, d); bMax = Math.max(bMax, d); }
+    let aMin = Infinity,
+      aMax = -Infinity;
+    for (const v of a) {
+      const d = v.x * ax.x + v.z * ax.z;
+      aMin = Math.min(aMin, d);
+      aMax = Math.max(aMax, d);
+    }
+    let bMin = Infinity,
+      bMax = -Infinity;
+    for (const v of b) {
+      const d = v.x * ax.x + v.z * ax.z;
+      bMin = Math.min(bMin, d);
+      bMax = Math.max(bMax, d);
+    }
     if (aMax <= bMin || bMax <= aMin) return false; // separating axis found
   }
   return true; // no separating axis → overlap
@@ -66,7 +76,11 @@ function convexPolygonsOverlap(
 const STEPS: StepDef[] = [
   { id: "terreno", label: "Terreno & rua", description: "Arestas e recuos" },
   { id: "perimetro", label: "Perímetro", description: "Muros e portões" },
-  { id: "programa", label: "Programa & Galpões", description: "Uso, dimensões e tipologia" },
+  {
+    id: "programa",
+    label: "Programa & Galpões",
+    description: "Uso, dimensões e tipologia",
+  },
   { id: "revisao", label: "Revisão", description: "Validar e gerar 3D" },
 ];
 
@@ -152,7 +166,9 @@ export default function BriefingClient({
   const [furthest, setFurthest] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [selectedBuildingId, setSelectedBuildingId] = useState<string | null>(null);
+  const [selectedBuildingId, setSelectedBuildingId] = useState<string | null>(
+    null,
+  );
   // Estado granular para o overlay de geração 3D — exibe etapa atual,
   // contagem de galpões finalizados e um pulso por SSE chunk recebido.
   const [genProgress, setGenProgress] = useState<{
@@ -236,7 +252,10 @@ export default function BriefingClient({
   );
 
   const buildableAreaM2 = useMemo(
-    () => (buildableRegion && buildableRegion.length >= 3 ? polygonAreaLocal(buildableRegion) : 0),
+    () =>
+      buildableRegion && buildableRegion.length >= 3
+        ? polygonAreaLocal(buildableRegion)
+        : 0,
     [buildableRegion],
   );
 
@@ -296,9 +315,20 @@ export default function BriefingClient({
       if (!buildable) {
         return {
           site: null,
-          report: { ok: false, issues: [{ severity: "error", code: "SETBACK_TOO_LARGE", message: "Recuos muito grandes — região construtível desaparece. Reduza os recuos." }] },
+          report: {
+            ok: false,
+            issues: [
+              {
+                severity: "error",
+                code: "SETBACK_TOO_LARGE",
+                message:
+                  "Recuos muito grandes — região construtível desaparece. Reduza os recuos.",
+              },
+            ],
+          },
           buildable: null,
-          error: "Recuos muito grandes para este terreno. Reduza os valores de recuo.",
+          error:
+            "Recuos muito grandes para este terreno. Reduza os valores de recuo.",
         };
       }
       const rotationRad = (state.rotationDeg * Math.PI) / 180;
@@ -357,7 +387,12 @@ export default function BriefingClient({
       // Collision check: SAT (Separating Axis Theorem) for convex polygons
       for (let a = 0; a < fit.placements.length && !fitError; a++) {
         for (let b2 = a + 1; b2 < fit.placements.length; b2++) {
-          if (convexPolygonsOverlap(fit.placements[a].footprintPolygon, fit.placements[b2].footprintPolygon)) {
+          if (
+            convexPolygonsOverlap(
+              fit.placements[a].footprintPolygon,
+              fit.placements[b2].footprintPolygon,
+            )
+          ) {
             fitError = `"${fit.placements[a].name}" e "${fit.placements[b2].name}" estão sobrepostos. Reduza a área, ajuste proporção ou mova os galpões.`;
           }
         }
@@ -591,9 +626,7 @@ export default function BriefingClient({
               {areaM2.toLocaleString("pt-BR", { maximumFractionDigits: 0 })} m²
             </span>
           </div>
-          {terrainAddress && (
-            <p className="text-sm muted">{terrainAddress}</p>
-          )}
+          {terrainAddress && <p className="text-sm muted">{terrainAddress}</p>}
         </div>
         <button
           type="button"
@@ -668,38 +701,42 @@ export default function BriefingClient({
               buildableAreaM2={buildableAreaM2}
               maxQty={maxQty}
               rotationDeg={state.rotationDeg}
-              onRotation={(deg) => setState((s) => ({ ...s, rotationDeg: deg }))}
+              onRotation={(deg) =>
+                setState((s) => ({ ...s, rotationDeg: deg }))
+              }
               clearHeight={state.clearHeight}
               onClearHeight={(v) => setState((s) => ({ ...s, clearHeight: v }))}
               gapM={state.gapM}
               onGap={(v) => setState((s) => ({ ...s, gapM: v }))}
             />
           )}
-          {step === 2 && candidate.site && candidate.site.buildings.length > 0 && (
-            <BuildingList
-              buildings={candidate.site.buildings}
-              overrides={state.buildingOverrides}
-              selectedId={selectedBuildingId}
-              onSelect={setSelectedBuildingId}
-              onOverride={(id, patch) =>
-                setState((s) => {
-                  const prev = s.buildingOverrides[id] ?? { dx: 0, dz: 0 };
-                  return {
-                    ...s,
-                    buildingOverrides: {
-                      ...s.buildingOverrides,
-                      [id]: { ...prev, ...patch },
-                    },
-                  };
-                })
-              }
-              onResetAll={() => {
-                setState((s) => ({ ...s, buildingOverrides: {} }));
-                setSelectedBuildingId(null);
-              }}
-              maxTargetArea={maxTargetArea}
-            />
-          )}
+          {step === 2 &&
+            candidate.site &&
+            candidate.site.buildings.length > 0 && (
+              <BuildingList
+                buildings={candidate.site.buildings}
+                overrides={state.buildingOverrides}
+                selectedId={selectedBuildingId}
+                onSelect={setSelectedBuildingId}
+                onOverride={(id, patch) =>
+                  setState((s) => {
+                    const prev = s.buildingOverrides[id] ?? { dx: 0, dz: 0 };
+                    return {
+                      ...s,
+                      buildingOverrides: {
+                        ...s.buildingOverrides,
+                        [id]: { ...prev, ...patch },
+                      },
+                    };
+                  })
+                }
+                onResetAll={() => {
+                  setState((s) => ({ ...s, buildingOverrides: {} }));
+                  setSelectedBuildingId(null);
+                }}
+                maxTargetArea={maxTargetArea}
+              />
+            )}
           {step === 3 && (
             <StepReview report={candidate.report} error={candidate.error} />
           )}
@@ -721,7 +758,9 @@ export default function BriefingClient({
               Atualiza em tempo real conforme você edita o briefing.
             </span>
           </div>
-          <div className={`briefing-v2__map-wrap${candidate.error ? " briefing-v2__svg--error" : ""}`}>
+          <div
+            className={`briefing-v2__map-wrap${candidate.error ? " briefing-v2__svg--error" : ""}`}
+          >
             <LotPreviewMap
               polygon={polygon}
               lotRef={lot.ref}
@@ -730,14 +769,12 @@ export default function BriefingClient({
               streetEdges={state.streetEdges}
               buildable={candidate.buildable}
               setbacks={state.setbacks}
-              buildings={
-                (candidate.site?.buildings ?? []).map((b) => ({
-                  id: b.id,
-                  polygon: b.footprintPolygon,
-                  use: b.use,
-                  name: b.name,
-                }))
-              }
+              buildings={(candidate.site?.buildings ?? []).map((b) => ({
+                id: b.id,
+                polygon: b.footprintPolygon,
+                use: b.use,
+                name: b.name,
+              }))}
               gates={candidate.site?.gates ?? []}
               hasFitError={Boolean(candidate.error)}
               clearHeight={state.clearHeight}
@@ -757,9 +794,7 @@ export default function BriefingClient({
                       }))
                   : undefined
               }
-              onBuildingSelect={
-                step === 2 ? setSelectedBuildingId : undefined
-              }
+              onBuildingSelect={step === 2 ? setSelectedBuildingId : undefined}
               selectedBuildingId={step === 2 ? selectedBuildingId : undefined}
             />
           </div>
@@ -805,7 +840,11 @@ export default function BriefingClient({
           className="btn btn--ghost"
           onClick={() => {
             if (step === 0) {
-              if (window.confirm("Tem certeza que deseja sair do briefing? Alterações não salvas serão perdidas.")) {
+              if (
+                window.confirm(
+                  "Tem certeza que deseja sair do briefing? Alterações não salvas serão perdidas.",
+                )
+              ) {
                 router.push(`/terrenos/${terrainId}`);
               }
             } else {
@@ -824,7 +863,12 @@ export default function BriefingClient({
             type="button"
             className="btn btn--accept"
             onClick={handleGenerate}
-            disabled={submitting || !candidate.report.ok || !candidate.site || Boolean(candidate.error)}
+            disabled={
+              submitting ||
+              !candidate.report.ok ||
+              !candidate.site ||
+              Boolean(candidate.error)
+            }
             title={
               candidate.error
                 ? candidate.error
@@ -881,8 +925,7 @@ function GenerateOverlay({
         return 0;
     }
   })();
-  const indeterminate =
-    progress.stage === "generating" && progress.done === 0;
+  const indeterminate = progress.stage === "generating" && progress.done === 0;
   return (
     <div
       className="gen-overlay"
@@ -892,7 +935,14 @@ function GenerateOverlay({
     >
       <div className="gen-overlay__card">
         <div className="gen-overlay__icon" aria-hidden="true">
-          <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            viewBox="0 0 64 64"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <path d="M32 6 L58 20 L58 44 L32 58 L6 44 L6 20 Z" />
             <path d="M6 20 L32 34 L58 20" />
             <path d="M32 34 L32 58" />
@@ -923,9 +973,7 @@ function GenerateOverlay({
         <ul className="gen-overlay__steps">
           <Stage
             active={progress.stage === "preparing"}
-            done={
-              progress.stage !== "preparing" && progress.stage !== "error"
-            }
+            done={progress.stage !== "preparing" && progress.stage !== "error"}
             label="Validar briefing"
           />
           <Stage
@@ -951,8 +999,8 @@ function GenerateOverlay({
           />
         </ul>
         <p className="gen-overlay__hint">
-          Isso costuma levar de 10 s a 1 min — não feche a aba enquanto o
-          modelo está sendo construído.
+          Isso costuma levar de 10 s a 1 min — não feche a aba enquanto o modelo
+          está sendo construído.
         </p>
       </div>
     </div>
@@ -1117,7 +1165,7 @@ function StepProgram({
       <div className="briefing-v2__field">
         <span>Padrão construtivo</span>
         <div className="briefing-v2__seg" role="group">
-          {([ "economico", "medio", "alto"] as const).map((s) => (
+          {(["economico", "medio", "alto"] as const).map((s) => (
             <button
               key={s}
               type="button"
@@ -1146,7 +1194,11 @@ function StepTerrain({
   onToggleEdge: (idx: number) => void;
   onSetbacks: (sb: { front: number; sides: number; back: number }) => void;
 }) {
-  const labels = { front: "frontal", sides: "laterais", back: "fundos" } as const;
+  const labels = {
+    front: "frontal",
+    sides: "laterais",
+    back: "fundos",
+  } as const;
   return (
     <div className="briefing-v2__fields">
       <div className="briefing-v2__field">
@@ -1278,7 +1330,14 @@ function BuildingList({
 }) {
   if (buildings.length === 0) return null;
   const hasAnyOverride = Object.values(overrides).some(
-    (o) => o.dx !== 0 || o.dz !== 0 || o.use || o.targetAreaM2 || o.name || o.rotationDeg || o.aspectRatio,
+    (o) =>
+      o.dx !== 0 ||
+      o.dz !== 0 ||
+      o.use ||
+      o.targetAreaM2 ||
+      o.name ||
+      o.rotationDeg ||
+      o.aspectRatio,
   );
   return (
     <div className="briefing-v2__building-list">
@@ -1304,9 +1363,7 @@ function BuildingList({
             className={`briefing-v2__building-card${isSelected ? " selected" : ""}`}
           >
             <div className="briefing-v2__building-card-header">
-              <span className="briefing-v2__building-card-name">
-                {b.name}
-              </span>
+              <span className="briefing-v2__building-card-name">{b.name}</span>
               {hasMoved && (
                 <span className="briefing-v2__building-card-badge">movido</span>
               )}
@@ -1350,7 +1407,10 @@ function BuildingList({
                   <span className="briefing-v2__field-label">
                     Área alvo
                     <span className="briefing-v2__field-value">
-                      {(ov?.targetAreaM2 ?? b.targetAreaM2).toLocaleString("pt-BR")} m²
+                      {(ov?.targetAreaM2 ?? b.targetAreaM2).toLocaleString(
+                        "pt-BR",
+                      )}{" "}
+                      m²
                     </span>
                   </span>
                   <input
@@ -1372,8 +1432,8 @@ function BuildingList({
                         ? "Profundo"
                         : (ov?.aspectRatio ?? 1) > 1.05
                           ? "Largo"
-                          : "Quadrado"}
-                      {" "}({(ov?.aspectRatio ?? 1).toFixed(1)})
+                          : "Quadrado"}{" "}
+                      ({(ov?.aspectRatio ?? 1).toFixed(1)})
                     </span>
                   </span>
                   <input
@@ -1390,7 +1450,9 @@ function BuildingList({
                 <label className="briefing-v2__field">
                   <span className="briefing-v2__field-label">
                     Rotação individual
-                    <span className="briefing-v2__field-value">{ov?.rotationDeg ?? 0}°</span>
+                    <span className="briefing-v2__field-value">
+                      {ov?.rotationDeg ?? 0}°
+                    </span>
                   </span>
                   <input
                     type="range"

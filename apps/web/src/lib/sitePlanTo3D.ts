@@ -575,11 +575,7 @@ function addSteelFrame(
       addNamedBox(
         parent,
         [braceLen, 0.14, 0.12],
-        [
-          dir * (halfW - braceLen * 0.55),
-          eaveHeight - braceLen * 0.4,
-          z,
-        ],
+        [dir * (halfW - braceLen * 0.55), eaveHeight - braceLen * 0.4, z],
         MAT_BEAM,
         `truss:${id}:b${i}:knee${dir > 0 ? "R" : "L"}`,
         dir * (Math.PI / 4),

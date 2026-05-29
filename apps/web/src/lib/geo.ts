@@ -466,10 +466,7 @@ export function gridSamples(polygon: LngLat[], n: number): GridSampling {
 }
 
 /** Resolve sistema linear 3×3 (regra de Cramer). Retorna null se singular. */
-function solve3x3(
-  m: number[][],
-  v: number[],
-): [number, number, number] | null {
+function solve3x3(m: number[][], v: number[]): [number, number, number] | null {
   const det = (a: number[][]) =>
     a[0][0] * (a[1][1] * a[2][2] - a[1][2] * a[2][1]) -
     a[0][1] * (a[1][0] * a[2][2] - a[1][2] * a[2][0]) +
