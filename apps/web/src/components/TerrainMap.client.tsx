@@ -96,8 +96,10 @@ interface Props {
   initialCenter?: LngLat;
   editable?: boolean;
   onChange?: (polygon: LngLat[], areaM2: number, errors?: string[]) => void;
-  /** Recebe endereço quando o usuário busca ou quando a forma fecha (reverse-geocoding). */
-  onAddressResolved?: (address: string) => void;
+  /** Recebe endereço quando o usuário busca (`source: "search"`) ou quando a
+   *  forma fecha (reverse-geocoding, `source: "reverse"`). A origem permite ao
+   *  consumidor priorizar o endereço buscado e nunca sobrescrevê-lo. */
+  onAddressResolved?: (address: string, source: "search" | "reverse") => void;
   /** Recebe os componentes estruturados (UF, cidade, bairro) — usados para
    *  alimentar tabelas paramétricas (SINAPI/CUB) por estado. */
   onLocationResolved?: (loc: ResolvedLocation) => void;
@@ -236,7 +238,8 @@ export default function TerrainMapClient({
             | null,
         ) => {
           const first = data?.[0];
-          if (first?.displayName) onAddressResolved?.(first.displayName);
+          if (first?.displayName)
+            onAddressResolved?.(first.displayName, "reverse");
           if (first?.address)
             onLocationResolved?.(parseNominatimAddress(first.address));
         },
@@ -334,7 +337,8 @@ export default function TerrainMapClient({
       }[];
       if (data[0]) {
         setSearchTarget([parseFloat(data[0].lon), parseFloat(data[0].lat)]);
-        if (data[0].displayName) onAddressResolved?.(data[0].displayName);
+        if (data[0].displayName)
+          onAddressResolved?.(data[0].displayName, "search");
         if (data[0].address)
           onLocationResolved?.(parseNominatimAddress(data[0].address));
       } else {

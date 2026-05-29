@@ -2,6 +2,7 @@ import Link from "next/link";
 import { prisma } from "@sfg/db";
 import { TerrainsExplorer } from "@/components/TerrainsExplorer";
 import { Breadcrumb } from "@/components/Breadcrumb";
+import { summarizeBuildingCost } from "@/lib/buildingCost";
 
 export const dynamic = "force-dynamic";
 
@@ -12,25 +13,18 @@ export default async function HomePage() {
   });
 
   const totalArea = terrains.reduce((s, t) => s + t.areaM2, 0);
-  const totalCost = terrains.reduce(
-    (s, t) =>
-      s +
-      t.buildings.reduce((bs, b) => {
-        const m = b.model as { estimate?: { totalCost?: number } } | null;
-        return bs + (m?.estimate?.totalCost ?? 0);
-      }, 0),
-    0,
+  const { totalCost, totalCovered } = terrains.reduce(
+    (acc, t) => {
+      for (const b of t.buildings) {
+        const { cost, covered } = summarizeBuildingCost(b.model);
+        acc.totalCost += cost;
+        acc.totalCovered += covered;
+      }
+      return acc;
+    },
+    { totalCost: 0, totalCovered: 0 },
   );
   const totalBuildings = terrains.reduce((s, t) => s + t.buildings.length, 0);
-  const totalCovered = terrains.reduce(
-    (s, t) =>
-      s +
-      t.buildings.reduce((bs, b) => {
-        const m = b.model as { estimate?: { coveredAreaM2?: number } } | null;
-        return bs + (m?.estimate?.coveredAreaM2 ?? 0);
-      }, 0),
-    0,
-  );
   const avgPerM2 = totalCovered > 0 ? Math.round(totalCost / totalCovered) : 0;
 
   const viaveis = terrains.filter((t) => t.buildings.length > 0).length;

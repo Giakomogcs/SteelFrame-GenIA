@@ -7,6 +7,7 @@ import { Breadcrumb } from "@/components/Breadcrumb";
 import BuildingsGallery from "@/components/BuildingsGallery";
 import ReliefPanel from "@/components/ReliefPanel";
 import type { LngLat } from "@/lib/geo";
+import { summarizeBuildingCost } from "@/lib/buildingCost";
 
 export const dynamic = "force-dynamic";
 
@@ -23,14 +24,15 @@ export default async function TerrainPage({
 
   const polygon = terrain.polygon as unknown as LngLat[];
   const shortId = terrain.id.slice(-6).toUpperCase();
-  const buildingsTotalCost = terrain.buildings.reduce((s, b) => {
-    const m = b.model as { estimate?: { totalCost?: number } } | null;
-    return s + (m?.estimate?.totalCost ?? 0);
-  }, 0);
-  const coveredArea = terrain.buildings.reduce((s, b) => {
-    const m = b.model as { estimate?: { coveredAreaM2?: number } } | null;
-    return s + (m?.estimate?.coveredAreaM2 ?? 0);
-  }, 0);
+  const { buildingsTotalCost, coveredArea } = terrain.buildings.reduce(
+    (acc, b) => {
+      const { cost, covered } = summarizeBuildingCost(b.model);
+      acc.buildingsTotalCost += cost;
+      acc.coveredArea += covered;
+      return acc;
+    },
+    { buildingsTotalCost: 0, coveredArea: 0 },
+  );
 
   return (
     <>

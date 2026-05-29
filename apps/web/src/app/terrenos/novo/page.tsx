@@ -14,6 +14,10 @@ export default function NewTerrainPage() {
   const [name, setName] = useState("");
   const [nameTouched, setNameTouched] = useState(false);
   const [address, setAddress] = useState("");
+  /** True depois que o usuário usa "Buscar endereço". A partir daí o
+   *  reverse-geocoding (ao fechar o polígono) não sobrescreve mais o nome/
+   *  endereço definidos pela busca. */
+  const [addressFromSearch, setAddressFromSearch] = useState(false);
   const [location, setLocation] = useState<ResolvedLocation | null>(null);
   const [polygon, setPolygon] = useState<LngLat[]>([]);
   const [area, setArea] = useState(0);
@@ -23,8 +27,12 @@ export default function NewTerrainPage() {
 
   /** Quando o mapa resolve um endereço (busca ou reverse-geocoding), preenche
    *  o campo de endereço e — se o usuário ainda não tocou no nome — deriva
-   *  um nome curto a partir das duas primeiras partes (ex.: "Rua X, 123 · Bairro"). */
-  function handleAddressResolved(full: string) {
+   *  um nome curto a partir das duas primeiras partes (ex.: "Rua X, 123 · Bairro").
+   *  O endereço vindo da busca tem prioridade: o reverse-geocoding nunca
+   *  sobrescreve o nome/endereço que o usuário definiu ao buscar. */
+  function handleAddressResolved(full: string, source: "search" | "reverse") {
+    if (source === "reverse" && addressFromSearch) return;
+    if (source === "search") setAddressFromSearch(true);
     setAddress(full);
     if (!nameTouched) {
       const parts = full

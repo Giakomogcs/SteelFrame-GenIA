@@ -5424,9 +5424,19 @@ textarea {
   width: 172px;
   overflow-y: auto;
   overflow-x: hidden;
+  /* Reserva o espaço da barra dentro do padding-box: a div se ajusta ao
+     scrollbar em vez de deixá-lo vazar por cima da borda arredondada. */
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-stroke) transparent;
 }
 .viewer-3d__layer-rail::-webkit-scrollbar {
   width: 6px;
+}
+.viewer-3d__layer-rail::-webkit-scrollbar-track {
+  /* Mantém a barra longe dos cantos arredondados do painel. */
+  margin: 8px 0;
+  background: transparent;
 }
 .viewer-3d__layer-rail::-webkit-scrollbar-thumb {
   background: var(--color-stroke);
